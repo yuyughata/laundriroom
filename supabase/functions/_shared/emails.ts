@@ -329,6 +329,20 @@ export const EMAIL_TEMPLATES: Record<string, (ctx: EmailContext) => { subject: s
     ],
     button: { label: "Reply", url: String(ctx.ticket_url ?? "#"), tone: "ink" },
   }),
+
+  // ── Support reply (to the customer) ──────────────────────────────────────
+  ticket_reply: (ctx) => build(`Support replied to your ticket #${c(ctx, "ticket_number")}`, {
+    preheader: "We've replied to your support request",
+    heading: "We've replied",
+    accent: TEAL,
+    paragraphs: [
+      `Hi ${c(ctx, "customer_name", "there")}, our support team replied to your ticket <strong>#${c(ctx, "ticket_number")} · ${c(ctx, "subject")}</strong>.`,
+      ctx.message_excerpt ? `“${c(ctx, "message_excerpt")}”` : "",
+    ].filter(Boolean),
+    rows: [{ label: "Status", value: String(ctx.ticket_status ?? "—") }],
+    button: { label: "View and reply", url: String(ctx.customer_ticket_url ?? "#"), tone: "ink" },
+    note: "Reply in the app so the whole conversation stays in one place.",
+  }),
 };
 
 function build(subject: string, b: Block) {

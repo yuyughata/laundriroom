@@ -11,7 +11,8 @@
 //   order_id  → order events; recipients from the rule ('customer', 'admin')
 //   user_id   → account events, sent to that account holder
 //   ticket_id → support events; ticket details are read from the database
-// Recipient 'admin' = every active platform_admin and support_agent.
+// Recipient 'admin' = every active platform_admin and support_agent;
+// 'customer' = the order's or the ticket's customer.
 //
 // Secrets: RESEND_API_KEY (email), WHATSAPP_API_TOKEN (+ phone number ID on
 // Admin → Integrations, or WHATSAPP_PHONE_ID), SITE_URL for links.
@@ -55,12 +56,14 @@ Deno.serve(async (req: Request) => {
 
   // Shared variables for the templates, then who gets the message.
   const base: Record<string, string> = {};
-  if (ticket_id) Object.assign(base, await ticketVars(db, ticket_id, SITE));
+  // A support reply quotes the latest support message; other ticket events
+  // quote the customer's latest message.
+  if (ticket_id) Object.assign(base, await ticketVars(db, ticket_id, SITE, event === "ticket_reply"));
   if (order_id) Object.assign(base, await orderVars(db, order_id));
 
   const recipients: Recipient[] = user_id
     ? await resolveUser(db, user_id)
-    : await resolveRecipients(db, order_id, rule.recipients ?? []);
+    : await resolveRecipients(db, order_id, ticket_id, rule.recipients ?? []);
 
   const results: any[] = [];
   for (const channel of rule.channels as Channel[]) {
@@ -121,10 +124,17 @@ async function resolveAdmins(db: any): Promise<Recipient[]> {
   }));
 }
 
-async function resolveRecipients(db: any, orderId: string | null, roles: string[]): Promise<Recipient[]> {
+async function resolveRecipients(
+  db: any, orderId: string | null, ticketId: string | null, roles: string[],
+): Promise<Recipient[]> {
   const out: Recipient[] = [];
   if (roles.includes("admin")) out.push(...await resolveAdmins(db));
-  if (orderId && roles.includes("customer")) {
+  if (ticketId && roles.includes("customer")) {
+    const { data: t } = await db.from("support_tickets")
+      .select("customer:customer_id(email, phone, full_name)").eq("id", ticketId).maybeSingle();
+    const c = t?.customer;
+    if (c) out.push({ email: c.email ?? null, phone: c.phone ?? null, vars: { customer_name: c.full_name ?? "" } });
+  } else if (orderId && roles.includes("customer")) {
     const { data: order } = await db.from("orders")
       .select("customer:customer_id(email, phone, full_name)").eq("id", orderId).maybeSingle();
     const c = order?.customer;
@@ -142,13 +152,13 @@ async function orderVars(db: any, orderId: string): Promise<Record<string, strin
 }
 
 /** Ticket details come from the database, never from the caller. */
-async function ticketVars(db: any, ticketId: string, site: string): Promise<Record<string, string>> {
+async function ticketVars(db: any, ticketId: string, site: string, fromSupport = false): Promise<Record<string, string>> {
   const { data: t } = await db.from("support_tickets")
     .select("id, number, subject, category, subcategory, other_text, status, customer:customer_id(full_name, email, phone), order:order_id(code)")
     .eq("id", ticketId).maybeSingle();
   if (!t) return {};
   const { data: last } = await db.from("support_messages").select("body")
-    .eq("ticket_id", ticketId).eq("from_support", false)
+    .eq("ticket_id", ticketId).eq("from_support", fromSupport)
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   const excerpt = String(last?.body ?? "").replace(/\s+/g, " ").trim();
   return {
@@ -162,6 +172,7 @@ async function ticketVars(db: any, ticketId: string, site: string): Promise<Reco
     order_code: t.order?.code ?? "",
     message_excerpt: excerpt.length > 280 ? excerpt.slice(0, 277) + "…" : excerpt,
     ticket_url: `${site}/admin/support/${t.id}`,
+    customer_ticket_url: `${site}/customer/support/${t.id}`,
   };
 }
 

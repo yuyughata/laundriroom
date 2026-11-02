@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { notifyTicket } from "@/lib/notify";
 import type { TicketStatus } from "@/lib/database.types";
 
 async function requireSupport() {
@@ -30,6 +31,7 @@ export async function replyTicket(ticketId: string, body: string) {
     .update({ status: "in_progress" } as never)
     .eq("id", ticketId).eq("status", "open");
 
+  await notifyTicket("ticket_reply", ticketId);
   revalidatePath(`/admin/support/${ticketId}`);
   return { ok: true };
 }

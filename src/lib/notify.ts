@@ -35,11 +35,12 @@ export async function notifyUser(event: AccountEvent, userId: string, context: R
 }
 
 /**
- * Alert admins & support agents about a support ticket (email + WhatsApp per
- * the rule on Admin → Communications). The edge function reads the ticket
- * itself, so only the id is sent.
+ * Support ticket notifications (email + WhatsApp per the rule on Admin →
+ * Communications): ticket_opened / ticket_message alert admins & support
+ * agents; ticket_reply tells the customer support has replied. The edge
+ * function reads the ticket itself, so only the id is sent.
  */
-export async function notifyTicket(event: "ticket_opened" | "ticket_message", ticketId: string) {
+export async function notifyTicket(event: "ticket_opened" | "ticket_message" | "ticket_reply", ticketId: string) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return;

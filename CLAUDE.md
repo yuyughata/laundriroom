@@ -146,8 +146,10 @@ on order close.
   rule recipient `admin` = every active platform_admin + support_agent (email,
   and `profiles.phone` for WhatsApp). Support tickets alert admins:
   `ticket_opened` / `ticket_message` (`0023`/`0024`) fired from
-  `customer/support/actions.ts` via `notifyTicket`; ticket details are read
-  from the DB, not trusted from the caller. WhatsApp needs the
+  `customer/support/actions.ts` via `notifyTicket`; support replies notify the
+  customer by email + WhatsApp (`ticket_reply`, `0025`/`0026`, fired from
+  `admin/support/actions.ts → replyTicket`). Ticket details are read from the
+  DB, not trusted from the caller. WhatsApp needs the
   `WHATSAPP_API_TOKEN` secret, the phone number ID and an approved template
   (one body variable `{{1}}`) set on Admin → Integrations. Email uses designed Ink &
   Ivory HTML templates in `src/lib/emails.ts` (one per event), mirrored to
@@ -165,7 +167,6 @@ on order close.
 ## Good next tasks
 
 - Implement the SMS adapter in `send-notification`.
-- Notify the customer when support replies to their ticket.
 - Call `send-notification` from the app/DB on key events (order confirmed,
   ready, payment received).
 - Invoice PDF generation + the `invoices` storage bucket.

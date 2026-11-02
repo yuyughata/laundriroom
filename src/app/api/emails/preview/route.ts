@@ -36,6 +36,7 @@ const SAMPLE: EmailContext = {
   message_excerpt: "Hi, I dropped off 6 items yesterday including an agbada for an event on Saturday. Will it be ready by Friday evening?",
   ticket_status: "In progress",
   ticket_url: "#",
+  customer_ticket_url: "#",
 };
 
 const LABEL: Record<string, string> = {
@@ -49,6 +50,7 @@ const LABEL: Record<string, string> = {
   password_changed: "Password changed", account_updated: "Account details updated",
   account_suspended: "Account suspended", account_reactivated: "Account reactivated",
   ticket_opened: "New support ticket (admins)", ticket_message: "Customer replied on ticket (admins)",
+  ticket_reply: "Support replied (customer)",
 };
 
 /** Admin-only preview of the email templates with sample data. */
