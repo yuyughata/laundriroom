@@ -32,12 +32,19 @@ Deno.serve(async (req: Request) => {
   });
   const verify = await vr.json();
   if (verify?.data?.status !== "successful") return new Response("not successful", { status: 200 });
+  // The verified transaction must be this payment's, in NGN, for the full amount.
+  if (verify.data.tx_ref !== txRef || verify.data.currency !== "NGN") {
+    return new Response("reference mismatch", { status: 200 });
+  }
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
   const { data: payment } = await db
-    .from("payments").select("id, status").eq("reference", txRef).maybeSingle();
+    .from("payments").select("id, status, amount").eq("reference", txRef).maybeSingle();
   if (!payment) return new Response("payment not found", { status: 200 });
   if ((payment as any).status === "succeeded") return new Response("already processed", { status: 200 });
+  if (Number(verify.data.amount) < Number((payment as any).amount)) {
+    return new Response("amount short", { status: 200 });
+  }
 
   await db.from("payments")
     .update({ status: "succeeded", paid_at: new Date().toISOString() })

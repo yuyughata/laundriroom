@@ -35,7 +35,7 @@ npm run setup     # should print "Ready."
 ### Option A — Supabase dashboard (no CLI)
 
 Open **SQL Editor** and run each file in `supabase/migrations/` **in order**
-(0001 → 0006), then `supabase/seed.sql` if you want demo data. Paste the
+(0001 onward, in number order), then `supabase/seed.sql` if you want demo data. Paste the
 contents of each file and run it.
 
 ### Option B — Supabase CLI (recommended)
@@ -48,7 +48,7 @@ supabase db push                                  # applies supabase/migrations 
 psql "$(supabase db url)" -f supabase/seed.sql
 ```
 
-After this you have 23 tables, all RLS policies, the default commission plan,
+After this you have every table, all RLS policies, the default commission plan,
 the global item catalogue, notification rules + templates, and the three
 integration rows (all "not configured").
 
@@ -102,13 +102,18 @@ buckets.
 4. In the app, set `PAYSTACK_SECRET_KEY` in the server env too (so the
    "Pay now" action hands off to Paystack instead of the dev simulator).
 
-**Without Paystack keys** the "Pay now" button still works in development: it
-records a succeeded payment using the service-role key so you can watch the
-order close and the payout get scheduled.
+**Without Paystack keys** the "Pay now" button still works under `npm run dev`:
+it records a succeeded payment using the service-role key so you can watch the
+order close and the payout get scheduled. A deployed (production) build refuses
+to simulate unless you set `ALLOW_SIMULATED_PAYMENTS=true` — use that only on
+staging. With a key set, a failed hand-off shows an error; it never falls back
+to the simulator.
 
 ## 8. Notifications (Resend / WhatsApp / SMS)
 
-1. Deploy the function: `supabase functions deploy send-notification`.
+1. Deploy the function: `supabase functions deploy send-notification`. It only
+   accepts server-to-server calls carrying
+   `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`.
 2. For email, set `RESEND_API_KEY` as a function secret and add your sender
    domain in Resend.
 3. In the app: **Admin → Integrations**, connect each provider. Status flips to
@@ -167,10 +172,10 @@ dashboard (Settings → Preferences → disable "OTP for transfers"), or via the
 
 **3. Deploy the functions and set secrets:**
 ```bash
-supabase functions deploy process-payouts
+supabase functions deploy process-payouts --no-verify-jwt   # checks CRON_SECRET itself
 supabase functions deploy paystack-webhook --no-verify-jwt
 supabase secrets set PAYSTACK_SECRET_KEY=sk_live_xxx
-supabase secrets set CRON_SECRET=$(openssl rand -hex 16)   # protects process-payouts
+supabase secrets set CRON_SECRET=$(openssl rand -hex 16)   # required: process-payouts refuses to run without it
 ```
 
 **4. Point the Paystack webhook** (dashboard → Settings → API Keys & Webhooks)

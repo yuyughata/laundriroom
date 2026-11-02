@@ -5,7 +5,8 @@
 // dispatches on each active channel via an adapter. SMS is fully wired but only
 // fires once its provider is connected (integration_settings.status).
 //
-// Call it from the app (or a DB webhook) with { event, order_id, context }.
+// Call it from server code (or a DB webhook) with { event, order_id, context }
+// and `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`; other callers get 401.
 // Deploy:  supabase functions deploy send-notification
 // ============================================================================
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -16,6 +17,13 @@ type Channel = "email" | "whatsapp" | "sms";
 Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // Server-to-server only: the caller must present the service-role key.
+  // Otherwise anyone holding the public anon key could make us email customers.
+  if (req.headers.get("Authorization") !== `Bearer ${SERVICE_KEY}`) {
+    return json({ error: "unauthorized" }, 401);
+  }
+
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
   const { event, order_id, context = {} } = await req.json().catch(() => ({}));

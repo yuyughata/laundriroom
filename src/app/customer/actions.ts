@@ -136,11 +136,15 @@ export async function submitReview(orderId: string, vendorId: string, rating: nu
 }
 
 /**
- * Pay now. In production this creates a Paystack transaction (edge function
- * `create-payment`) and redirects to the Paystack checkout; the webhook then
- * marks the payment succeeded. For local development without Paystack keys,
- * this uses the service client to record a succeeded payment directly so the
- * full flow (close order → schedule payout) can be exercised end to end.
+ * Pay now. With a payment key configured this creates a transaction through
+ * the `create-payment` edge function and redirects to the provider's checkout;
+ * the webhook then marks the payment succeeded. If that hand-off fails we show
+ * an error — never fall through to the simulator, or the order would be
+ * marked paid for free.
+ *
+ * Without payment keys, local development (or ALLOW_SIMULATED_PAYMENTS=true)
+ * records a succeeded payment with the service client so the full flow
+ * (close order → schedule payout) can be exercised end to end.
  */
 export async function payNow(orderId: string) {
   const supabase = createClient();
@@ -154,17 +158,30 @@ export async function payNow(orderId: string) {
   // Production path: hand off to the payment edge function (returns a checkout URL).
   const fnUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-payment`;
   if (process.env.PAYSTACK_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY) {
-    // The edge function returns { authorization_url } — redirect the customer there.
+    // The edge function checks this token to confirm the caller owns the order,
+    // then returns { authorization_url } — redirect the customer there.
+    const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch(fnUrl, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${session?.access_token ?? ""}`,
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+      },
       body: JSON.stringify({ order_id: orderId }),
     }).catch(() => null);
-    const json = res && res.ok ? await res.json() : null;
-    if (json?.authorization_url) redirect(json.authorization_url as string);
+    const json = res ? await res.json().catch(() => null) : null;
+    if (res?.ok && json?.authorization_url) redirect(json.authorization_url as string);
+    return { error: "We couldn't start the payment. Please try again in a moment." };
   }
 
-  // Dev path: no Paystack keys → simulate a successful payment.
+  // Simulator: only when no payment provider is configured, and only in local
+  // development unless explicitly allowed (e.g. on a staging deploy).
+  const simulate =
+    process.env.NODE_ENV !== "production" || process.env.ALLOW_SIMULATED_PAYMENTS === "true";
+  if (!simulate) {
+    return { error: "Online payment isn't set up yet. Please contact support." };
+  }
   const service = createServiceClient();
   if (!service) {
     return {
