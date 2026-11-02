@@ -65,12 +65,11 @@ promote an admin → deploy edge functions → wire Paystack).
   non-collection penalty (% of delivery fee, admin-set) is added on reschedule
   when the customer was at fault (`apply_delivery_reschedule`). Everything
   lives on one page, Admin → Fees & charges (the old Plans & fees tab redirects
-  there): one platform-wide set of rates — commission (stored on the default
-  plan), express % and premium % (`platform_settings`) — plus delivery fee,
-  penalty and referral reward. An admin can override commission/express/premium
-  per vendor (`vendors.*_override`, `0022`; NULL = platform rate);
-  `recompute_order` and `schedule_payout_if_ready` use the override when set.
-  Vendors can't change their own rates/status/KYC (`guard_vendor_columns`).
+  there): one global set of rates for every vendor — commission (stored on the
+  default plan; `schedule_payout_if_ready` always uses it, `0022`), express %
+  and premium % (`platform_settings`) — plus delivery fee, penalty and
+  referral reward. There are deliberately no per-vendor rates. Vendors can't
+  change their own status/plan/KYC flag (`guard_vendor_columns`).
 - Server Components fetch; interactive bits are small client components calling
   server actions in each area's `actions.ts`.
 

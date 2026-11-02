@@ -124,7 +124,7 @@ export async function deleteExtra(id: string) {
 const pctOk = (n: number) => Number.isFinite(n) && n >= 0 && n <= 100;
 
 /**
- * The platform-wide rates every vendor uses unless an admin overrides them.
+ * The platform-wide rates — one set that applies to every vendor.
  * Inputs are percentages (15 = 15%); stored as fractions. Commission lives on
  * the default plan; express and premium markups in platform_settings (the
  * platform keeps those markups in full).
@@ -161,28 +161,6 @@ export async function setOtherCharges(penaltyPct: number, referralReward: number
     .eq("id", true);
   if (error) return { error: error.message };
   revalidatePath("/admin/fees");
-  return { ok: true };
-}
-
-/**
- * Override a vendor's commission / express / premium rates. Pass null for any
- * rate to use the platform rate. Inputs are percentages.
- */
-export async function setVendorRates(
-  vendorId: string, commissionPct: number | null, expressPct: number | null, premiumPct: number | null,
-) {
-  const vals = [commissionPct, expressPct, premiumPct];
-  if (!vals.every((v) => v === null || pctOk(v))) return { error: "Rates must be between 0 and 100%, or blank for the platform rate." };
-  const supabase = createClient();
-  const toFrac = (v: number | null) => (v === null ? null : v / 100);
-  const { error } = await supabase.from("vendors").update({
-    commission_rate_override: toFrac(commissionPct),
-    express_pct_override: toFrac(expressPct),
-    premium_pct_override: toFrac(premiumPct),
-  } as never).eq("id", vendorId);
-  if (error) return { error: error.message };
-  revalidatePath("/admin/fees");
-  revalidatePath("/admin/vendors");
   return { ok: true };
 }
 
