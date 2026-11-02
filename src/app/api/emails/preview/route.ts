@@ -27,6 +27,15 @@ const SAMPLE: EmailContext = {
   signin_url: "#",
   account_url: "#",
   support_url: "#",
+  admin_name: "Tola",
+  ticket_number: 1042,
+  subject: "When will my agbada be ready?",
+  category: "Order & delivery · Late delivery",
+  customer_email: "ada.obi@gmail.com",
+  customer_phone: "+234 810 333 0005",
+  message_excerpt: "Hi, I dropped off 6 items yesterday including an agbada for an event on Saturday. Will it be ready by Friday evening?",
+  ticket_status: "In progress",
+  ticket_url: "#",
 };
 
 const LABEL: Record<string, string> = {
@@ -39,6 +48,7 @@ const LABEL: Record<string, string> = {
   email_verification: "Email verification", email_verification_reminder: "Verification reminder",
   password_changed: "Password changed", account_updated: "Account details updated",
   account_suspended: "Account suspended", account_reactivated: "Account reactivated",
+  ticket_opened: "New support ticket (admins)", ticket_message: "Customer replied on ticket (admins)",
 };
 
 /** Admin-only preview of the email templates with sample data. */

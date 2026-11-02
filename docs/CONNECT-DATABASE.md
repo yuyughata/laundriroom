@@ -138,8 +138,21 @@ to the simulator.
    domain in Resend.
 3. In the app: **Admin → Integrations**, connect each provider. Status flips to
    "Connected"; SMS then appears as a channel on **Admin → Communications**.
-4. WhatsApp and SMS adapters are stubbed in `send-notification/index.ts` — drop
-   in your provider calls where marked.
+4. **WhatsApp** (Meta WhatsApp Cloud API) — used for order updates and to alert
+   admins about support tickets:
+   - In Meta Business → WhatsApp, note the **Phone number ID** and create a
+     permanent **access token** (System user with `whatsapp_business_messaging`).
+   - Create a **Utility** message template, e.g. `laundriroom_alert`, language
+     English, body: `laundriroom update: {{1}}`. Wait for approval. Every
+     WhatsApp message is sent inside it, with the text as `{{1}}` (Meta only
+     allows free-form text within 24 hours of the person messaging you).
+   - `supabase secrets set WHATSAPP_API_TOKEN=... SITE_URL=https://your-app`
+   - Admin → Integrations → WhatsApp: enter the phone number ID, the template
+     name and language code (`en`), and save so the status shows Connected.
+   - Admins and support agents get alerts on the phone number in their profile
+     (Admin → Users), so make sure it's a real WhatsApp number.
+5. SMS is stubbed in `send-notification/index.ts` — drop in your provider where
+   marked.
 
 ## 9. Deploy the app
 

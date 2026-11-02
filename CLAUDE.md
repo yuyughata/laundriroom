@@ -141,8 +141,15 @@ on order close.
   `transfer.failed`/`reversed` → back to `due` with a `failure_reason`. Needs
   Transfers enabled + OTP disabled on Paystack; test keys simulate the full path.
 - Messaging — `supabase/functions/send-notification` has the event→rule→channel
-  engine + a working Resend email adapter; WhatsApp and SMS adapters are marked
-  `not implemented` where to drop your provider in. Email uses designed Ink &
+  engine with working Resend email and WhatsApp Cloud API adapters (SMS is
+  marked `not implemented`). Payload `{ event, order_id | user_id | ticket_id }`;
+  rule recipient `admin` = every active platform_admin + support_agent (email,
+  and `profiles.phone` for WhatsApp). Support tickets alert admins:
+  `ticket_opened` / `ticket_message` (`0023`/`0024`) fired from
+  `customer/support/actions.ts` via `notifyTicket`; ticket details are read
+  from the DB, not trusted from the caller. WhatsApp needs the
+  `WHATSAPP_API_TOKEN` secret, the phone number ID and an approved template
+  (one body variable `{{1}}`) set on Admin → Integrations. Email uses designed Ink &
   Ivory HTML templates in `src/lib/emails.ts` (one per event), mirrored to
   `supabase/functions/_shared/emails.ts` (keep both in sync). Admins preview
   all templates at `/api/emails/preview`. Account emails (password changed,
@@ -157,7 +164,8 @@ on order close.
 
 ## Good next tasks
 
-- Implement the WhatsApp and SMS adapters in `send-notification`.
+- Implement the SMS adapter in `send-notification`.
+- Notify the customer when support replies to their ticket.
 - Call `send-notification` from the app/DB on key events (order confirmed,
   ready, payment received).
 - Invoice PDF generation + the `invoices` storage bucket.

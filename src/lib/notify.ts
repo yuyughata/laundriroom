@@ -33,3 +33,24 @@ export async function notifyUser(event: AccountEvent, userId: string, context: R
     // best-effort
   }
 }
+
+/**
+ * Alert admins & support agents about a support ticket (email + WhatsApp per
+ * the rule on Admin → Communications). The edge function reads the ticket
+ * itself, so only the id is sent.
+ */
+export async function notifyTicket(event: "ticket_opened" | "ticket_message", ticketId: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+  try {
+    await fetch(`${url}/functions/v1/send-notification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+      body: JSON.stringify({ event, ticket_id: ticketId }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // best-effort
+  }
+}

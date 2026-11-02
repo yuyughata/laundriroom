@@ -296,6 +296,39 @@ export const EMAIL_TEMPLATES: Record<string, (ctx: EmailContext) => { subject: s
     paragraphs: [`Hi ${c(ctx, "customer_name", "there")}, your laundriroom account has been reactivated. You can sign in and order as usual.`],
     button: { label: "Sign in", url: String(ctx.signin_url ?? "#"), tone: "ink" },
   }),
+
+  // ── Support alerts (to admins & support agents) ─────────────────────────
+  ticket_opened: (ctx) => build(`New ticket #${c(ctx, "ticket_number")} — ${c(ctx, "subject")}`, {
+    preheader: `${c(ctx, "customer_name", "A customer")} needs help`,
+    heading: "New support ticket",
+    accent: WARN,
+    paragraphs: [
+      `Hi ${c(ctx, "admin_name", "there")}, <strong>${c(ctx, "customer_name", "A customer")}</strong> opened a support ticket.`,
+      ctx.message_excerpt ? `“${c(ctx, "message_excerpt")}”` : "",
+    ].filter(Boolean),
+    rows: [
+      { label: "Ticket", value: `#${ctx.ticket_number ?? "—"}` },
+      { label: "Subject", value: String(ctx.subject ?? "—") },
+      { label: "Category", value: String(ctx.category ?? "—") },
+      ...(ctx.order_code ? [{ label: "Order", value: String(ctx.order_code) }] : []),
+      { label: "Customer", value: [ctx.customer_email, ctx.customer_phone].filter(Boolean).join(" · ") || "—" },
+    ],
+    button: { label: "Open ticket", url: String(ctx.ticket_url ?? "#"), tone: "ink" },
+  }),
+
+  ticket_message: (ctx) => build(`New reply on ticket #${c(ctx, "ticket_number")} — ${c(ctx, "subject")}`, {
+    preheader: `${c(ctx, "customer_name", "The customer")} replied`,
+    heading: "Customer replied",
+    paragraphs: [
+      `Hi ${c(ctx, "admin_name", "there")}, <strong>${c(ctx, "customer_name", "The customer")}</strong> replied on ticket #${c(ctx, "ticket_number")}.`,
+      ctx.message_excerpt ? `“${c(ctx, "message_excerpt")}”` : "",
+    ].filter(Boolean),
+    rows: [
+      { label: "Subject", value: String(ctx.subject ?? "—") },
+      { label: "Status", value: String(ctx.ticket_status ?? "—") },
+    ],
+    button: { label: "Reply", url: String(ctx.ticket_url ?? "#"), tone: "ink" },
+  }),
 };
 
 function build(subject: string, b: Block) {

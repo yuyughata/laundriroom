@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { notifyTicket } from "@/lib/notify";
 
 /** Customer opens a support ticket (with its first message). */
 export async function createTicket(formData: FormData) {
@@ -36,6 +37,7 @@ export async function createTicket(formData: FormData) {
     .insert({ ticket_id: ticket.id, author_id: user.id, from_support: false, body: message } as never);
   if (msgErr) return { error: msgErr.message };
 
+  await notifyTicket("ticket_opened", ticket.id);
   revalidatePath("/customer/support");
   redirect(`/customer/support/${ticket.id}`);
 }
@@ -51,6 +53,7 @@ export async function addCustomerMessage(ticketId: string, body: string) {
     .from("support_messages")
     .insert({ ticket_id: ticketId, author_id: user.id, from_support: false, body: body.trim() } as never);
   if (error) return { error: error.message };
+  await notifyTicket("ticket_message", ticketId);
   revalidatePath(`/customer/support/${ticketId}`);
   return { ok: true };
 }
