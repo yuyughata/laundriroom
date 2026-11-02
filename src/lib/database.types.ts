@@ -95,6 +95,7 @@ export type Order = {
   items_total: number; extras_total: number; bulk_discount: number; total: number;
   handover_code: string | null; pickup_code: string | null; picked_up_at: string | null;
   dispatch_reference: string | null; rider_name: string | null; rider_phone: string | null;
+  created_by: string | null;
   promo_code: string | null; discount: number;
   discount_type: "percent" | "fixed" | null; discount_value: number | null; discount_max: number | null;
   pickup_address_id: string | null; notes: string | null;

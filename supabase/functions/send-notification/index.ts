@@ -6,14 +6,15 @@
 // its provider is connected (integration_settings.status).
 //
 // Call it from server code (or a DB webhook) with JSON
-//   { event, order_id?, user_id?, ticket_id?, context? }
+//   { event, order_id?, user_id?, ticket_id?, context?, skip_recipients? }
 // and `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`; other callers get 401.
 //   order_id  → order events; recipients from the rule ('customer', 'admin')
 //   user_id   → account events, sent to that account holder
 //   ticket_id → support events; ticket details are read from the database
 // Recipient 'admin' = every active platform_admin and support_agent;
 // 'vendor' = the order's vendor's active managers and attendants;
-// 'customer' = the order's or the ticket's customer.
+// 'customer' = the order's or the ticket's customer. skip_recipients drops
+// groups for this send (e.g. ['vendor'] when the vendor's own staff entered it).
 //
 // Secrets: RESEND_API_KEY (email), WHATSAPP_API_TOKEN (+ phone number ID on
 // Admin → Integrations, or WHATSAPP_PHONE_ID), SITE_URL for links.
@@ -42,7 +43,7 @@ Deno.serve(async (req: Request) => {
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  const { event, order_id = null, user_id = null, ticket_id = null, context = {} } =
+  const { event, order_id = null, user_id = null, ticket_id = null, context = {}, skip_recipients = [] } =
     await req.json().catch(() => ({}));
   if (!event) return json({ error: "event required" }, 400);
 
@@ -64,7 +65,11 @@ Deno.serve(async (req: Request) => {
 
   const recipients: Recipient[] = user_id
     ? await resolveUser(db, user_id)
-    : await resolveRecipients(db, order_id, ticket_id, rule.recipients ?? [], SITE);
+    : await resolveRecipients(
+        db, order_id, ticket_id,
+        (rule.recipients ?? []).filter((r: string) => !(Array.isArray(skip_recipients) && skip_recipients.includes(r))),
+        SITE,
+      );
 
   const results: any[] = [];
   for (const channel of rule.channels as Channel[]) {
@@ -177,9 +182,18 @@ async function resolveRecipients(
 /** Order details come from the database, never from the caller. */
 async function orderVars(db: any, orderId: string, site: string): Promise<Record<string, string>> {
   const { data: o } = await db.from("orders")
-    .select("id, code, total, entry_mode, return_mode, service_tier, turnaround, payment_timing, notes, pickup_address_id, vendor:vendor_id(name), customer:customer_id(full_name, email, phone)")
+    .select("id, code, total, entry_mode, return_mode, service_tier, turnaround, payment_timing, notes, pickup_address_id, customer_id, created_by, vendor:vendor_id(name), customer:customer_id(full_name, email, phone)")
     .eq("id", orderId).maybeSingle();
   if (!o) return {};
+  // Entered by someone other than the customer (vendor staff or an admin)?
+  let placedBy = "";
+  if (o.created_by && o.created_by !== o.customer_id) {
+    const { data: who } = await db.from("profiles").select("full_name, role").eq("id", o.created_by).maybeSingle();
+    if (who) {
+      const staff = ["platform_admin", "support_agent"].includes(who.role) ? "laundriroom admin" : `${o.vendor?.name ?? "vendor"} staff`;
+      placedBy = `${staff} · ${who.full_name ?? ""}`.trim();
+    }
+  }
   let address = "";
   if (o.pickup_address_id) {
     const { data: a } = await db.from("customer_addresses").select("line1, area, city").eq("id", o.pickup_address_id).maybeSingle();
@@ -201,6 +215,7 @@ async function orderVars(db: any, orderId: string, site: string): Promise<Record
     extras_line: (extras ?? []).map((e: any) => e.name).join(", "),
     address_line: address,
     notes: o.notes ?? "",
+    placed_by_line: placedBy,
     track_url: `${site}/customer/orders/${o.id}`,
   };
 }

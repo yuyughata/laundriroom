@@ -1,8 +1,13 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import type { ServiceType, StageKind } from "@/lib/database.types";
+import { redirect } from "next/navigation";
+import { getVendorContext } from "@/lib/vendor";
+import { notifyOrder } from "@/lib/notify";
+import type {
+  ServiceType, StageKind, EntryMode, ReturnMode, DeliveredBy, PaymentTiming, ServiceTier, Turnaround,
+} from "@/lib/database.types";
 
 /** Attendant checks in an item: creates an order_item (price snapshot + sub-code by trigger). */
 export async function checkInItem(formData: FormData) {
@@ -288,4 +293,135 @@ export async function decideItemType(id: string, approve: boolean) {
   if (error) return { error: error.message };
   revalidatePath("/vendor/requests");
   return { ok: true };
+}
+
+// ─── Orders entered by the vendor (walk-in / phone customers) ───────────────
+
+export type FoundCustomer = { id: string; full_name: string; phone: string | null; email_hint: string | null };
+
+/** Look a customer up by exact phone or email (vendor staff only — enforced in the DB). */
+export async function findCustomer(query: string): Promise<{ results?: FoundCustomer[]; error?: string }> {
+  const q = query.trim();
+  if (q.replace(/\D/g, "").length < 10 && !q.includes("@")) {
+    return { error: "Enter the customer's full phone number or email." };
+  }
+  const supabase = createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)("find_customer_for_vendor", { p_query: q });
+  if (error) return { error: error.message };
+  return { results: (data ?? []) as FoundCustomer[] };
+}
+
+/** Nigerian local or international number → E.164 (+234…). */
+function toE164(raw: string): string | null {
+  let d = raw.replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length === 11 && d.startsWith("0")) d = "234" + d.slice(1);
+  return d.length >= 10 ? `+${d}` : null;
+}
+
+/**
+ * Create a customer account for a walk-in (vendor staff only). With an email,
+ * the customer is invited to set a password (Supabase "Invite user" email);
+ * with only a phone, the account is created for them to claim later.
+ */
+async function createWalkInCustomer(full_name: string, phoneRaw: string, emailRaw: string) {
+  const service = createServiceClient();
+  if (!service) return { error: "Adding new customers needs SUPABASE_SERVICE_ROLE_KEY on the server." };
+  const phone = toE164(phoneRaw);
+  if (!phone) return { error: "Enter a valid phone number." };
+  const email = emailRaw.trim().toLowerCase();
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) return { error: "Enter a valid email, or leave it blank." };
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const meta = { full_name, phone };
+  const { data, error } = email
+    ? await service.auth.admin.inviteUserByEmail(email, {
+        data: meta, redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+      })
+    : await service.auth.admin.createUser({ phone, user_metadata: meta });
+  if (error) {
+    return { error: /already|registered|exists/i.test(error.message)
+      ? "That email or phone already has an account — search for it instead."
+      : error.message };
+  }
+  return { id: data.user.id as string };
+}
+
+/** Vendor staff create an order for a customer (found or newly added). */
+export async function createVendorOrder(_prev: unknown, formData: FormData) {
+  const ctx = await getVendorContext();
+  const supabase = createClient();
+
+  let customer_id = String(formData.get("customer_id") || "");
+  if (!customer_id) {
+    const full_name = String(formData.get("new_name") || "").trim();
+    const phone = String(formData.get("new_phone") || "").trim();
+    if (!full_name || !phone) return { error: "Find the customer, or enter a name and phone to add them." };
+    const created = await createWalkInCustomer(full_name, phone, String(formData.get("new_email") || ""));
+    if ("error" in created) return { error: created.error };
+    customer_id = created.id;
+  } else {
+    // Only customer accounts can own orders.
+    const service = createServiceClient();
+    if (service) {
+      const { data: p } = await service.from("profiles").select("role").eq("id", customer_id).maybeSingle();
+      if (p?.role !== "customer") return { error: "That account isn't a customer." };
+    }
+  }
+
+  const entry_mode = String(formData.get("entry_mode") || "drop_off") as EntryMode;
+  const return_mode = String(formData.get("return_mode") || "collection") as ReturnMode;
+  const payment_timing = String(formData.get("payment_timing") || "on_delivery") as PaymentTiming;
+  const service_tier = String(formData.get("service_tier") || "standard") as ServiceTier;
+  const turnaround = String(formData.get("turnaround") || "normal") as Turnaround;
+  const delivered_by = (String(formData.get("delivered_by") || "") || null) as DeliveredBy | null;
+  const notes = String(formData.get("notes") || "").trim() || null;
+  const extraIds = formData.getAll("extras").map(String).filter(Boolean);
+
+  let delivery_fee = 0;
+  if (return_mode === "delivery") {
+    const { data: rule } = await supabase
+      .from("delivery_fee_rules").select("flat_amount")
+      .eq("scope", "global").eq("active", true).limit(1).maybeSingle();
+    delivery_fee = Number(rule?.flat_amount ?? 0);
+  }
+
+  const { data, error } = await supabase
+    .from("orders")
+    .insert({
+      customer_id,
+      vendor_id: ctx.vendorId,
+      entry_mode,
+      return_mode,
+      delivered_by: return_mode === "delivery" ? (delivered_by ?? "own_rider") : null,
+      payment_timing,
+      service_tier,
+      turnaround,
+      delivery_fee,
+      total: delivery_fee, // items/extras/markups recompute via triggers
+      notes,
+      status: entry_mode === "pickup" ? "pickup_requested" : "awaiting_dropoff",
+    } as never)
+    .select("id")
+    .single();
+  if (error) return { error: error.message };
+  const orderId = (data as { id: string }).id;
+
+  if (service_tier === "premium" && extraIds.length > 0) {
+    const { data: extras } = await supabase
+      .from("service_extras").select("id, name, price").in("id", extraIds).eq("active", true);
+    const rows = (extras ?? []).map((e) => ({ order_id: orderId, extra_id: e.id, name: e.name, price: e.price }));
+    if (rows.length > 0) await supabase.from("order_extras").insert(rows as never);
+  }
+
+  // Customer gets "Order confirmed"; admins get "New order". The vendor's own
+  // staff entered it, so they're skipped.
+  await Promise.all([
+    notifyOrder("order_confirmed", orderId),
+    notifyOrder("order_placed", orderId, { skip: ["vendor"] }),
+  ]);
+
+  revalidatePath("/vendor/queue");
+  redirect(`/vendor/orders/${orderId}`);
 }

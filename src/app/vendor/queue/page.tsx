@@ -26,7 +26,8 @@ export default async function VendorQueue() {
       staffName={ctx.profile.full_name} staffRole={ctx.isManager ? "Manager" : "Attendant"}>
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl text-ink">Order queue</h1>
-        <div className="flex gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs">
+          <Link href="/vendor/orders/new" className="btn-primary px-4 py-2 text-xs">New order</Link>
           <span className="chip-muted">{incoming.length} incoming</span>
           <span className="chip-ink">{working.length} in progress</span>
           <span className="chip-ok">{outbound.length} ready</span>

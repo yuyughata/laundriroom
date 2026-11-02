@@ -46,6 +46,7 @@ const SAMPLE: EmailContext = {
   payment_line: "Pay online",
   notes: "Gate code 4412. Please handle the agbada with care.",
   order_url: "#",
+  placed_by_line: "Fold & Press, Lekki staff · Halima Bello",
 };
 
 const LABEL: Record<string, string> = {

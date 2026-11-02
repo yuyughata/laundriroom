@@ -356,6 +356,7 @@ export const EMAIL_TEMPLATES: Record<string, (ctx: EmailContext) => { subject: s
     rows: [
       { label: "Order", value: String(ctx.order_code ?? "—") },
       { label: "Customer", value: [ctx.customer_name, ctx.customer_phone].filter(Boolean).join(" · ") || "—" },
+      ...(ctx.placed_by_line ? [{ label: "Entered by", value: String(ctx.placed_by_line) }] : []),
       { label: "Getting it in", value: String(ctx.entry_line ?? "—") },
       ...(ctx.address_line ? [{ label: "Pickup address", value: String(ctx.address_line) }] : []),
       { label: "Getting it back", value: String(ctx.return_mode_line ?? "—") },

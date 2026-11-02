@@ -148,7 +148,14 @@ on order close.
   the order's/ticket's customer (email, and `profiles.phone` for WhatsApp).
   New orders alert admins + the vendor (`order_placed`, `0027`/`0028`) and send
   the customer `order_confirmed`, both fired from `customer/actions.ts →
-  createOrder` via `notifyOrder`; order details are read from the DB. Support tickets alert admins:
+  createOrder` via `notifyOrder`; order details are read from the DB.
+  **Vendors can also create orders** for walk-in/phone customers at
+  Vendor → Queue → New order (`vendor/actions.ts → createVendorOrder`): staff
+  find the customer with `find_customer_for_vendor` (exact phone/email, staff
+  only, `0030`) or add them (invite email when an email is given, else a
+  phone-only account via the service key). `orders.created_by` is set by a
+  trigger; vendor-entered orders notify the customer + admins only
+  (`skip_recipients: ['vendor']`) and the alert shows who entered it. Support tickets alert admins:
   `ticket_opened` / `ticket_message` (`0023`/`0024`) fired from
   `customer/support/actions.ts` via `notifyTicket`; support replies notify the
   customer by email + WhatsApp (`ticket_reply`, `0025`/`0026`, fired from
