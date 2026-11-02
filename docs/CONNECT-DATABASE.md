@@ -183,24 +183,23 @@ at the `paystack-webhook` URL. It already handles `charge.success`; it now also
 settles `transfer.success` / `transfer.failed` / `transfer.reversed` onto the
 payout (success → `sent`; failed/reversed → back to `due` with a reason).
 
-**5. Schedule `process-payouts` hourly** with `pg_cron` + `pg_net` (enable both
-extensions in the dashboard), replacing the URL, service-role key and
-`CRON_SECRET`:
+**5. Schedule `process-payouts` hourly.** Migration `0019_payout_schedule.sql`
+enables `pg_cron` + `pg_net` and creates the `process-payouts-hourly` job. The
+job reads the URL and secret from Supabase Vault, so nothing secret is stored in
+the job itself, and it does nothing until both Vault entries exist. Once per
+project, in the SQL Editor:
 ```sql
-select cron.schedule(
-  'process-payouts-hourly',
-  '0 * * * *',
-  $$
-  select net.http_post(
-    url     := 'https://<project-ref>.functions.supabase.co/process-payouts',
-    headers := jsonb_build_object(
-                 'Content-Type','application/json',
-                 'x-cron-secret','<CRON_SECRET>'),
-    body    := '{}'::jsonb
-  );
-  $$
-);
+select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'),
+                           'process_payouts_cron_secret');
+-- copy this value into the edge-function secret CRON_SECRET:
+select decrypted_secret from vault.decrypted_secrets
+where name = 'process_payouts_cron_secret';
 ```
+Then set `CRON_SECRET` to that value under **Edge Functions → Secrets**. Check
+runs with `select * from cron.job_run_details order by start_time desc;` and
+the function's replies with
+`select status_code, content from net._http_response order by created desc;`.
 
 Each run transfers every `due` payout whose `due_at` has passed: it creates the
 Paystack recipient from the vendor's saved bank account on first use, checks the
