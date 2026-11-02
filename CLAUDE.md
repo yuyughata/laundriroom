@@ -35,6 +35,12 @@ promote an admin → deploy edge functions → wire Paystack).
   (`0004_rls.sql`). The browser only uses the anon key. Never expose the
   service-role key to client code; use it only in server actions / edge
   functions (`src/lib/supabase/server.ts → createServiceClient`).
+  Sign-up always creates a `customer` (role metadata is ignored) and only a
+  platform admin can change a profile's role/status/verification columns
+  (`0018`, `guard_profile_columns`). Views must either use
+  `security_invoker = true` or filter their own rows (`order_summaries`), and
+  new SECURITY DEFINER functions should `revoke execute ... from anon` unless
+  they're meant to be public.
 - **Schema changes:** add a new migration file (don't edit applied ones once the
   DB is live), then `npm run db:types` to regenerate `src/lib/database.types.ts`.
   Those entity types are `type` aliases (not `interface`) on purpose — Supabase's

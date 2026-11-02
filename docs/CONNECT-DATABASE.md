@@ -35,7 +35,7 @@ npm run setup     # should print "Ready."
 ### Option A — Supabase dashboard (no CLI)
 
 Open **SQL Editor** and run each file in `supabase/migrations/` **in order**
-(0001 → 0006), then `supabase/seed.sql` if you want demo data. Paste the
+(0001 onward, in number order), then `supabase/seed.sql` if you want demo data. Paste the
 contents of each file and run it.
 
 ### Option B — Supabase CLI (recommended)
@@ -48,7 +48,7 @@ supabase db push                                  # applies supabase/migrations 
 psql "$(supabase db url)" -f supabase/seed.sql
 ```
 
-After this you have 23 tables, all RLS policies, the default commission plan,
+After this you have every table, all RLS policies, the default commission plan,
 the global item catalogue, notification rules + templates, and the three
 integration rows (all "not configured").
 
