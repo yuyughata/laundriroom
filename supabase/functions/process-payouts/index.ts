@@ -20,8 +20,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { createRecipient, initiateTransfer, getBalanceNGN } from "../_shared/paystack.ts";
 
 Deno.serve(async (req: Request) => {
+  // Fail closed: without CRON_SECRET set, nobody can trigger a payout run.
   const CRON_SECRET = Deno.env.get("CRON_SECRET");
-  if (CRON_SECRET && req.headers.get("x-cron-secret") !== CRON_SECRET) {
+  if (!CRON_SECRET) return json({ error: "CRON_SECRET not set" }, 503);
+  if (req.headers.get("x-cron-secret") !== CRON_SECRET) {
     return json({ error: "unauthorized" }, 401);
   }
 

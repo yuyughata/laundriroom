@@ -23,6 +23,11 @@ Deno.serve(async (req: Request) => {
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
+  // Who is calling? Only the order's customer may start its payment.
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const { data: { user } } = await db.auth.getUser(token);
+  if (!user) return json({ error: "sign in required" }, 401);
+
   // which provider?
   const { data: settings } = await db.from("platform_settings").select("payment_provider").eq("id", true).single();
   const provider = settings?.payment_provider ?? "paystack";
@@ -32,7 +37,7 @@ Deno.serve(async (req: Request) => {
     .select("id, code, total, customer_id, profiles:customer_id(email, phone, full_name)")
     .eq("id", order_id)
     .single();
-  if (!order) return json({ error: "order not found" }, 404);
+  if (!order || order.customer_id !== user.id) return json({ error: "order not found" }, 404);
   const email = (order as any).profiles?.email ?? "customer@laundriroom.example";
 
   // Record a pending payment row.
