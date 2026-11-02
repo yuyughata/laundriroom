@@ -12,6 +12,7 @@
 //   user_id   → account events, sent to that account holder
 //   ticket_id → support events; ticket details are read from the database
 // Recipient 'admin' = every active platform_admin and support_agent;
+// 'vendor' = the order's vendor's active managers and attendants;
 // 'customer' = the order's or the ticket's customer.
 //
 // Secrets: RESEND_API_KEY (email), WHATSAPP_API_TOKEN (+ phone number ID on
@@ -59,11 +60,11 @@ Deno.serve(async (req: Request) => {
   // A support reply quotes the latest support message; other ticket events
   // quote the customer's latest message.
   if (ticket_id) Object.assign(base, await ticketVars(db, ticket_id, SITE, event === "ticket_reply"));
-  if (order_id) Object.assign(base, await orderVars(db, order_id));
+  if (order_id) Object.assign(base, await orderVars(db, order_id, SITE));
 
   const recipients: Recipient[] = user_id
     ? await resolveUser(db, user_id)
-    : await resolveRecipients(db, order_id, ticket_id, rule.recipients ?? []);
+    : await resolveRecipients(db, order_id, ticket_id, rule.recipients ?? [], SITE);
 
   const results: any[] = [];
   for (const channel of rule.channels as Channel[]) {
@@ -115,20 +116,42 @@ async function resolveUser(db: any, userId: string): Promise<Recipient[]> {
   return [{ email: p.email ?? null, phone: p.phone ?? null, vars: { customer_name: p.full_name ?? "", email: p.email ?? "" } }];
 }
 
+const firstName = (n: string | null | undefined) => (n ?? "").trim().split(/\s+/)[0] ?? "";
+
 /** Admins & support agents who should hear about platform events. */
-async function resolveAdmins(db: any): Promise<Recipient[]> {
+async function resolveAdmins(db: any, extra: Record<string, string> = {}): Promise<Recipient[]> {
   const { data } = await db.from("profiles").select("email, phone, full_name")
     .in("role", ["platform_admin", "support_agent"]).eq("status", "active");
   return (data ?? []).map((p: any) => ({
-    email: p.email ?? null, phone: p.phone ?? null, vars: { admin_name: (p.full_name ?? "").split(" ")[0] },
+    email: p.email ?? null, phone: p.phone ?? null,
+    vars: { admin_name: firstName(p.full_name), recipient_name: firstName(p.full_name), ...extra },
   }));
 }
 
+/** The vendor's active managers and attendants (riders have no login). */
+async function resolveVendorStaff(db: any, vendorId: string, extra: Record<string, string> = {}): Promise<Recipient[]> {
+  const { data } = await db.from("vendor_memberships")
+    .select("role, profile:profile_id(email, phone, full_name, status)")
+    .eq("vendor_id", vendorId).in("role", ["vendor_manager", "attendant"]);
+  return (data ?? [])
+    .filter((m: any) => m.profile && m.profile.status === "active")
+    .map((m: any) => ({
+      email: m.profile.email ?? null, phone: m.profile.phone ?? null,
+      vars: { recipient_name: firstName(m.profile.full_name), ...extra },
+    }));
+}
+
 async function resolveRecipients(
-  db: any, orderId: string | null, ticketId: string | null, roles: string[],
+  db: any, orderId: string | null, ticketId: string | null, roles: string[], site: string,
 ): Promise<Recipient[]> {
   const out: Recipient[] = [];
-  if (roles.includes("admin")) out.push(...await resolveAdmins(db));
+  if (roles.includes("admin")) {
+    out.push(...await resolveAdmins(db, orderId ? { order_url: `${site}/admin/orders` } : {}));
+  }
+  if (orderId && roles.includes("vendor")) {
+    const { data: o } = await db.from("orders").select("vendor_id").eq("id", orderId).maybeSingle();
+    if (o?.vendor_id) out.push(...await resolveVendorStaff(db, o.vendor_id, { order_url: `${site}/vendor/orders/${orderId}` }));
+  }
   if (ticketId && roles.includes("customer")) {
     const { data: t } = await db.from("support_tickets")
       .select("customer:customer_id(email, phone, full_name)").eq("id", ticketId).maybeSingle();
@@ -140,15 +163,46 @@ async function resolveRecipients(
     const c = order?.customer;
     if (c) out.push({ email: c.email ?? null, phone: c.phone ?? null, vars: { customer_name: c.full_name ?? "" } });
   }
-  // vendor/rider recipients would be resolved here similarly.
-  return out;
+  // Someone can hold two roles (e.g. an admin who is also vendor staff):
+  // send each address once.
+  const seen = new Set<string>();
+  return out.filter((r) => {
+    const key = `${r.email ?? ""}|${r.phone ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
-async function orderVars(db: any, orderId: string): Promise<Record<string, string>> {
+/** Order details come from the database, never from the caller. */
+async function orderVars(db: any, orderId: string, site: string): Promise<Record<string, string>> {
   const { data: o } = await db.from("orders")
-    .select("code, total, vendor:vendor_id(name)").eq("id", orderId).maybeSingle();
+    .select("id, code, total, entry_mode, return_mode, service_tier, turnaround, payment_timing, notes, pickup_address_id, vendor:vendor_id(name), customer:customer_id(full_name, email, phone)")
+    .eq("id", orderId).maybeSingle();
   if (!o) return {};
-  return { order_code: o.code, total: String(o.total), vendor_name: o.vendor?.name ?? "" };
+  let address = "";
+  if (o.pickup_address_id) {
+    const { data: a } = await db.from("customer_addresses").select("line1, area, city").eq("id", o.pickup_address_id).maybeSingle();
+    if (a) address = [a.line1, a.area, a.city].filter(Boolean).join(", ");
+  }
+  const { data: extras } = await db.from("order_extras").select("name").eq("order_id", orderId);
+  const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
+  return {
+    order_code: o.code,
+    total: String(o.total),
+    vendor_name: o.vendor?.name ?? "",
+    customer_name: o.customer?.full_name ?? "",
+    customer_email: o.customer?.email ?? "",
+    customer_phone: o.customer?.phone ?? "",
+    entry_line: o.entry_mode === "pickup" ? "Pickup from customer" : "Customer drops off",
+    return_mode_line: o.return_mode === "delivery" ? "Deliver back to customer" : "Customer collects",
+    service_line: `${cap(o.service_tier ?? "standard")} · ${cap(o.turnaround ?? "normal")}`,
+    payment_line: o.payment_timing === "on_delivery" ? "Pay on delivery" : "Pay online",
+    extras_line: (extras ?? []).map((e: any) => e.name).join(", "),
+    address_line: address,
+    notes: o.notes ?? "",
+    track_url: `${site}/customer/orders/${o.id}`,
+  };
 }
 
 /** Ticket details come from the database, never from the caller. */

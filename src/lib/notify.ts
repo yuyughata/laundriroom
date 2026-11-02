@@ -55,3 +55,24 @@ export async function notifyTicket(event: "ticket_opened" | "ticket_message" | "
     // best-effort
   }
 }
+
+/**
+ * Order notifications: order_placed alerts admins and the vendor's staff;
+ * order_confirmed goes to the customer. The edge function reads the order
+ * itself, so only the id is sent.
+ */
+export async function notifyOrder(event: "order_placed" | "order_confirmed", orderId: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+  try {
+    await fetch(`${url}/functions/v1/send-notification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+      body: JSON.stringify({ event, order_id: orderId }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // best-effort
+  }
+}

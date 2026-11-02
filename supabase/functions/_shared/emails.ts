@@ -343,10 +343,39 @@ export const EMAIL_TEMPLATES: Record<string, (ctx: EmailContext) => { subject: s
     button: { label: "View and reply", url: String(ctx.customer_ticket_url ?? "#"), tone: "ink" },
     note: "Reply in the app so the whole conversation stays in one place.",
   }),
+
+  // ── New order alert (to admins & the vendor's staff) ────────────────────
+  order_placed: (ctx) => build(`New order ${c(ctx, "order_code")} — ${c(ctx, "vendor_name")}`, {
+    preheader: `${c(ctx, "customer_name", "A customer")} placed an order`,
+    heading: "New order",
+    accent: CHAMP,
+    paragraphs: [
+      `Hi ${c(ctx, "recipient_name", "there")}, <strong>${c(ctx, "customer_name", "A customer")}</strong> placed order <strong>${c(ctx, "order_code")}</strong> with ${c(ctx, "vendor_name", "your laundry")}.`,
+      ctx.notes ? `Customer note: “${c(ctx, "notes")}”` : "",
+    ].filter(Boolean),
+    rows: [
+      { label: "Order", value: String(ctx.order_code ?? "—") },
+      { label: "Customer", value: [ctx.customer_name, ctx.customer_phone].filter(Boolean).join(" · ") || "—" },
+      { label: "Getting it in", value: String(ctx.entry_line ?? "—") },
+      ...(ctx.address_line ? [{ label: "Pickup address", value: String(ctx.address_line) }] : []),
+      { label: "Getting it back", value: String(ctx.return_mode_line ?? "—") },
+      { label: "Service", value: String(ctx.service_line ?? "—") },
+      ...(ctx.extras_line ? [{ label: "Premium extras", value: String(ctx.extras_line) }] : []),
+      { label: "Payment", value: String(ctx.payment_line ?? "—") },
+    ],
+    button: { label: "Open order", url: String(ctx.order_url ?? "#"), tone: "ink" },
+    note: "Items are priced when they're checked in at the laundry.",
+  }),
 };
 
+/** Undo esc() for plain-text parts (subject line, text body). */
+function unesc(s: string): string {
+  return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+}
+
 function build(subject: string, b: Block) {
-  return { subject, html: renderEmail(b), text: toText(b) };
+  // Values are escaped for the HTML; the subject and text part are plain text.
+  return { subject: unesc(subject), html: renderEmail(b), text: unesc(toText(b)) };
 }
 
 /**
