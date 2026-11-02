@@ -249,10 +249,133 @@ export const EMAIL_TEMPLATES: Record<string, (ctx: EmailContext) => { subject: s
     paragraphs: [`Please verify your email so you don't miss order updates and receipts.`],
     button: { label: "Verify email", url: String(ctx.verify_url ?? "#"), tone: "champagne" },
   }),
+
+  // ── Account & security (sent by the app through send-notification) ───────
+  password_changed: (ctx) => build(`Your laundriroom password was changed`, {
+    preheader: "Your password was just changed",
+    heading: "Your password was changed",
+    accent: TEAL,
+    paragraphs: [
+      `Hi ${c(ctx, "customer_name", "there")}, the password for your laundriroom account <strong>${c(ctx, "email")}</strong> was changed${ctx.changed_at ? ` on ${c(ctx, "changed_at")}` : ""}.`,
+      `If this was you, there's nothing else to do.`,
+    ],
+    rows: [{ label: "Account", value: String(ctx.email ?? "—") }],
+    button: { label: "Sign in", url: String(ctx.signin_url ?? "#"), tone: "ink" },
+    note: `Didn't change it? Reset your password straight away and contact support — someone may have access to your account.`,
+  }),
+
+  account_updated: (ctx) => build(`Your laundriroom account details were updated`, {
+    preheader: "Your account details changed",
+    heading: "Your details were updated",
+    paragraphs: [
+      `Hi ${c(ctx, "customer_name", "there")}, we've updated your laundriroom account.`,
+    ],
+    rows: [
+      { label: "What changed", value: String(ctx.changes ?? "Account details") },
+      { label: "Account", value: String(ctx.email ?? "—") },
+    ],
+    button: { label: "Review your account", url: String(ctx.account_url ?? "#"), tone: "ink" },
+    note: `Didn't make this change? Change your password and contact support.`,
+  }),
+
+  account_suspended: (ctx) => build(`Your laundriroom account has been suspended`, {
+    preheader: "Your account is on hold",
+    heading: "Your account is suspended",
+    accent: WARN,
+    paragraphs: [
+      `Hi ${c(ctx, "customer_name", "there")}, your laundriroom account has been suspended, so you can't place or manage orders for now.`,
+      ctx.reason ? `Reason: ${c(ctx, "reason")}` : `If you think this is a mistake, our support team can help.`,
+    ],
+    button: { label: "Contact support", url: String(ctx.support_url ?? "#"), tone: "ink" },
+  }),
+
+  account_reactivated: (ctx) => build(`Your laundriroom account is active again`, {
+    preheader: "Welcome back",
+    heading: "Your account is active again",
+    accent: TEAL,
+    paragraphs: [`Hi ${c(ctx, "customer_name", "there")}, your laundriroom account has been reactivated. You can sign in and order as usual.`],
+    button: { label: "Sign in", url: String(ctx.signin_url ?? "#"), tone: "ink" },
+  }),
 };
 
 function build(subject: string, b: Block) {
   return { subject, html: renderEmail(b), text: toText(b) };
+}
+
+/**
+ * Supabase Auth emails (sign-up, password reset, email change…). Supabase
+ * sends these itself because they carry its one-time links, so they're Go
+ * templates: the {{ .X }} placeholders are filled in by Supabase.
+ * `npm run emails:auth` writes them to supabase/templates/*.html; paste each
+ * into Supabase → Authentication → Email Templates for the hosted project.
+ */
+export const AUTH_EMAIL_TEMPLATES: Record<string, { label: string; subject: string; html: string }> = (() => {
+  const auth = (label: string, subject: string, b: Block) => ({ label, subject, html: renderEmail(b) });
+  return {
+    confirmation: auth("Confirm sign-up", "Confirm your laundriroom email", {
+      preheader: "One tap to confirm your email",
+      heading: "Confirm your email",
+      paragraphs: [
+        `Welcome to laundriroom. Confirm <strong>{{ .Email }}</strong> to secure your account and keep order updates flowing.`,
+        `You can keep placing orders in the meantime.`,
+      ],
+      button: { label: "Confirm email", url: "{{ .ConfirmationURL }}", tone: "champagne" },
+      note: "If you didn't create a laundriroom account, you can ignore this email.",
+    }),
+    recovery: auth("Reset password", "Reset your laundriroom password", {
+      preheader: "Reset your password",
+      heading: "Reset your password",
+      accent: WARN,
+      paragraphs: [
+        `We got a request to reset the password for <strong>{{ .Email }}</strong>. Tap below to choose a new one.`,
+        `The link works once and expires soon.`,
+      ],
+      button: { label: "Choose a new password", url: "{{ .ConfirmationURL }}", tone: "ink" },
+      note: "Didn't ask for this? You can ignore this email — your password won't change.",
+    }),
+    magic_link: auth("Magic link", "Your laundriroom sign-in link", {
+      preheader: "Your one-time sign-in link",
+      heading: "Sign in to laundriroom",
+      paragraphs: [`Tap below to sign in as <strong>{{ .Email }}</strong>. The link works once and expires soon.`],
+      button: { label: "Sign in", url: "{{ .ConfirmationURL }}", tone: "ink" },
+      note: "Didn't try to sign in? You can ignore this email.",
+    }),
+    email_change: auth("Change email address", "Confirm your new laundriroom email", {
+      preheader: "Confirm your new email address",
+      heading: "Confirm your new email",
+      paragraphs: [
+        `You asked to change your laundriroom email from <strong>{{ .Email }}</strong> to <strong>{{ .NewEmail }}</strong>.`,
+        `Confirm to finish the change. Until then, keep signing in with your current email.`,
+      ],
+      button: { label: "Confirm new email", url: "{{ .ConfirmationURL }}", tone: "champagne" },
+      note: "Didn't ask for this? Ignore this email and change your password.",
+    }),
+    invite: auth("Invite user", "You've been invited to laundriroom", {
+      preheader: "Your laundriroom account is ready",
+      heading: "You've been invited",
+      paragraphs: [`You've been invited to join laundriroom as <strong>{{ .Email }}</strong>. Accept to set your password and get started.`],
+      button: { label: "Accept invitation", url: "{{ .ConfirmationURL }}", tone: "champagne" },
+    }),
+    reauthentication: auth("Verification code", "Your laundriroom verification code", {
+      preheader: "Your one-time code",
+      heading: "Confirm it's you",
+      paragraphs: [
+        `Enter this code to confirm a sensitive change to your account:`,
+        `<span style="display:inline-block;font-family:Georgia,'Times New Roman',serif;font-size:30px;letter-spacing:8px;color:${INK};">{{ .Token }}</span>`,
+      ],
+      note: "Didn't request a code? Change your password and contact support.",
+    }),
+  };
+})();
+
+/** Fill Supabase's Go placeholders with sample values (for previews). */
+export function sampleAuthEmail(html: string): string {
+  return html
+    .replace(/\{\{ \.ConfirmationURL \}\}/g, "#")
+    .replace(/\{\{ \.NewEmail \}\}/g, "ada.new@example.com")
+    .replace(/\{\{ \.Email \}\}/g, "ada@example.com")
+    .replace(/\{\{ \.Token \}\}/g, "482913")
+    .replace(/\{\{ \.SiteURL \}\}/g, "#");
 }
 
 /** All event keys that have a template (handy for previews/tests). */

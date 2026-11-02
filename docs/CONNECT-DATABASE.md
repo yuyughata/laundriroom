@@ -57,7 +57,27 @@ integration rows (all "not configured").
 In **Authentication → URL Configuration**:
 
 - **Site URL:** your app URL (e.g. `http://localhost:3000` for dev).
-- **Redirect URLs:** add `<app-url>/auth/callback`.
+- **Redirect URLs:** add `<app-url>/auth/callback` **and** `<app-url>/auth/callback**`
+  (the password-reset and email-change links add `?next=…`).
+
+In **Authentication → Email Templates**, replace Supabase's default emails with
+the laundriroom ones so every email matches. Run `npm run emails:auth`, then for
+each template paste the file from `supabase/templates/` and set the subject:
+
+| Template | File | Subject |
+| --- | --- | --- |
+| Confirm signup | `confirmation.html` | Confirm your laundriroom email |
+| Reset password | `recovery.html` | Reset your laundriroom password |
+| Magic link | `magic_link.html` | Your laundriroom sign-in link |
+| Change email address | `email_change.html` | Confirm your new laundriroom email |
+| Invite user | `invite.html` | You've been invited to laundriroom |
+| Reauthentication | `reauthentication.html` | Your laundriroom verification code |
+
+Leave Supabase's own "security notification" emails off: the app already sends
+"password changed", "details updated", "suspended" and "reactivated" emails
+through `send-notification` (they need `SUPABASE_SERVICE_ROLE_KEY` in the app's
+env set to the **service_role JWT** from Project Settings → API, the same value
+the edge function sees).
 
 In **Authentication → Providers → Email**: keep email enabled. "Confirm email"
 on is fine — customers can order before confirming; the app shows a verify

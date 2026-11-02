@@ -30,32 +30,6 @@ export async function setVendorStatus(vendorId: string, status: VendorStatus) {
   return { ok: true };
 }
 
-export async function assignVendorPlan(vendorId: string, planId: string) {
-  const supabase = createClient();
-  const { error } = await supabase.from("vendors").update({ plan_id: planId } as never).eq("id", vendorId);
-  if (error) return { error: error.message };
-  revalidatePath("/admin/vendors");
-  return { ok: true };
-}
-
-export async function savePlan(formData: FormData) {
-  const supabase = createClient();
-  const id = String(formData.get("id") || "");
-  // Commission is the only model offered; type and monthly fee are fixed.
-  const payload = {
-    name: String(formData.get("name")),
-    type: "commission",
-    commission_rate: Number(formData.get("commission_rate") || 0) / 100, // UI is percent
-    monthly_fee: 0,
-  };
-  const { error } = id
-    ? await supabase.from("vendor_plans").update(payload as never).eq("id", id)
-    : await supabase.from("vendor_plans").insert({ ...payload, active: true } as never);
-  if (error) return { error: error.message };
-  revalidatePath("/admin/plans");
-  return { ok: true };
-}
-
 export async function setGlobalDeliveryFee(amount: number) {
   const supabase = createClient();
   const { data: rule } = await supabase
@@ -64,7 +38,7 @@ export async function setGlobalDeliveryFee(amount: number) {
     ? await supabase.from("delivery_fee_rules").update({ flat_amount: amount } as never).eq("id", rule.id)
     : await supabase.from("delivery_fee_rules").insert({ scope: "global", type: "flat", flat_amount: amount, active: true } as never);
   if (error) return { error: error.message };
-  revalidatePath("/admin/plans");
+  revalidatePath("/admin/fees");
   return { ok: true };
 }
 
@@ -147,20 +121,39 @@ export async function deleteExtra(id: string) {
   return { ok: true };
 }
 
+const pctOk = (n: number) => Number.isFinite(n) && n >= 0 && n <= 100;
+
 /**
- * Save the platform fees & charges. Inputs are percentages (e.g. 20 for 20%);
- * stored as fractions. Express and premium are platform markups; the
- * non-collection penalty is a share of the delivery fee.
+ * The platform-wide rates every vendor uses unless an admin overrides them.
+ * Inputs are percentages (15 = 15%); stored as fractions. Commission lives on
+ * the default plan; express and premium markups in platform_settings (the
+ * platform keeps those markups in full).
  */
-export async function setFeesCharges(
-  expressPct: number, premiumPct: number, penaltyPct: number, referralReward: number,
-) {
+export async function setPlatformRates(commissionPct: number, expressPct: number, premiumPct: number) {
+  if (![commissionPct, expressPct, premiumPct].every(pctOk)) return { error: "Rates must be between 0 and 100%." };
+  const supabase = createClient();
+  const { data: plan } = await supabase.from("vendor_plans").select("id").eq("is_default", true).limit(1).maybeSingle();
+  if (!plan) return { error: "No default plan found." };
+  const { error: e1 } = await supabase.from("vendor_plans")
+    .update({ commission_rate: commissionPct / 100 } as never).eq("id", (plan as { id: string }).id);
+  if (e1) return { error: e1.message };
+  const { error: e2 } = await supabase.from("platform_settings")
+    .update({ express_pct: expressPct / 100, premium_pct: premiumPct / 100, updated_at: new Date().toISOString() } as never)
+    .eq("id", true);
+  if (e2) return { error: e2.message };
+  revalidatePath("/admin/fees");
+  revalidatePath("/admin/vendors");
+  return { ok: true };
+}
+
+/** Non-collection penalty (% of the delivery fee) and the referral reward (₦). */
+export async function setOtherCharges(penaltyPct: number, referralReward: number) {
+  if (!pctOk(penaltyPct)) return { error: "Penalty must be between 0 and 100%." };
+  if (!Number.isFinite(referralReward) || referralReward < 0) return { error: "Referral reward can't be negative." };
   const supabase = createClient();
   const { error } = await supabase
     .from("platform_settings")
     .update({
-      express_pct: expressPct / 100,
-      premium_pct: premiumPct / 100,
       noncollection_penalty_pct: penaltyPct / 100,
       referral_reward: referralReward,
       updated_at: new Date().toISOString(),
@@ -168,6 +161,28 @@ export async function setFeesCharges(
     .eq("id", true);
   if (error) return { error: error.message };
   revalidatePath("/admin/fees");
+  return { ok: true };
+}
+
+/**
+ * Override a vendor's commission / express / premium rates. Pass null for any
+ * rate to use the platform rate. Inputs are percentages.
+ */
+export async function setVendorRates(
+  vendorId: string, commissionPct: number | null, expressPct: number | null, premiumPct: number | null,
+) {
+  const vals = [commissionPct, expressPct, premiumPct];
+  if (!vals.every((v) => v === null || pctOk(v))) return { error: "Rates must be between 0 and 100%, or blank for the platform rate." };
+  const supabase = createClient();
+  const toFrac = (v: number | null) => (v === null ? null : v / 100);
+  const { error } = await supabase.from("vendors").update({
+    commission_rate_override: toFrac(commissionPct),
+    express_pct_override: toFrac(expressPct),
+    premium_pct_override: toFrac(premiumPct),
+  } as never).eq("id", vendorId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/fees");
+  revalidatePath("/admin/vendors");
   return { ok: true };
 }
 

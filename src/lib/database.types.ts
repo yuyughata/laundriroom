@@ -71,6 +71,8 @@ export type Vendor = {
   lat: number | null; lng: number | null; service_radius_km: number;
   opens_at: string | null; closes_at: string | null; is_open: boolean;
   kyc_verified: boolean; terms_accepted_at: string | null;
+  /** Admin overrides (fractions); null = platform rate. */
+  commission_rate_override: number | null; express_pct_override: number | null; premium_pct_override: number | null;
   created_at: string; updated_at: string;
 }
 export type VendorPlan = {

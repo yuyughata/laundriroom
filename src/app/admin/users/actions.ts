@@ -3,6 +3,7 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { UserRole } from "@/lib/database.types";
+import { notifyUser } from "@/lib/notify";
 
 const STAFF_ROLES: UserRole[] = ["attendant", "vendor_manager", "rider"];
 
@@ -34,8 +35,12 @@ export async function updateUserRole(id: string, role: UserRole) {
 export async function setUserStatus(id: string, status: "active" | "suspended") {
   const g = await requirePlatformAdmin();
   if (!g.ok) return { error: g.error };
+  const { data: before } = await g.supabase.from("profiles").select("status").eq("id", id).single();
   const { error } = await g.supabase.from("profiles").update({ status } as never).eq("id", id);
   if (error) return { error: error.message };
+  if (before?.status !== status) {
+    await notifyUser(status === "suspended" ? "account_suspended" : "account_reactivated", id);
+  }
   revalidatePath("/admin/users");
   return { ok: true };
 }

@@ -26,7 +26,9 @@ Deno.serve(async (req: Request) => {
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  const { event, order_id, context = {} } = await req.json().catch(() => ({}));
+  // order_id → order events (recipients from the rule); user_id → account
+  // events sent to that account holder.
+  const { event, order_id = null, user_id = null, context = {} } = await req.json().catch(() => ({}));
   if (!event) return json({ error: "event required" }, 400);
 
   const { data: rule } = await db.from("notification_rules").select("*").eq("event", event).maybeSingle();
@@ -38,8 +40,10 @@ Deno.serve(async (req: Request) => {
   const { data: integrations } = await db.from("integration_settings").select("provider, status, config");
   const connected = new Map<string, any>((integrations ?? []).map((i: any) => [i.provider, i]));
 
-  // Resolve recipient contacts for this order.
-  const recipients = await resolveRecipients(db, order_id, rule.recipients);
+  // Resolve recipient contacts: the account holder, or the order's parties.
+  const recipients = user_id
+    ? await resolveUser(db, user_id)
+    : await resolveRecipients(db, order_id, rule.recipients);
 
   const results: any[] = [];
   for (const channel of rule.channels as Channel[]) {
@@ -77,6 +81,12 @@ Deno.serve(async (req: Request) => {
 
   return json({ event, results });
 });
+
+async function resolveUser(db: any, userId: string) {
+  const { data: p } = await db.from("profiles").select("email, full_name").eq("id", userId).maybeSingle();
+  if (!p?.email) return [];
+  return [{ address: p.email as string, vars: { customer_name: p.full_name ?? "", email: p.email as string } }];
+}
 
 async function resolveRecipients(db: any, orderId: string | null, roles: string[]) {
   const out: { address: string; vars: Record<string, string> }[] = [];

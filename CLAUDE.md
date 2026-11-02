@@ -63,8 +63,14 @@ promote an admin → deploy edge functions → wire Paystack).
   percentages kept 100% by the platform — they are excluded from the vendor
   payout (`schedule_payout_if_ready` pays on items+extras+delivery only). A
   non-collection penalty (% of delivery fee, admin-set) is added on reschedule
-  when the customer was at fault (`apply_delivery_reschedule`). All three knobs
-  live on Admin → Fees & charges.
+  when the customer was at fault (`apply_delivery_reschedule`). Everything
+  lives on one page, Admin → Fees & charges (the old Plans & fees tab redirects
+  there): one platform-wide set of rates — commission (stored on the default
+  plan), express % and premium % (`platform_settings`) — plus delivery fee,
+  penalty and referral reward. An admin can override commission/express/premium
+  per vendor (`vendors.*_override`, `0022`; NULL = platform rate);
+  `recompute_order` and `schedule_payout_if_ready` use the override when set.
+  Vendors can't change their own rates/status/KYC (`guard_vendor_columns`).
 - Server Components fetch; interactive bits are small client components calling
   server actions in each area's `actions.ts`.
 
@@ -140,7 +146,15 @@ on order close.
   `not implemented` where to drop your provider in. Email uses designed Ink &
   Ivory HTML templates in `src/lib/emails.ts` (one per event), mirrored to
   `supabase/functions/_shared/emails.ts` (keep both in sync). Admins preview
-  all templates at `/api/emails/preview`.
+  all templates at `/api/emails/preview`. Account emails (password changed,
+  details updated, suspended, reactivated) are sent by the app via
+  `src/lib/notify.ts → send-notification` with `user_id`. Sign-in emails that
+  carry Supabase's one-time links (confirm sign-up, reset password, magic
+  link, change email, invite, reauthentication) are Supabase Auth templates in
+  the same design: `AUTH_EMAIL_TEMPLATES` in `emails.ts` → `npm run
+  emails:auth` → `supabase/templates/*.html` (wired in `config.toml`; paste into
+  the dashboard for the hosted project). Password screens: `/forgot-password`,
+  `/reset-password`, `/account/password` (all roles).
 
 ## Good next tasks
 

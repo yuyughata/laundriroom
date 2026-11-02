@@ -1,5 +1,5 @@
 import { getProfile } from "@/lib/auth";
-import { EMAIL_TEMPLATES, EMAIL_EVENTS, type EmailContext } from "@/lib/emails";
+import { EMAIL_TEMPLATES, EMAIL_EVENTS, AUTH_EMAIL_TEMPLATES, sampleAuthEmail, type EmailContext } from "@/lib/emails";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +21,12 @@ const SAMPLE: EmailContext = {
   item_name: "Kaftan",
   price: "₦1,500",
   net: "₦4,080",
+  email: "barry@example.com",
+  changed_at: "2 Nov 2026, 14:05",
+  changes: "Name, Phone",
+  signin_url: "#",
+  account_url: "#",
+  support_url: "#",
 };
 
 const LABEL: Record<string, string> = {
@@ -31,6 +37,8 @@ const LABEL: Record<string, string> = {
   order_closed: "Order complete", item_type_requested: "Item type requested (vendor)",
   item_type_approved: "Item type approved (vendor)", payout_sent: "Payout sent (vendor)",
   email_verification: "Email verification", email_verification_reminder: "Verification reminder",
+  password_changed: "Password changed", account_updated: "Account details updated",
+  account_suspended: "Account suspended", account_reactivated: "Account reactivated",
 };
 
 /** Admin-only preview of the email templates with sample data. */
@@ -42,6 +50,11 @@ export async function GET(req: Request) {
   }
 
   const event = new URL(req.url).searchParams.get("event");
+
+  const auth = new URL(req.url).searchParams.get("auth");
+  if (auth && AUTH_EMAIL_TEMPLATES[auth]) {
+    return new Response(sampleAuthEmail(AUTH_EMAIL_TEMPLATES[auth].html), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+  }
 
   if (event && EMAIL_TEMPLATES[event]) {
     const { html } = EMAIL_TEMPLATES[event](SAMPLE);
@@ -58,6 +71,12 @@ export async function GET(req: Request) {
     </li>`;
   }).join("");
 
+  const authItems = Object.entries(AUTH_EMAIL_TEMPLATES).map(([k, t]) => `<li style="margin:0 0 10px;">
+      <a href="/api/emails/preview?auth=${k}" target="_blank"
+         style="color:#0F1B2D;text-decoration:none;font-weight:600;">${t.label}</a>
+      <span style="color:#5B6678;"> — ${t.subject.replace(/</g, "&lt;")}</span>
+    </li>`).join("");
+
   const page = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>laundriroom email templates</title></head>
 <body style="margin:0;background:#F8F5EF;font-family:Arial,Helvetica,sans-serif;">
@@ -66,6 +85,9 @@ export async function GET(req: Request) {
   <h1 style="font-family:Georgia,serif;color:#0F1B2D;">Email templates</h1>
   <p style="color:#5B6678;">Every communication, rendered with sample data. Click any one to open it.</p>
   <ul style="list-style:none;padding:0;margin:24px 0 0;">${items}</ul>
+  <h2 style="font-family:Georgia,serif;color:#0F1B2D;margin-top:36px;">Sign-in &amp; security (sent by Supabase Auth)</h2>
+  <p style="color:#5B6678;">These carry Supabase's one-time links, so Supabase sends them. Paste each file from <code>supabase/templates/</code> into Authentication → Email Templates.</p>
+  <ul style="list-style:none;padding:0;margin:24px 0 0;">${authItems}</ul>
 </div></body></html>`;
 
   return new Response(page, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
