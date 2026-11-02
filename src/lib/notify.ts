@@ -35,11 +35,12 @@ export async function notifyUser(event: AccountEvent, userId: string, context: R
 }
 
 /**
- * Alert admins & support agents about a support ticket (email + WhatsApp per
- * the rule on Admin → Communications). The edge function reads the ticket
- * itself, so only the id is sent.
+ * Support ticket notifications (email + WhatsApp per the rule on Admin →
+ * Communications): ticket_opened / ticket_message alert admins & support
+ * agents; ticket_reply tells the customer support has replied. The edge
+ * function reads the ticket itself, so only the id is sent.
  */
-export async function notifyTicket(event: "ticket_opened" | "ticket_message", ticketId: string) {
+export async function notifyTicket(event: "ticket_opened" | "ticket_message" | "ticket_reply", ticketId: string) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return;
@@ -48,6 +49,31 @@ export async function notifyTicket(event: "ticket_opened" | "ticket_message", ti
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
       body: JSON.stringify({ event, ticket_id: ticketId }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Order notifications: order_placed alerts admins and the vendor's staff;
+ * order_confirmed goes to the customer. `skip` drops recipient groups (e.g.
+ * the vendor, when its own staff entered the order). The edge function reads the order
+ * itself, so only the id is sent.
+ */
+export async function notifyOrder(
+  event: "order_placed" | "order_confirmed", orderId: string,
+  opts: { skip?: ("admin" | "vendor" | "customer")[] } = {},
+) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+  try {
+    await fetch(`${url}/functions/v1/send-notification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+      body: JSON.stringify({ event, order_id: orderId, skip_recipients: opts.skip ?? [] }),
       signal: AbortSignal.timeout(5000),
     });
   } catch {

@@ -5,7 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isVendorOpenNow } from "@/lib/hours";
-import { notifyUser } from "@/lib/notify";
+import { notifyUser, notifyOrder } from "@/lib/notify";
 import type {
   EntryMode, ReturnMode, DeliveredBy, PaymentTiming, ServiceTier, Turnaround,
 } from "@/lib/database.types";
@@ -77,6 +77,10 @@ export async function createOrder(formData: FormData) {
     }));
     if (rows.length > 0) await supabase.from("order_extras").insert(rows as never);
   }
+
+  // Tell admins + the vendor's staff, and confirm to the customer (best-effort,
+  // in parallel; never blocks the order).
+  await Promise.all([notifyOrder("order_placed", data.id), notifyOrder("order_confirmed", data.id)]);
 
   revalidatePath("/customer");
   redirect(`/customer/orders/${data.id}`);

@@ -143,11 +143,24 @@ on order close.
 - Messaging — `supabase/functions/send-notification` has the event→rule→channel
   engine with working Resend email and WhatsApp Cloud API adapters (SMS is
   marked `not implemented`). Payload `{ event, order_id | user_id | ticket_id }`;
-  rule recipient `admin` = every active platform_admin + support_agent (email,
-  and `profiles.phone` for WhatsApp). Support tickets alert admins:
+  rule recipient `admin` = every active platform_admin + support_agent,
+  `vendor` = the order's vendor's active managers + attendants, `customer` =
+  the order's/ticket's customer (email, and `profiles.phone` for WhatsApp).
+  New orders alert admins + the vendor (`order_placed`, `0027`/`0028`) and send
+  the customer `order_confirmed`, both fired from `customer/actions.ts →
+  createOrder` via `notifyOrder`; order details are read from the DB.
+  **Vendors can also create orders** for walk-in/phone customers at
+  Vendor → Queue → New order (`vendor/actions.ts → createVendorOrder`): staff
+  find the customer with `find_customer_for_vendor` (exact phone/email, staff
+  only, `0030`) or add them (invite email when an email is given, else a
+  phone-only account via the service key). `orders.created_by` is set by a
+  trigger; vendor-entered orders notify the customer + admins only
+  (`skip_recipients: ['vendor']`) and the alert shows who entered it. Support tickets alert admins:
   `ticket_opened` / `ticket_message` (`0023`/`0024`) fired from
-  `customer/support/actions.ts` via `notifyTicket`; ticket details are read
-  from the DB, not trusted from the caller. WhatsApp needs the
+  `customer/support/actions.ts` via `notifyTicket`; support replies notify the
+  customer by email + WhatsApp (`ticket_reply`, `0025`/`0026`, fired from
+  `admin/support/actions.ts → replyTicket`). Ticket details are read from the
+  DB, not trusted from the caller. WhatsApp needs the
   `WHATSAPP_API_TOKEN` secret, the phone number ID and an approved template
   (one body variable `{{1}}`) set on Admin → Integrations. Email uses designed Ink &
   Ivory HTML templates in `src/lib/emails.ts` (one per event), mirrored to
@@ -165,9 +178,8 @@ on order close.
 ## Good next tasks
 
 - Implement the SMS adapter in `send-notification`.
-- Notify the customer when support replies to their ticket.
-- Call `send-notification` from the app/DB on key events (order confirmed,
-  ready, payment received).
+- Call `send-notification` on the remaining order events (checked in, ready,
+  out for delivery, payment received, closed) — order_placed/confirmed are wired.
 - Invoice PDF generation + the `invoices` storage bucket.
 - Item photo capture on check-in (bucket + policies already exist).
 - Email the applicant on approve/reject, and the admin on a new application

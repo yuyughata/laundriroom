@@ -6,12 +6,15 @@
 // its provider is connected (integration_settings.status).
 //
 // Call it from server code (or a DB webhook) with JSON
-//   { event, order_id?, user_id?, ticket_id?, context? }
+//   { event, order_id?, user_id?, ticket_id?, context?, skip_recipients? }
 // and `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`; other callers get 401.
 //   order_id  → order events; recipients from the rule ('customer', 'admin')
 //   user_id   → account events, sent to that account holder
 //   ticket_id → support events; ticket details are read from the database
-// Recipient 'admin' = every active platform_admin and support_agent.
+// Recipient 'admin' = every active platform_admin and support_agent;
+// 'vendor' = the order's vendor's active managers and attendants;
+// 'customer' = the order's or the ticket's customer. skip_recipients drops
+// groups for this send (e.g. ['vendor'] when the vendor's own staff entered it).
 //
 // Secrets: RESEND_API_KEY (email), WHATSAPP_API_TOKEN (+ phone number ID on
 // Admin → Integrations, or WHATSAPP_PHONE_ID), SITE_URL for links.
@@ -40,7 +43,7 @@ Deno.serve(async (req: Request) => {
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  const { event, order_id = null, user_id = null, ticket_id = null, context = {} } =
+  const { event, order_id = null, user_id = null, ticket_id = null, context = {}, skip_recipients = [] } =
     await req.json().catch(() => ({}));
   if (!event) return json({ error: "event required" }, 400);
 
@@ -55,12 +58,18 @@ Deno.serve(async (req: Request) => {
 
   // Shared variables for the templates, then who gets the message.
   const base: Record<string, string> = {};
-  if (ticket_id) Object.assign(base, await ticketVars(db, ticket_id, SITE));
-  if (order_id) Object.assign(base, await orderVars(db, order_id));
+  // A support reply quotes the latest support message; other ticket events
+  // quote the customer's latest message.
+  if (ticket_id) Object.assign(base, await ticketVars(db, ticket_id, SITE, event === "ticket_reply"));
+  if (order_id) Object.assign(base, await orderVars(db, order_id, SITE));
 
   const recipients: Recipient[] = user_id
     ? await resolveUser(db, user_id)
-    : await resolveRecipients(db, order_id, rule.recipients ?? []);
+    : await resolveRecipients(
+        db, order_id, ticket_id,
+        (rule.recipients ?? []).filter((r: string) => !(Array.isArray(skip_recipients) && skip_recipients.includes(r))),
+        SITE,
+      );
 
   const results: any[] = [];
   for (const channel of rule.channels as Channel[]) {
@@ -112,43 +121,113 @@ async function resolveUser(db: any, userId: string): Promise<Recipient[]> {
   return [{ email: p.email ?? null, phone: p.phone ?? null, vars: { customer_name: p.full_name ?? "", email: p.email ?? "" } }];
 }
 
+const firstName = (n: string | null | undefined) => (n ?? "").trim().split(/\s+/)[0] ?? "";
+
 /** Admins & support agents who should hear about platform events. */
-async function resolveAdmins(db: any): Promise<Recipient[]> {
+async function resolveAdmins(db: any, extra: Record<string, string> = {}): Promise<Recipient[]> {
   const { data } = await db.from("profiles").select("email, phone, full_name")
     .in("role", ["platform_admin", "support_agent"]).eq("status", "active");
   return (data ?? []).map((p: any) => ({
-    email: p.email ?? null, phone: p.phone ?? null, vars: { admin_name: (p.full_name ?? "").split(" ")[0] },
+    email: p.email ?? null, phone: p.phone ?? null,
+    vars: { admin_name: firstName(p.full_name), recipient_name: firstName(p.full_name), ...extra },
   }));
 }
 
-async function resolveRecipients(db: any, orderId: string | null, roles: string[]): Promise<Recipient[]> {
+/** The vendor's active managers and attendants (riders have no login). */
+async function resolveVendorStaff(db: any, vendorId: string, extra: Record<string, string> = {}): Promise<Recipient[]> {
+  const { data } = await db.from("vendor_memberships")
+    .select("role, profile:profile_id(email, phone, full_name, status)")
+    .eq("vendor_id", vendorId).in("role", ["vendor_manager", "attendant"]);
+  return (data ?? [])
+    .filter((m: any) => m.profile && m.profile.status === "active")
+    .map((m: any) => ({
+      email: m.profile.email ?? null, phone: m.profile.phone ?? null,
+      vars: { recipient_name: firstName(m.profile.full_name), ...extra },
+    }));
+}
+
+async function resolveRecipients(
+  db: any, orderId: string | null, ticketId: string | null, roles: string[], site: string,
+): Promise<Recipient[]> {
   const out: Recipient[] = [];
-  if (roles.includes("admin")) out.push(...await resolveAdmins(db));
-  if (orderId && roles.includes("customer")) {
+  if (roles.includes("admin")) {
+    out.push(...await resolveAdmins(db, orderId ? { order_url: `${site}/admin/orders` } : {}));
+  }
+  if (orderId && roles.includes("vendor")) {
+    const { data: o } = await db.from("orders").select("vendor_id").eq("id", orderId).maybeSingle();
+    if (o?.vendor_id) out.push(...await resolveVendorStaff(db, o.vendor_id, { order_url: `${site}/vendor/orders/${orderId}` }));
+  }
+  if (ticketId && roles.includes("customer")) {
+    const { data: t } = await db.from("support_tickets")
+      .select("customer:customer_id(email, phone, full_name)").eq("id", ticketId).maybeSingle();
+    const c = t?.customer;
+    if (c) out.push({ email: c.email ?? null, phone: c.phone ?? null, vars: { customer_name: c.full_name ?? "" } });
+  } else if (orderId && roles.includes("customer")) {
     const { data: order } = await db.from("orders")
       .select("customer:customer_id(email, phone, full_name)").eq("id", orderId).maybeSingle();
     const c = order?.customer;
     if (c) out.push({ email: c.email ?? null, phone: c.phone ?? null, vars: { customer_name: c.full_name ?? "" } });
   }
-  // vendor/rider recipients would be resolved here similarly.
-  return out;
+  // Someone can hold two roles (e.g. an admin who is also vendor staff):
+  // send each address once.
+  const seen = new Set<string>();
+  return out.filter((r) => {
+    const key = `${r.email ?? ""}|${r.phone ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
-async function orderVars(db: any, orderId: string): Promise<Record<string, string>> {
+/** Order details come from the database, never from the caller. */
+async function orderVars(db: any, orderId: string, site: string): Promise<Record<string, string>> {
   const { data: o } = await db.from("orders")
-    .select("code, total, vendor:vendor_id(name)").eq("id", orderId).maybeSingle();
+    .select("id, code, total, entry_mode, return_mode, service_tier, turnaround, payment_timing, notes, pickup_address_id, customer_id, created_by, vendor:vendor_id(name), customer:customer_id(full_name, email, phone)")
+    .eq("id", orderId).maybeSingle();
   if (!o) return {};
-  return { order_code: o.code, total: String(o.total), vendor_name: o.vendor?.name ?? "" };
+  // Entered by someone other than the customer (vendor staff or an admin)?
+  let placedBy = "";
+  if (o.created_by && o.created_by !== o.customer_id) {
+    const { data: who } = await db.from("profiles").select("full_name, role").eq("id", o.created_by).maybeSingle();
+    if (who) {
+      const staff = ["platform_admin", "support_agent"].includes(who.role) ? "laundriroom admin" : `${o.vendor?.name ?? "vendor"} staff`;
+      placedBy = `${staff} · ${who.full_name ?? ""}`.trim();
+    }
+  }
+  let address = "";
+  if (o.pickup_address_id) {
+    const { data: a } = await db.from("customer_addresses").select("line1, area, city").eq("id", o.pickup_address_id).maybeSingle();
+    if (a) address = [a.line1, a.area, a.city].filter(Boolean).join(", ");
+  }
+  const { data: extras } = await db.from("order_extras").select("name").eq("order_id", orderId);
+  const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
+  return {
+    order_code: o.code,
+    total: String(o.total),
+    vendor_name: o.vendor?.name ?? "",
+    customer_name: o.customer?.full_name ?? "",
+    customer_email: o.customer?.email ?? "",
+    customer_phone: o.customer?.phone ?? "",
+    entry_line: o.entry_mode === "pickup" ? "Pickup from customer" : "Customer drops off",
+    return_mode_line: o.return_mode === "delivery" ? "Deliver back to customer" : "Customer collects",
+    service_line: `${cap(o.service_tier ?? "standard")} · ${cap(o.turnaround ?? "normal")}`,
+    payment_line: o.payment_timing === "on_delivery" ? "Pay on delivery" : "Pay online",
+    extras_line: (extras ?? []).map((e: any) => e.name).join(", "),
+    address_line: address,
+    notes: o.notes ?? "",
+    placed_by_line: placedBy,
+    track_url: `${site}/customer/orders/${o.id}`,
+  };
 }
 
 /** Ticket details come from the database, never from the caller. */
-async function ticketVars(db: any, ticketId: string, site: string): Promise<Record<string, string>> {
+async function ticketVars(db: any, ticketId: string, site: string, fromSupport = false): Promise<Record<string, string>> {
   const { data: t } = await db.from("support_tickets")
     .select("id, number, subject, category, subcategory, other_text, status, customer:customer_id(full_name, email, phone), order:order_id(code)")
     .eq("id", ticketId).maybeSingle();
   if (!t) return {};
   const { data: last } = await db.from("support_messages").select("body")
-    .eq("ticket_id", ticketId).eq("from_support", false)
+    .eq("ticket_id", ticketId).eq("from_support", fromSupport)
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   const excerpt = String(last?.body ?? "").replace(/\s+/g, " ").trim();
   return {
@@ -162,6 +241,7 @@ async function ticketVars(db: any, ticketId: string, site: string): Promise<Reco
     order_code: t.order?.code ?? "",
     message_excerpt: excerpt.length > 280 ? excerpt.slice(0, 277) + "…" : excerpt,
     ticket_url: `${site}/admin/support/${t.id}`,
+    customer_ticket_url: `${site}/customer/support/${t.id}`,
   };
 }
 

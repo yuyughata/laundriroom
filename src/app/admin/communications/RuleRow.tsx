@@ -25,6 +25,8 @@ const EVENT_LABEL: Record<string, string> = {
   account_reactivated: "Account reactivated",
   ticket_opened: "New support ticket",
   ticket_message: "Customer replied on ticket",
+  ticket_reply: "Support replied (to customer)",
+  order_placed: "New order (admins & vendor)",
 };
 
 const CHANNELS: NotifChannel[] = ["email", "whatsapp", "sms"];

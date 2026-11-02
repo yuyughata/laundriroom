@@ -36,6 +36,17 @@ const SAMPLE: EmailContext = {
   message_excerpt: "Hi, I dropped off 6 items yesterday including an agbada for an event on Saturday. Will it be ready by Friday evening?",
   ticket_status: "In progress",
   ticket_url: "#",
+  customer_ticket_url: "#",
+  recipient_name: "Chidi",
+  entry_line: "Pickup from customer",
+  address_line: "Flat 4, 21 Fola Osibo Rd, Lekki Phase 1, Lagos",
+  return_mode_line: "Deliver back to customer",
+  service_line: "Premium · Express",
+  extras_line: "Stain treatment, Fabric softener & scent",
+  payment_line: "Pay online",
+  notes: "Gate code 4412. Please handle the agbada with care.",
+  order_url: "#",
+  placed_by_line: "Fold & Press, Lekki staff · Halima Bello",
 };
 
 const LABEL: Record<string, string> = {
@@ -49,6 +60,8 @@ const LABEL: Record<string, string> = {
   password_changed: "Password changed", account_updated: "Account details updated",
   account_suspended: "Account suspended", account_reactivated: "Account reactivated",
   ticket_opened: "New support ticket (admins)", ticket_message: "Customer replied on ticket (admins)",
+  ticket_reply: "Support replied (customer)",
+  order_placed: "New order (admins & vendor)",
 };
 
 /** Admin-only preview of the email templates with sample data. */
