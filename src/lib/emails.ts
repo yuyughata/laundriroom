@@ -30,12 +30,22 @@ type Block = {
   accent?: string; // header accent bar colour
 };
 
+// Brand icon for the email header. Emails can't embed images reliably (Gmail
+// blocks data: URIs), so it's loaded from the app's public URL. Server code
+// sets the base once (send-notification uses SITE_URL); in the in-app preview
+// the base is empty and the relative path resolves against the app.
+let ASSET_BASE = "";
+export function setEmailAssetBase(base: string) {
+  ASSET_BASE = (base ?? "").replace(/\/$/, "");
+}
+const brandIconUrl = () => `${ASSET_BASE}/brand/mark-email.png`;
+
 function esc(s: string): string {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /** The shared layout. Renders a full HTML email document. */
-export function renderEmail(b: Block): string {
+export function renderEmail(b: Block, iconUrl: string = brandIconUrl()): string {
   const accent = b.accent ?? CHAMP;
   const rows = b.rows?.length
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;border-collapse:collapse;">
@@ -81,9 +91,16 @@ export function renderEmail(b: Block): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${IVORY};padding:28px 16px;">
   <tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
-      <!-- header -->
+      <!-- header: brand icon + wordmark -->
       <tr><td style="padding:4px 4px 20px;">
-        <span style="font-family:Arial,Helvetica,sans-serif;font-size:21px;font-weight:700;color:${INK};letter-spacing:-.3px;">laundriroom</span>
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="padding-right:9px;vertical-align:middle;">
+            <img src="${esc(iconUrl)}" width="32" height="24" alt="" style="display:block;width:32px;height:24px;border:0;outline:none;text-decoration:none;">
+          </td>
+          <td style="vertical-align:middle;">
+            <span style="font-family:Arial,Helvetica,sans-serif;font-size:21px;font-weight:700;color:${INK};letter-spacing:-.3px;">laundriroom</span>
+          </td>
+        </tr></table>
       </td></tr>
       <!-- card -->
       <tr><td style="background:#FFFFFF;border:1px solid #EFEAE0;border-radius:16px;overflow:hidden;">
@@ -387,7 +404,10 @@ function build(subject: string, b: Block) {
  * into Supabase → Authentication → Email Templates for the hosted project.
  */
 export const AUTH_EMAIL_TEMPLATES: Record<string, { label: string; subject: string; html: string }> = (() => {
-  const auth = (label: string, subject: string, b: Block) => ({ label, subject, html: renderEmail(b) });
+  // Supabase fills {{ .SiteURL }} with the project's Site URL (the app), which
+  // serves the brand icon.
+  const auth = (label: string, subject: string, b: Block) =>
+    ({ label, subject, html: renderEmail(b, "{{ .SiteURL }}/brand/mark-email.png") });
   return {
     confirmation: auth("Confirm sign-up", "Confirm your laundriroom email", {
       preheader: "One tap to confirm your email",
@@ -452,6 +472,7 @@ export function sampleAuthEmail(html: string): string {
     .replace(/\{\{ \.NewEmail \}\}/g, "ada.new@example.com")
     .replace(/\{\{ \.Email \}\}/g, "ada@example.com")
     .replace(/\{\{ \.Token \}\}/g, "482913")
+    .replace(/\{\{ \.SiteURL \}\}\/brand/g, "/brand")
     .replace(/\{\{ \.SiteURL \}\}/g, "#");
 }
 

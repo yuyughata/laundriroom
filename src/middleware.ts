@@ -7,7 +7,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // everything except static assets and the manifest
-    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.webmanifest|.*\\.(?:png|jpg|svg)$).*)",
+    // everything except static assets, the manifest, the service worker and
+    // the offline page (those must load for signed-out visitors too — a
+    // redirected sw.js fails to register, and the SW would cache the sign-in
+    // page as the offline page)
+    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.webmanifest|sw.js|offline.html|.*\\.(?:png|jpg|svg)$).*)",
   ],
 };

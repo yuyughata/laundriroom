@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/ui/Logo";
 
 const NAV = [
   { href: "/customer", label: "Home", icon: "M3 11l9-8 9 8M5 10v10h14V10" },
@@ -10,7 +11,10 @@ const NAV = [
 export function CustomerShell({ children, active }: { children: React.ReactNode; active?: string }) {
   return (
     <div className="min-h-screen bg-ivory">
-      <div className="mx-auto max-w-phone px-5 pb-28 pt-6">{children}</div>
+      <header className="mx-auto max-w-phone px-5 pt-5">
+        <Link href="/customer" aria-label="laundriroom home"><Logo className="text-lg" /></Link>
+      </header>
+      <div className="mx-auto max-w-phone px-5 pb-28 pt-4">{children}</div>
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-ink/10 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-phone items-center justify-around px-6 py-3">

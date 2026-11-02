@@ -164,7 +164,11 @@ on order close.
   `WHATSAPP_API_TOKEN` secret, the phone number ID and an approved template
   (one body variable `{{1}}`) set on Admin → Integrations. Email uses designed Ink &
   Ivory HTML templates in `src/lib/emails.ts` (one per event), mirrored to
-  `supabase/functions/_shared/emails.ts` (keep both in sync). Admins preview
+  `supabase/functions/_shared/emails.ts` (keep both in sync). Every email header
+  shows the brand icon + wordmark; the icon is `public/brand/mark-email.png`,
+  loaded from `SITE_URL` (edge function) or `{{ .SiteURL }}` (auth templates).
+  Branding everywhere is icon + wordmark: `components/ui/Logo.tsx` in the app
+  shells, `src/lib/brandMark.ts` (embedded PNG) in PDF reports. Admins preview
   all templates at `/api/emails/preview`. Account emails (password changed,
   details updated, suspended, reactivated) are sent by the app via
   `src/lib/notify.ts → send-notification` with `user_id`. Sign-in emails that
