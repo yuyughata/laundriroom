@@ -13,8 +13,12 @@ const META: Record<IntegrationProvider, { title: string; blurb: string; fields: 
   },
   whatsapp: {
     title: "WhatsApp",
-    blurb: "WhatsApp Cloud API for customer and vendor alerts.",
-    fields: [{ key: "phone_id", label: "Phone number ID", placeholder: "1234567890" }],
+    blurb: "WhatsApp Cloud API for customer, vendor and support alerts. The access token is the WHATSAPP_API_TOKEN edge-function secret.",
+    fields: [
+      { key: "phone_id", label: "Phone number ID", placeholder: "1234567890" },
+      { key: "template", label: "Approved template name (one body variable {{1}})", placeholder: "laundriroom_alert" },
+      { key: "template_lang", label: "Template language code", placeholder: "en" },
+    ],
   },
   sms: {
     title: "SMS",

@@ -14,7 +14,6 @@ const NAV = [
   { href: "/admin/support", label: "Support" },
   { href: "/admin/claims", label: "Claims" },
   { href: "/admin/reviews", label: "Reviews" },
-  { href: "/admin/plans", label: "Plans & fees" },
   { href: "/admin/services", label: "Services & extras" },
   { href: "/admin/fees", label: "Fees & charges" },
   { href: "/admin/promos", label: "Promos" },
@@ -35,7 +34,6 @@ const TITLES: Record<string, string> = {
   "/admin/support": "Support",
   "/admin/claims": "Claims & lost items",
   "/admin/reviews": "Reviews",
-  "/admin/plans": "Plans & fees",
   "/admin/services": "Services & extras",
   "/admin/fees": "Fees & charges",
   "/admin/promos": "Promo codes",
@@ -73,6 +71,7 @@ export function AdminShell({
           <p className="font-display text-lg text-ink">{TITLES[active ?? ""] ?? "Admin"}</p>
           <div className="flex items-center gap-4">
             <span className="text-xs text-slate">{name} · {role.replace("_", " ")}</span>
+            <Link href="/account/password" className="text-xs text-slate hover:text-ink">Password</Link>
             <SignOutButton />
           </div>
         </header>

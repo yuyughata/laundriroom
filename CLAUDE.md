@@ -63,8 +63,13 @@ promote an admin → deploy edge functions → wire Paystack).
   percentages kept 100% by the platform — they are excluded from the vendor
   payout (`schedule_payout_if_ready` pays on items+extras+delivery only). A
   non-collection penalty (% of delivery fee, admin-set) is added on reschedule
-  when the customer was at fault (`apply_delivery_reschedule`). All three knobs
-  live on Admin → Fees & charges.
+  when the customer was at fault (`apply_delivery_reschedule`). Everything
+  lives on one page, Admin → Fees & charges (the old Plans & fees tab redirects
+  there): one global set of rates for every vendor — commission (stored on the
+  default plan; `schedule_payout_if_ready` always uses it, `0022`), express %
+  and premium % (`platform_settings`) — plus delivery fee, penalty and
+  referral reward. There are deliberately no per-vendor rates. Vendors can't
+  change their own status/plan/KYC flag (`guard_vendor_columns`).
 - Server Components fetch; interactive bits are small client components calling
   server actions in each area's `actions.ts`.
 
@@ -136,15 +141,31 @@ on order close.
   `transfer.failed`/`reversed` → back to `due` with a `failure_reason`. Needs
   Transfers enabled + OTP disabled on Paystack; test keys simulate the full path.
 - Messaging — `supabase/functions/send-notification` has the event→rule→channel
-  engine + a working Resend email adapter; WhatsApp and SMS adapters are marked
-  `not implemented` where to drop your provider in. Email uses designed Ink &
+  engine with working Resend email and WhatsApp Cloud API adapters (SMS is
+  marked `not implemented`). Payload `{ event, order_id | user_id | ticket_id }`;
+  rule recipient `admin` = every active platform_admin + support_agent (email,
+  and `profiles.phone` for WhatsApp). Support tickets alert admins:
+  `ticket_opened` / `ticket_message` (`0023`/`0024`) fired from
+  `customer/support/actions.ts` via `notifyTicket`; ticket details are read
+  from the DB, not trusted from the caller. WhatsApp needs the
+  `WHATSAPP_API_TOKEN` secret, the phone number ID and an approved template
+  (one body variable `{{1}}`) set on Admin → Integrations. Email uses designed Ink &
   Ivory HTML templates in `src/lib/emails.ts` (one per event), mirrored to
   `supabase/functions/_shared/emails.ts` (keep both in sync). Admins preview
-  all templates at `/api/emails/preview`.
+  all templates at `/api/emails/preview`. Account emails (password changed,
+  details updated, suspended, reactivated) are sent by the app via
+  `src/lib/notify.ts → send-notification` with `user_id`. Sign-in emails that
+  carry Supabase's one-time links (confirm sign-up, reset password, magic
+  link, change email, invite, reauthentication) are Supabase Auth templates in
+  the same design: `AUTH_EMAIL_TEMPLATES` in `emails.ts` → `npm run
+  emails:auth` → `supabase/templates/*.html` (wired in `config.toml`; paste into
+  the dashboard for the hosted project). Password screens: `/forgot-password`,
+  `/reset-password`, `/account/password` (all roles).
 
 ## Good next tasks
 
-- Implement the WhatsApp and SMS adapters in `send-notification`.
+- Implement the SMS adapter in `send-notification`.
+- Notify the customer when support replies to their ticket.
 - Call `send-notification` from the app/DB on key events (order confirmed,
   ready, payment received).
 - Invoice PDF generation + the `invoices` storage bucket.

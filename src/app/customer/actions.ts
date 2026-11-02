@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isVendorOpenNow } from "@/lib/hours";
+import { notifyUser } from "@/lib/notify";
 import type {
   EntryMode, ReturnMode, DeliveredBy, PaymentTiming, ServiceTier, Turnaround,
 } from "@/lib/database.types";
@@ -201,4 +202,52 @@ export async function payNow(orderId: string) {
 
   revalidatePath(`/customer/orders/${orderId}`);
   redirect(`/customer/orders/${orderId}?paid=1`);
+}
+
+/**
+ * Update the signed-in user's name, phone and/or email. Name and phone save
+ * straight away; an email change is confirmed by Supabase (it emails a link)
+ * and profiles.email follows once confirmed. Emails an "account updated"
+ * notice listing what changed.
+ */
+export async function updateMyProfile(_prev: unknown, formData: FormData) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const full_name = String(formData.get("full_name") || "").trim();
+  const phone = String(formData.get("phone") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  if (!full_name) return { error: "Enter your name." };
+  if (!phone) return { error: "Enter your phone number." };
+  if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "Enter a valid email." };
+
+  const { data: current } = await supabase.from("profiles").select("full_name, phone, email").eq("id", user.id).single();
+  const changes: string[] = [];
+  if (current?.full_name !== full_name) changes.push("Name");
+  if ((current?.phone ?? "") !== phone) changes.push("Phone");
+
+  if (changes.length) {
+    const { error } = await supabase.from("profiles").update({ full_name, phone } as never).eq("id", user.id);
+    if (error) return { error: error.message };
+  }
+
+  let emailPending = false;
+  if (email !== (user.email ?? "").toLowerCase()) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: `${siteUrl}/auth/callback?next=/customer/account` });
+    if (error) return { error: error.message };
+    emailPending = true;
+    changes.push("Email (pending confirmation)");
+  }
+
+  if (!changes.length) return { ok: true, message: "Nothing changed." };
+  await notifyUser("account_updated", user.id, { changes: changes.join(", ") });
+  revalidatePath("/customer/account");
+  return {
+    ok: true,
+    message: emailPending
+      ? `Saved. To finish changing your email, tap the link we sent to ${email}.`
+      : "Saved.",
+  };
 }

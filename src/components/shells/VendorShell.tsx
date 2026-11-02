@@ -44,7 +44,10 @@ export function VendorShell({
             <p className="font-display text-lg text-ink">{vendorName}</p>
             <p className="text-xs text-slate">{staffName} · {staffRole}</p>
           </div>
-          <SignOutButton />
+          <div className="flex items-center gap-4">
+            <Link href="/account/password" className="text-xs text-slate hover:text-ink">Password</Link>
+            <SignOutButton />
+          </div>
         </header>
         <main className="mx-auto max-w-tablet px-6 py-6">{children}</main>
       </div>

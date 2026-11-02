@@ -57,7 +57,27 @@ integration rows (all "not configured").
 In **Authentication → URL Configuration**:
 
 - **Site URL:** your app URL (e.g. `http://localhost:3000` for dev).
-- **Redirect URLs:** add `<app-url>/auth/callback`.
+- **Redirect URLs:** add `<app-url>/auth/callback` **and** `<app-url>/auth/callback**`
+  (the password-reset and email-change links add `?next=…`).
+
+In **Authentication → Email Templates**, replace Supabase's default emails with
+the laundriroom ones so every email matches. Run `npm run emails:auth`, then for
+each template paste the file from `supabase/templates/` and set the subject:
+
+| Template | File | Subject |
+| --- | --- | --- |
+| Confirm signup | `confirmation.html` | Confirm your laundriroom email |
+| Reset password | `recovery.html` | Reset your laundriroom password |
+| Magic link | `magic_link.html` | Your laundriroom sign-in link |
+| Change email address | `email_change.html` | Confirm your new laundriroom email |
+| Invite user | `invite.html` | You've been invited to laundriroom |
+| Reauthentication | `reauthentication.html` | Your laundriroom verification code |
+
+Leave Supabase's own "security notification" emails off: the app already sends
+"password changed", "details updated", "suspended" and "reactivated" emails
+through `send-notification` (they need `SUPABASE_SERVICE_ROLE_KEY` in the app's
+env set to the **service_role JWT** from Project Settings → API, the same value
+the edge function sees).
 
 In **Authentication → Providers → Email**: keep email enabled. "Confirm email"
 on is fine — customers can order before confirming; the app shows a verify
@@ -118,8 +138,21 @@ to the simulator.
    domain in Resend.
 3. In the app: **Admin → Integrations**, connect each provider. Status flips to
    "Connected"; SMS then appears as a channel on **Admin → Communications**.
-4. WhatsApp and SMS adapters are stubbed in `send-notification/index.ts` — drop
-   in your provider calls where marked.
+4. **WhatsApp** (Meta WhatsApp Cloud API) — used for order updates and to alert
+   admins about support tickets:
+   - In Meta Business → WhatsApp, note the **Phone number ID** and create a
+     permanent **access token** (System user with `whatsapp_business_messaging`).
+   - Create a **Utility** message template, e.g. `laundriroom_alert`, language
+     English, body: `laundriroom update: {{1}}`. Wait for approval. Every
+     WhatsApp message is sent inside it, with the text as `{{1}}` (Meta only
+     allows free-form text within 24 hours of the person messaging you).
+   - `supabase secrets set WHATSAPP_API_TOKEN=... SITE_URL=https://your-app`
+   - Admin → Integrations → WhatsApp: enter the phone number ID, the template
+     name and language code (`en`), and save so the status shows Connected.
+   - Admins and support agents get alerts on the phone number in their profile
+     (Admin → Users), so make sure it's a real WhatsApp number.
+5. SMS is stubbed in `send-notification/index.ts` — drop in your provider where
+   marked.
 
 ## 9. Deploy the app
 

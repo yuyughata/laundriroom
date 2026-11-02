@@ -1,6 +1,7 @@
 import { CustomerShell } from "@/components/shells/CustomerShell";
 import { requireProfile } from "@/lib/auth";
 import { SignOutButton } from "@/components/ui/SignOutButton";
+import { AccountDetails } from "./AccountDetails";
 
 export default async function AccountPage() {
   const profile = await requireProfile();
@@ -9,13 +10,8 @@ export default async function AccountPage() {
     <CustomerShell active="/customer/account">
       <h1 className="font-display text-2xl text-ink">Account</h1>
 
-      <section className="card mt-6 divide-y divide-ink/5">
-        <Field label="Name" value={profile.full_name || "—"} />
-        <Field label="Email" value={profile.email || "—"}
-          badge={profile.email_verified ? "Verified" : "Unverified"}
-          badgeClass={profile.email_verified ? "chip-ok" : "chip-warn"} />
-        <Field label="Phone" value={profile.phone || "—"} />
-      </section>
+      <AccountDetails fullName={profile.full_name} email={profile.email ?? ""}
+        phone={profile.phone ?? ""} verified={profile.email_verified} />
 
       {!profile.email_verified && (
         <p className="mt-4 text-xs text-slate">
@@ -57,16 +53,3 @@ export default async function AccountPage() {
   );
 }
 
-function Field({
-  label, value, badge, badgeClass,
-}: { label: string; value: string; badge?: string; badgeClass?: string }) {
-  return (
-    <div className="flex items-center justify-between p-4">
-      <div>
-        <p className="text-xs text-slate">{label}</p>
-        <p className="text-sm text-ink">{value}</p>
-      </div>
-      {badge && <span className={badgeClass}>{badge}</span>}
-    </div>
-  );
-}

@@ -12,7 +12,8 @@
     "db:types": "supabase gen types typescript --local > src/lib/database.types.ts",
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",
-    "setup": "node scripts/check-env.mjs"
+    "setup": "node scripts/check-env.mjs",
+    "emails:auth": "node scripts/build-auth-emails.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

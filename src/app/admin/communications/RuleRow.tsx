@@ -19,6 +19,12 @@ const EVENT_LABEL: Record<string, string> = {
   payout_sent: "Payout sent",
   email_verification: "Email verification",
   email_verification_reminder: "Verification reminder",
+  password_changed: "Password changed",
+  account_updated: "Account details updated",
+  account_suspended: "Account suspended",
+  account_reactivated: "Account reactivated",
+  ticket_opened: "New support ticket",
+  ticket_message: "Customer replied on ticket",
 };
 
 const CHANNELS: NotifChannel[] = ["email", "whatsapp", "sms"];

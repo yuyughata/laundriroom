@@ -5,7 +5,7 @@ import { VendorActions } from "./VendorActions";
 import { NewVendor } from "./NewVendor";
 import { Stars } from "@/components/ui/Stars";
 import { dateShort } from "@/lib/format";
-import type { Vendor, VendorPlan, VendorRating } from "@/lib/database.types";
+import type { Vendor, VendorRating } from "@/lib/database.types";
 
 const STATUS_CHIP: Record<string, string> = {
   verified: "chip-ok", pending: "chip-warn", suspended: "chip-muted", rejected: "chip-muted",
@@ -15,17 +15,13 @@ export default async function AdminVendors() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  const [{ data: vendors }, { data: plans }, { data: ratings }] = await Promise.all([
+  const [{ data: vendors }, { data: ratings }] = await Promise.all([
     supabase.from("vendors").select("*").order("created_at", { ascending: false }),
-    supabase.from("vendor_plans").select("*").eq("active", true).order("name"),
     supabase.from("vendor_ratings").select("*"),
   ]);
 
   const vs = (vendors ?? []) as Vendor[];
-  const pl = (plans ?? []) as VendorPlan[];
   const ratingMap = new Map(((ratings ?? []) as VendorRating[]).map((r) => [r.vendor_id, r]));
-  const planName = (id: string | null) => pl.find((p) => p.id === id)?.name ?? "—";
-
   return (
     <AdminShell active="/admin/vendors" name={profile.full_name} role={profile.role}>
       <div className="relative flex items-center justify-between">
@@ -44,7 +40,6 @@ export default async function AdminVendors() {
               <th className="px-4 py-3">Vendor</th>
               <th className="px-4 py-3">Area</th>
               <th className="px-4 py-3">Delivery</th>
-              <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Rating</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Joined</th>
@@ -57,7 +52,6 @@ export default async function AdminVendors() {
                 <td className="px-4 py-3 font-medium text-ink">{v.name}</td>
                 <td className="px-4 py-3 text-slate">{[v.area, v.city].filter(Boolean).join(", ") || "—"}</td>
                 <td className="px-4 py-3 text-slate">{v.delivery.replace("_", " ")}</td>
-                <td className="px-4 py-3 text-slate">{planName(v.plan_id)}</td>
                 <td className="px-4 py-3">
                   {ratingMap.get(v.id)
                     ? <Stars value={Number(ratingMap.get(v.id)!.avg_rating)} size={13} showValue count={ratingMap.get(v.id)!.review_count} />
@@ -66,12 +60,12 @@ export default async function AdminVendors() {
                 <td className="px-4 py-3"><span className={STATUS_CHIP[v.status]}>{v.status}</span></td>
                 <td className="px-4 py-3 text-slate">{dateShort(v.created_at)}</td>
                 <td className="px-4 py-3">
-                  <VendorActions vendorId={v.id} status={v.status} planId={v.plan_id} plans={pl} />
+                  <VendorActions vendorId={v.id} status={v.status} />
                 </td>
               </tr>
             ))}
             {vs.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-slate">No vendors yet.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-slate">No vendors yet.</td></tr>
             )}
           </tbody>
         </table>
