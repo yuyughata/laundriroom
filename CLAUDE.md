@@ -136,8 +136,13 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Manual DB updates:** if MCP/CLI can't apply migrations, paste
-  `supabase/manual/apply-0033-0038.sql` into the SQL Editor (two
+- **Live database:** migrations 0001–0038 are applied to the hosted project
+  (0033–0038 on 2026-11-03 via the Supabase MCP `execute_sql`, versions
+  recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
+  approval this cloud session can't show whenever SQL contains `drop …`
+  statements, so live changes went in drop-free (`create or replace trigger`,
+  `alter policy`) — same end state as the migration files.
+  `supabase/manual/apply-0033-0038.sql` is the SQL Editor fallback (two
   transactions, self-checks, re-runnable).
 - **Password fields** use `components/ui/PasswordInput.tsx` (Show/Hide).
 - **Responsive dashboards:** admin and vendor shells share `ShellNav` — a fixed

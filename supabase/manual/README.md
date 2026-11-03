@@ -13,3 +13,6 @@ if anything is off, so nothing half-applies. Safe to run twice.
   against 0001–0032 + demo seed: one-request run (as the SQL Editor sends it),
   repeat run, and `psql -f`. Also fine if the earlier `apply-0033-0035.sql`
   was already run.
+
+Status: 0033–0038 are applied to the hosted project (2026-11-03), so this file
+is only needed for another environment.
