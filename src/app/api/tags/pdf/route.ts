@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
 import { buildTagSheetPdf } from "@/lib/tagPdf";
+import { tagSizeFrom } from "@/lib/tagSizes";
 import type { TagStatus } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ const STAFF = ["attendant", "vendor_manager", "rider", "platform_admin", "suppor
  *   ?batch=<id>                     the whole batch
  *   ?batch=<id>&only=missing,damaged  just the batch's missing/damaged tags
  *   ?ids=<id>,<id>                  chosen tags (same vendor)
+ *   &size=20|25|30                  tag size in mm (square; default 25)
  *   &reprint=1                      a reprint: missing/damaged tags printed
  *                                   here go back to free (or in use)
  * Access follows the database rules: vendor staff see their own tags, admins all.
@@ -28,6 +30,7 @@ export async function GET(req: NextRequest) {
   const only = (sp.get("only") ?? "").split(",")
     .filter((s): s is TagStatus => ["missing", "damaged", "free", "in_use"].includes(s));
   const reprint = sp.get("reprint") === "1";
+  const sizeMm = tagSizeFrom(sp.get("size"));
 
   let q = supabase.from("tags").select("id, code, status, vendor_id, serial, print_count, current_item_id, batch_id");
   if (batchId && UUID.test(batchId)) q = q.eq("batch_id", batchId);
@@ -46,7 +49,7 @@ export async function GET(req: NextRequest) {
   const vendorName = (v as { name?: string } | null)?.name ?? "laundriroom";
   const first = tags[0].code, last = tags[tags.length - 1].code;
   const title = `${reprint ? "Reprint" : "Tags"} ${tags.length === 1 ? first : `${first} – ${last}`} (${tags.length})`;
-  const pdf = await buildTagSheetPdf(tags.map((t) => ({ code: t.code })), { vendorName, title });
+  const pdf = await buildTagSheetPdf(tags.map((t) => ({ code: t.code })), { vendorName, title, sizeMm });
 
   // Record the print. Reprinted missing/damaged tags are back in circulation.
   const now = new Date().toISOString();

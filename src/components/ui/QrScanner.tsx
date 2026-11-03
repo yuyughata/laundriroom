@@ -31,7 +31,9 @@ function ScannerModal({ onClose, onResult }: { onClose: () => void; onResult: (t
         if (cancelled || !ref.current) return;
         const el = ref.current;
         el.id = el.id || "qr-reader-" + Math.random().toString(36).slice(2);
-        const scanner = new Html5Qrcode(el.id);
+        // Use the phone's built-in QR reader where there is one (Android
+        // Chrome); otherwise html5-qrcode's own decoder (zxing).
+        const scanner = new Html5Qrcode(el.id, { verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
         instanceRef.current = scanner;
         await scanner.start(
           { facingMode: "environment" },

@@ -112,8 +112,14 @@ promote an admin → deploy edge functions → wire Paystack).
   `vendor_tag_prefix_default`), VID a 4-char code unique to the vendor
   (`vendors.tag_vid`), number from `vendors.tag_seq` under a row lock (never
   reused). `/api/tags/pdf?batch=|ids=[&only=missing,damaged][&reprint=1]`
-  renders A4 sheets (`src/lib/tagPdf.ts`: 3×5 grid, dashed cut lines, punch
-  ring on the left, QR = the code, code in Courier) and counts prints; a
+  `&size=20|25|30` (square tags in mm, default 25; picker remembered per
+  device, `src/lib/tagSizes.ts`) renders A4 sheets (`src/lib/tagPdf.ts`:
+  tags edge to edge with shared dashed cut lines, punch mark on the left,
+  QR = the code, code in Courier — on two lines at 2 cm — and a 5 cm ruler
+  to check the print wasn't scaled). Each QR's mask is picked so zxing (the
+  decoder in html5-qrcode) reads it (`src/lib/qrScannable.ts`; ~1 in 5 small
+  codes otherwise can't be read by it); the scanner also uses the phone's
+  native BarcodeDetector when present. The route counts prints; a
   reprint puts missing/damaged tags back in service. Staff mark tags
   `missing`/`damaged`/found (`src/lib/tagActions.ts`); closing an order only
   frees `in_use` tags. UI: `components/tags/TagManager.tsx`.

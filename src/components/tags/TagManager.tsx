@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useTransition } from "react";
 import { generateTagBatch, setTagStatus } from "@/lib/tagActions";
 import type { BatchRow, TagOverview } from "@/lib/tagData";
 import type { Tag } from "@/lib/database.types";
+import { DEFAULT_TAG_SIZE_MM, TAG_SIZES_MM, tagSizeFrom, tagSizeLabel, tagsPerPage, type TagSizeMm } from "@/lib/tagSizes";
 
 type TagRow = Pick<Tag, "id" | "code" | "status" | "serial" | "print_count" | "last_printed_at" | "status_note" | "status_changed_at" | "current_item_id">;
 
@@ -16,22 +17,61 @@ const STATUS: Record<string, { label: string; chip: string }> = {
   retired: { label: "Retired", chip: "chip-muted" },
 };
 const d = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" }) : "—");
-const pdf = (q: string) => `/api/tags/pdf?${q}`;
+
+// Print size (square tags, mm), remembered on this device.
+const SIZE_KEY = "lr.tagSizeMm";
+const SizeCtx = createContext<{ size: TagSizeMm; setSize: (s: TagSizeMm) => void }>({ size: DEFAULT_TAG_SIZE_MM, setSize: () => {} });
+function usePdf() {
+  const { size } = useContext(SizeCtx);
+  return (q: string) => `/api/tags/pdf?${q}&size=${size}`;
+}
+
+/** "Tag size: 2 cm · 2.5 cm · 3 cm" — applies to every Print / Reprint link. */
+function SizePicker() {
+  const { size, setSize } = useContext(SizeCtx);
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-slate">
+      <span>Tag size</span>
+      <div className="inline-flex overflow-hidden rounded-full border border-ink/15" role="radiogroup" aria-label="Tag size">
+        {TAG_SIZES_MM.map((mm) => (
+          <button key={mm} type="button" role="radio" aria-checked={size === mm} onClick={() => setSize(mm)}
+            className={`px-3 py-1.5 ${size === mm ? "bg-ink text-ivory" : "bg-white text-ink hover:bg-ink/5"}`}>
+            {tagSizeLabel(mm)}
+          </button>
+        ))}
+      </div>
+      <span>{tagsPerPage(size).perPage} per A4 page</span>
+    </div>
+  );
+}
 
 /**
  * Tags: generate a batch of QR tags (PREFIX-ID-NUMBER), print it, and keep
  * the history. Any staff member can mark a tag missing/damaged and reprint
  * it; generating is for the business's main manager or an admin.
  */
-export function TagManager({
-  vendorId, vendorName, overview, canGenerate, batch, batchTags, basePath,
-}: {
+type Props = {
   vendorId: string; vendorName: string; overview: TagOverview; canGenerate: boolean;
   /** A batch opened for detail, with its tags. */
   batch?: BatchRow | null; batchTags?: TagRow[];
   /** Page path, for links (keeps ?vendor= on the admin page). */
   basePath: string;
-}) {
+};
+
+export function TagManager(props: Props) {
+  const [size, setSizeState] = useState<TagSizeMm>(DEFAULT_TAG_SIZE_MM);
+  useEffect(() => {
+    try { const v = localStorage.getItem(SIZE_KEY); if (v) setSizeState(tagSizeFrom(v)); } catch { /* storage blocked */ }
+  }, []);
+  const setSize = (s: TagSizeMm) => {
+    setSizeState(s);
+    try { localStorage.setItem(SIZE_KEY, String(s)); } catch { /* storage blocked */ }
+  };
+  return <SizeCtx.Provider value={{ size, setSize }}><TagManagerInner {...props} /></SizeCtx.Provider>;
+}
+
+function TagManagerInner({ vendorId, vendorName, overview, canGenerate, batch, batchTags, basePath }: Props) {
+  const pdf = usePdf();
   if (!overview.available) {
     return <p className="mt-6 rounded-card bg-warn/10 px-4 py-3 text-sm text-warn">Tag printing needs database migration 0036.</p>;
   }
@@ -54,8 +94,13 @@ export function TagManager({
       {canGenerate && <Generator vendorId={vendorId} vendorName={vendorName} overview={overview} basePath={basePath} />}
 
       <section className="card p-5">
-        <h2 className="font-display text-lg text-ink">Tag history</h2>
-        <p className="mt-1 text-xs text-slate">Every batch you&apos;ve generated. Reprint a whole set, or just its missing and damaged tags.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg text-ink">Tag history</h2>
+            <p className="mt-1 text-xs text-slate">Every batch you&apos;ve generated. Reprint a whole set, or just its missing and damaged tags.</p>
+          </div>
+          <SizePicker />
+        </div>
         {overview.batches.length === 0 ? (
           <p className="mt-3 text-sm text-slate">No tags generated yet.</p>
         ) : (
@@ -121,6 +166,7 @@ function Generator({ vendorId, vendorName, overview, basePath }: {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [made, setMade] = useState<{ batchId: string; n: number } | null>(null);
+  const pdf = usePdf();
   const n = Math.max(0, Math.min(500, Math.round(Number(count) || 0)));
   const p = prefix.trim().toUpperCase();
   const vid = overview.vid ?? "XXXX";
@@ -157,8 +203,9 @@ function Generator({ vendorId, vendorName, overview, basePath }: {
       <p className="mt-2 text-xs text-slate">
         {n > 0 ? <>Codes <span className="font-mono text-ink">{sample(overview.nextSerial)}</span>
           {n > 1 && <> to <span className="font-mono text-ink">{sample(overview.nextSerial + n - 1)}</span></>}
-          {!overview.vid && " (the ID part is assigned on your first batch)"}. Up to 500 at a time; 15 tags per A4 page.</> : "Enter how many tags to make (1–500)."}
+          {!overview.vid && " (the ID part is assigned on your first batch)"}. Up to 500 at a time.</> : "Enter how many tags to make (1–500)."}
       </p>
+      <div className="mt-3"><SizePicker /></div>
       {err && <p className="mt-2 text-sm text-danger">{err}</p>}
       {made && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-card bg-teal/10 px-4 py-3 text-sm">
@@ -177,6 +224,7 @@ function BatchDetail({ batch, tags, basePath }: { batch: BatchRow; tags: TagRow[
   const [filter, setFilter] = useState<"all" | "missing" | "damaged" | "in_use" | "free">("all");
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const pdf = usePdf();
   const shown = useMemo(() => rows.filter((r) => filter === "all" || r.status === filter), [rows, filter]);
   const back = basePath;
 
@@ -211,6 +259,7 @@ function BatchDetail({ batch, tags, basePath }: { batch: BatchRow; tags: TagRow[
         </div>
       </div>
 
+      <SizePicker />
       <div className="flex flex-wrap gap-2">
         {(["all", "missing", "damaged", "in_use", "free"] as const).map((f) => (
           <button key={f} onClick={() => setFilter(f)} className={filter === f ? "chip-ink" : "chip-muted"}>
