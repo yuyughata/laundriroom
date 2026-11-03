@@ -230,6 +230,8 @@ export async function submitReview(orderId: string, vendorId: string, rating: nu
     if (error.code === "23505") return { error: "You've already reviewed this order." };
     return { error: error.message };
   }
+  // A 1–2★ review: tell the vendor to follow up, and flag it to admins.
+  if (rating <= 2) await notifyOrder("review_low", orderId);
   revalidatePath(`/customer/orders/${orderId}`);
   return { ok: true };
 }

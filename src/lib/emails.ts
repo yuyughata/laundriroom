@@ -361,6 +361,79 @@ export const EMAIL_TEMPLATES: Record<string, (ctx: EmailContext) => { subject: s
     note: "Reply in the app so the whole conversation stays in one place.",
   }),
 
+  // ── Bad review (to the vendor's staff, and admins) ──────────────────────
+  review_low: (ctx) => ctx.admin_name
+    ? build(`${c(ctx, "rating")}★ review for ${c(ctx, "vendor_name")} — ${c(ctx, "order_code")}`, {
+        preheader: `${c(ctx, "vendor_name")} received a ${c(ctx, "rating")}-star review`,
+        heading: "Low rating flagged",
+        accent: WARN,
+        paragraphs: [
+          `Hi ${c(ctx, "admin_name", "there")}, <strong>${c(ctx, "customer_name", "A customer")}</strong> gave <strong>${c(ctx, "vendor_name")}</strong> ${c(ctx, "rating")}★ for order <strong>${c(ctx, "order_code")}</strong>.`,
+          `“${c(ctx, "review_comment")}”`,
+          `The vendor has been asked to contact the customer and resolve it. Vendors with rising bad reviews show on the Vendor quality page.`,
+        ],
+        rows: [
+          { label: "Vendor", value: String(ctx.vendor_name ?? "—") },
+          ...(ctx.branch_line ? [{ label: "Branch", value: String(ctx.branch_line) }] : []),
+          { label: "Customer", value: [ctx.customer_name, ctx.customer_phone].filter(Boolean).join(" · ") || "—" },
+        ],
+        button: { label: "Open Vendor quality", url: String(ctx.quality_url ?? "#"), tone: "ink" },
+      })
+    : build(`A customer rated order ${c(ctx, "order_code")} ${c(ctx, "rating")}★ — please follow up`, {
+        preheader: "Please look into this review and reach out to the customer",
+        heading: "A customer wasn't happy",
+        accent: WARN,
+        paragraphs: [
+          `Hi ${c(ctx, "recipient_name", "there")}, <strong>${c(ctx, "customer_name", "A customer")}</strong> rated order <strong>${c(ctx, "order_code")}</strong> ${c(ctx, "rating")} out of 5.`,
+          `“${c(ctx, "review_comment")}”`,
+          `Please look into what happened, reach out to the customer to talk it through, and resolve it promptly. Quick, caring follow-up usually turns an unhappy customer around — and repeated low ratings are reviewed by laundriroom.`,
+        ],
+        rows: [
+          { label: "Order", value: String(ctx.order_code ?? "—") },
+          ...(ctx.branch_line ? [{ label: "Branch", value: String(ctx.branch_line) }] : []),
+          { label: "Customer", value: [ctx.customer_name, ctx.customer_phone].filter(Boolean).join(" · ") || "—" },
+        ],
+        button: { label: "Open the order", url: String(ctx.order_url ?? ctx.reviews_url ?? "#"), tone: "ink" },
+        note: "Tip: call or WhatsApp the customer first, then note what you did when you reply in the app.",
+      }),
+
+  // ── Review-quality steps (to the vendor's managers) ─────────────────────
+  vendor_inquiry: (ctx) => build(`Your recent reviews on laundriroom`, {
+    preheader: "We'd like to understand what's behind some recent reviews",
+    heading: "Can you help us understand?",
+    accent: WARN,
+    paragraphs: [
+      `Hi ${c(ctx, "recipient_name", "there")}, ${c(ctx, "vendor_name")} has had ${c(ctx, "bad_reviews_30", "some")} low rating(s) in the last 30 days, and we'd like to understand what's happening.`,
+      ctx.action_message ? `“${c(ctx, "action_message")}”` : "",
+      `Please reply from your dashboard with what went wrong and what you're doing about it.`,
+    ].filter(Boolean),
+    button: { label: "Reply in your dashboard", url: String(ctx.reviews_url ?? "#"), tone: "ink" },
+  }),
+
+  vendor_warning: (ctx) => build(`Warning: customer reviews at ${c(ctx, "vendor_name")}`, {
+    preheader: "Low ratings are continuing — action is needed",
+    heading: "This is a formal warning",
+    accent: WARN,
+    paragraphs: [
+      `Hi ${c(ctx, "recipient_name", "there")}, low ratings at ${c(ctx, "vendor_name")} are continuing (${c(ctx, "bad_reviews_30", "several")} in the last 30 days).`,
+      ctx.action_message ? `“${c(ctx, "action_message")}”` : "",
+      `If customer reviews don't improve, your laundry may be suspended from laundriroom. Please reply from your dashboard with the steps you're taking.`,
+    ].filter(Boolean),
+    button: { label: "Respond now", url: String(ctx.reviews_url ?? "#"), tone: "ink" },
+  }),
+
+  vendor_suspended: (ctx) => build(`${c(ctx, "vendor_name")} has been suspended from laundriroom`, {
+    preheader: "Your laundry can't take new orders on laundriroom",
+    heading: "Your laundry is suspended",
+    accent: WARN,
+    paragraphs: [
+      `Hi ${c(ctx, "recipient_name", "there")}, after repeated low customer ratings, ${c(ctx, "vendor_name")} has been suspended from laundriroom and can't take new orders.`,
+      ctx.action_message ? `“${c(ctx, "action_message")}”` : "",
+      `Orders already in progress should still be completed. Contact laundriroom support to discuss the next steps.`,
+    ].filter(Boolean),
+    button: { label: "Open your dashboard", url: String(ctx.support_url ?? "#"), tone: "ink" },
+  }),
+
   // ── New order alert (to admins & the vendor's staff) ────────────────────
   order_placed: (ctx) => build(`New order ${c(ctx, "order_code")} — ${c(ctx, "vendor_name")}`, {
     preheader: `${c(ctx, "customer_name", "A customer")} placed an order`,

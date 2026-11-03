@@ -1,0 +1,270 @@
+"use client";
+
+import Link from "next/link";
+import { useMemo, useState, useTransition } from "react";
+import { generateTagBatch, setTagStatus } from "@/lib/tagActions";
+import type { BatchRow, TagOverview } from "@/lib/tagData";
+import type { Tag } from "@/lib/database.types";
+
+type TagRow = Pick<Tag, "id" | "code" | "status" | "serial" | "print_count" | "last_printed_at" | "status_note" | "status_changed_at" | "current_item_id">;
+
+const STATUS: Record<string, { label: string; chip: string }> = {
+  free: { label: "Ready", chip: "chip-ok" },
+  in_use: { label: "On an item", chip: "chip-ink" },
+  missing: { label: "Missing", chip: "chip-warn" },
+  damaged: { label: "Damaged", chip: "chip-warn" },
+  retired: { label: "Retired", chip: "chip-muted" },
+};
+const d = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" }) : "—");
+const pdf = (q: string) => `/api/tags/pdf?${q}`;
+
+/**
+ * Tags: generate a batch of QR tags (PREFIX-ID-NUMBER), print it, and keep
+ * the history. Any staff member can mark a tag missing/damaged and reprint
+ * it; generating is for the business's main manager or an admin.
+ */
+export function TagManager({
+  vendorId, vendorName, overview, canGenerate, batch, batchTags, basePath,
+}: {
+  vendorId: string; vendorName: string; overview: TagOverview; canGenerate: boolean;
+  /** A batch opened for detail, with its tags. */
+  batch?: BatchRow | null; batchTags?: TagRow[];
+  /** Page path, for links (keeps ?vendor= on the admin page). */
+  basePath: string;
+}) {
+  if (!overview.available) {
+    return <p className="mt-6 rounded-card bg-warn/10 px-4 py-3 text-sm text-warn">Tag printing needs database migration 0036.</p>;
+  }
+  if (batch && batchTags) return <BatchDetail batch={batch} tags={batchTags} basePath={basePath} />;
+
+  const t = overview.totals;
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-4">
+        {([["Ready", t.free, "chip-ok"], ["On items", t.in_use, "chip-ink"], ["Missing", t.missing, "chip-warn"], ["Damaged", t.damaged, "chip-warn"]] as const)
+          .map(([k, n, chip]) => (
+            <div key={k} className="card p-4">
+              <p className="text-xs text-slate">{k}</p>
+              <p className="mt-1 font-display text-2xl text-ink">{n}</p>
+              {(k === "Missing" || k === "Damaged") && n > 0 && <span className={`${chip} mt-1`}>Reprint from the batch below</span>}
+            </div>
+          ))}
+      </div>
+
+      {canGenerate && <Generator vendorId={vendorId} vendorName={vendorName} overview={overview} basePath={basePath} />}
+
+      <section className="card p-5">
+        <h2 className="font-display text-lg text-ink">Tag history</h2>
+        <p className="mt-1 text-xs text-slate">Every batch you&apos;ve generated. Reprint a whole set, or just its missing and damaged tags.</p>
+        {overview.batches.length === 0 ? (
+          <p className="mt-3 text-sm text-slate">No tags generated yet.</p>
+        ) : (
+          <div className="table-scroll mt-3 rounded-card border border-ink/10 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-ink/5 text-left text-xs text-slate">
+                <tr>
+                  <th className="px-4 py-2.5">Generated</th><th className="px-4 py-2.5">Codes</th><th className="px-4 py-2.5">Qty</th>
+                  <th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">Printed</th><th className="px-4 py-2.5">Print</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink/5">
+                {overview.batches.map((b) => {
+                  const lost = b.counts.missing + b.counts.damaged;
+                  return (
+                    <tr key={b.id}>
+                      <td className="px-4 py-3 text-slate">{d(b.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <Link href={`${basePath}${basePath.includes("?") ? "&" : "?"}batch=${b.id}`} className="font-mono text-xs text-ink underline">
+                          {b.firstCode}{b.quantity > 1 ? ` → ${b.lastCode?.split("-").pop()}` : ""}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-ink">{b.quantity}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {(["in_use", "missing", "damaged"] as const).filter((k) => b.counts[k] > 0).map((k) => (
+                            <span key={k} className={STATUS[k].chip}>{b.counts[k]} {STATUS[k].label.toLowerCase()}</span>
+                          ))}
+                          {b.counts.free > 0 && <span className="chip-ok">{b.counts.free} ready</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate">{b.print_count ? `${b.print_count}× · ${d(b.last_printed_at)}` : "Not yet"}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <a href={pdf(`batch=${b.id}`)} target="_blank" rel="noopener noreferrer" className="btn-ghost px-3 py-1.5 text-xs">
+                            {b.print_count ? "Reprint set" : "Print"}
+                          </a>
+                          {lost > 0 && (
+                            <a href={pdf(`batch=${b.id}&only=missing,damaged&reprint=1`)} target="_blank" rel="noopener noreferrer"
+                              className="btn-ghost border-warn/40 px-3 py-1.5 text-xs text-warn">
+                              Reprint {lost} missing/damaged
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Generator({ vendorId, vendorName, overview, basePath }: {
+  vendorId: string; vendorName: string; overview: TagOverview; basePath: string;
+}) {
+  const [count, setCount] = useState("50");
+  const [prefix, setPrefix] = useState(overview.prefix ?? "");
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const [made, setMade] = useState<{ batchId: string; n: number } | null>(null);
+  const n = Math.max(0, Math.min(500, Math.round(Number(count) || 0)));
+  const p = prefix.trim().toUpperCase();
+  const vid = overview.vid ?? "XXXX";
+  const sample = (k: number) => `${p || "??"}-${vid}-${String(k).padStart(5, "0")}`;
+
+  return (
+    <section className="card p-5">
+      <h2 className="font-display text-lg text-ink">Generate tags</h2>
+      <p className="mt-1 text-xs text-slate">
+        Each tag gets a QR code and a code staff can type in: <span className="font-mono text-ink">PREFIX-ID-NUMBER</span>.
+        The middle ID is unique to {vendorName}, and numbers never repeat, so no two tags are ever the same.
+      </p>
+      <div className="mt-4 flex flex-wrap items-end gap-4">
+        <div>
+          <label className="label" htmlFor="tag-count">How many</label>
+          <input id="tag-count" className="field w-28" inputMode="numeric" value={count}
+            onChange={(e) => { setCount(e.target.value.replace(/[^0-9]/g, "")); setMade(null); }} />
+        </div>
+        <div>
+          <label className="label" htmlFor="tag-prefix">Prefix</label>
+          <input id="tag-prefix" className="field w-28 font-mono uppercase" maxLength={5} value={prefix}
+            onChange={(e) => { setPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")); setMade(null); }} />
+        </div>
+        <button className="btn-primary" disabled={pending || n < 1}
+          onClick={() => start(async () => {
+            setErr(null);
+            const r = await generateTagBatch(vendorId, n, p);
+            if ("error" in r) setErr(r.error ?? "Couldn't generate tags.");
+            else setMade({ batchId: r.batchId, n });
+          })}>
+          {pending ? "Generating…" : `Generate ${n || ""} tag${n === 1 ? "" : "s"}`}
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-slate">
+        {n > 0 ? <>Codes <span className="font-mono text-ink">{sample(overview.nextSerial)}</span>
+          {n > 1 && <> to <span className="font-mono text-ink">{sample(overview.nextSerial + n - 1)}</span></>}
+          {!overview.vid && " (the ID part is assigned on your first batch)"}. Up to 500 at a time; 15 tags per A4 page.</> : "Enter how many tags to make (1–500)."}
+      </p>
+      {err && <p className="mt-2 text-sm text-danger">{err}</p>}
+      {made && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-card bg-teal/10 px-4 py-3 text-sm">
+          <span className="text-teal">{made.n} tags created.</span>
+          <a href={pdf(`batch=${made.batchId}`)} target="_blank" rel="noopener noreferrer" className="btn-primary px-4 py-2 text-xs">Print them (PDF)</a>
+          <Link href={`${basePath}${basePath.includes("?") ? "&" : "?"}batch=${made.batchId}`} className="text-xs text-ink underline">View the batch</Link>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BatchDetail({ batch, tags, basePath }: { batch: BatchRow; tags: TagRow[]; basePath: string }) {
+  const [rows, setRows] = useState(tags);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [filter, setFilter] = useState<"all" | "missing" | "damaged" | "in_use" | "free">("all");
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const shown = useMemo(() => rows.filter((r) => filter === "all" || r.status === filter), [rows, filter]);
+  const back = basePath;
+
+  const mark = (id: string, status: "missing" | "damaged" | "found") => start(async () => {
+    setErr(null);
+    const r = await setTagStatus(id, status);
+    if ("error" in r) { setErr(r.error ?? "Couldn't update the tag."); return; }
+    setRows((rs) => rs.map((x) => x.id !== id ? x : {
+      ...x, status: status === "found" ? (x.current_item_id ? "in_use" : "free") : status,
+      status_note: status === "found" ? "Found" : null, status_changed_at: new Date().toISOString(),
+    }));
+  });
+
+  return (
+    <div className="space-y-4">
+      <Link href={back} className="text-sm text-slate hover:text-ink">← Tag history</Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-xl text-ink">
+            <span className="font-mono text-lg">{batch.firstCode}</span>{batch.quantity > 1 && <> → <span className="font-mono text-lg">{batch.lastCode?.split("-").pop()}</span></>}
+          </h2>
+          <p className="text-xs text-slate">{batch.quantity} tags · generated {d(batch.created_at)} · printed {batch.print_count}×</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a href={pdf(`batch=${batch.id}`)} target="_blank" rel="noopener noreferrer" className="btn-ghost px-3 py-2 text-xs">Reprint whole set</a>
+          {selected.length > 0 && (
+            <a href={pdf(`ids=${selected.join(",")}&reprint=1`)} target="_blank" rel="noopener noreferrer" className="btn-primary px-3 py-2 text-xs"
+              onClick={() => setTimeout(() => setSelected([]), 500)}>
+              Reprint {selected.length} selected
+            </a>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(["all", "missing", "damaged", "in_use", "free"] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)} className={filter === f ? "chip-ink" : "chip-muted"}>
+            {f === "all" ? `All (${rows.length})` : `${STATUS[f].label} (${rows.filter((r) => r.status === f).length})`}
+          </button>
+        ))}
+      </div>
+      {err && <p className="text-sm text-danger">{err}</p>}
+
+      <div className="table-scroll rounded-card border border-ink/10 bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-ink/5 text-left text-xs text-slate">
+            <tr>
+              <th className="w-10 px-4 py-2.5">
+                <input type="checkbox" aria-label="Select all shown"
+                  checked={shown.length > 0 && shown.every((r) => selected.includes(r.id))}
+                  onChange={(e) => setSelected(e.target.checked ? [...new Set([...selected, ...shown.map((r) => r.id)])] : selected.filter((id) => !shown.some((r) => r.id === id)))} />
+              </th>
+              <th className="px-4 py-2.5">Code</th><th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5">Printed</th><th className="px-4 py-2.5">Mark / reprint</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-ink/5">
+            {shown.map((r) => (
+              <tr key={r.id}>
+                <td className="px-4 py-2.5">
+                  <input type="checkbox" aria-label={`Select ${r.code}`} checked={selected.includes(r.id)}
+                    onChange={(e) => setSelected(e.target.checked ? [...selected, r.id] : selected.filter((x) => x !== r.id))} />
+                </td>
+                <td className="px-4 py-2.5 font-mono text-xs text-ink">{r.code}</td>
+                <td className="px-4 py-2.5">
+                  <span className={STATUS[r.status]?.chip ?? "chip-muted"}>{STATUS[r.status]?.label ?? r.status}</span>
+                  {r.status_note && <span className="ml-2 text-xs text-slate">{r.status_note}</span>}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-slate">{r.print_count}× · {d(r.last_printed_at)}</td>
+                <td className="px-4 py-2.5">
+                  <div className="flex flex-wrap gap-1.5">
+                    {(r.status === "free" || r.status === "in_use") && (<>
+                      <button className="btn-ghost px-2.5 py-1 text-xs" disabled={pending} onClick={() => mark(r.id, "missing")}>Missing</button>
+                      <button className="btn-ghost px-2.5 py-1 text-xs" disabled={pending} onClick={() => mark(r.id, "damaged")}>Damaged</button>
+                    </>)}
+                    {(r.status === "missing" || r.status === "damaged") && (<>
+                      <a href={pdf(`ids=${r.id}&reprint=1`)} target="_blank" rel="noopener noreferrer" className="btn-primary px-2.5 py-1 text-xs">Reprint</a>
+                      {r.status === "missing" && <button className="btn-ghost px-2.5 py-1 text-xs" disabled={pending} onClick={() => mark(r.id, "found")}>Found it</button>}
+                    </>)}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {shown.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate">No tags here.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-slate">Reprinting a missing or damaged tag prints the same code again and puts it back into use.</p>
+    </div>
+  );
+}

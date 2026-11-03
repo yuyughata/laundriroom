@@ -63,7 +63,7 @@ export async function notifyTicket(event: "ticket_opened" | "ticket_message" | "
  * itself, so only the id is sent.
  */
 export async function notifyOrder(
-  event: "order_placed" | "order_confirmed", orderId: string,
+  event: "order_placed" | "order_confirmed" | "review_low", orderId: string,
   opts: { skip?: ("admin" | "vendor" | "customer")[] } = {},
 ) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -74,6 +74,26 @@ export async function notifyOrder(
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
       body: JSON.stringify({ event, order_id: orderId, skip_recipients: opts.skip ?? [] }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Review-quality steps (inquiry / warning / suspension): message the vendor's
+ * main managers. The edge function reads the step and its message itself.
+ */
+export async function notifyVendorAction(event: "vendor_inquiry" | "vendor_warning" | "vendor_suspended", actionId: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+  try {
+    await fetch(`${url}/functions/v1/send-notification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+      body: JSON.stringify({ event, vendor_action_id: actionId }),
       signal: AbortSignal.timeout(5000),
     });
   } catch {

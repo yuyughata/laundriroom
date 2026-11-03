@@ -4,6 +4,7 @@ import { ShellNav } from "./ShellNav";
 
 const NAV = [
   { href: "/vendor/queue", label: "Queue" },
+  { href: "/vendor/tags", label: "Tags" },
   { href: "/vendor/profile", label: "My page" },
   { href: "/vendor/branches", label: "Branches" },
   { href: "/vendor/requests", label: "Item requests" },

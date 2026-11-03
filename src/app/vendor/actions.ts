@@ -462,3 +462,13 @@ export async function createVendorOrder(_prev: unknown, formData: FormData) {
   revalidatePath("/vendor/queue");
   redirect(`/vendor/orders/${orderId}`);
 }
+
+/** The main manager replies to laundriroom's inquiry or warning about reviews. */
+export async function respondQualityAction(actionId: string, response: string) {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("respond_quality_action" as never, { p_action: actionId, p_response: response } as never);
+  if (error) return { error: error.message };
+  revalidatePath("/vendor/reviews");
+  revalidatePath("/admin/quality");
+  return { ok: true };
+}

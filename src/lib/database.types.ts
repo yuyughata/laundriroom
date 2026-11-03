@@ -27,7 +27,7 @@ export type InvoiceStatus = "draft" | "issued" | "paid" | "void";
 export type PaymentMethod = "paystack" | "flutterwave" | "manual";
 export type PaymentStatus = "pending" | "succeeded" | "failed" | "refunded";
 export type PayoutStatus = "held" | "due" | "processing" | "sent" | "failed";
-export type TagStatus = "free" | "in_use" | "retired";
+export type TagStatus = "free" | "in_use" | "retired" | "missing" | "damaged";
 export type RequestStatus = "pending" | "approved" | "rejected";
 export type NotifChannel = "email" | "whatsapp" | "sms";
 export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
@@ -138,6 +138,14 @@ export type VendorPayoutAccount = {
 export type Tag = {
   id: string; code: string; batch: string | null; status: TagStatus;
   vendor_id: string | null; current_item_id: string | null; created_at: string;
+  /** Printable batches (migration 0036). */
+  batch_id: string | null; serial: number | null; print_count: number; last_printed_at: string | null;
+  status_note: string | null; status_changed_at: string | null;
+}
+/** A generated batch of printable tags (migration 0036). */
+export type TagBatch = {
+  id: string; vendor_id: string; prefix: string; first_serial: number; last_serial: number; quantity: number;
+  created_by: string | null; created_at: string; print_count: number; last_printed_at: string | null;
 }
 export type ItemTypeRequest = {
   id: string; vendor_id: string; requested_by: string; item_name: string;

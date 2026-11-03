@@ -4,6 +4,12 @@ import { EMAIL_TEMPLATES, EMAIL_EVENTS, AUTH_EMAIL_TEMPLATES, sampleAuthEmail, t
 export const dynamic = "force-dynamic";
 
 const SAMPLE: EmailContext = {
+  rating: 2,
+  review_comment: "My white shirt came back with a stain and two buttons missing.",
+  action_message: "We've seen several low ratings mentioning damaged items. What happened, and what are you changing?",
+  bad_reviews_30: 3,
+  quality_url: "#",
+  reviews_url: "#",
   order_code: "ORD-261101-0042",
   customer_name: "Barry",
   vendor_name: "Fold & Press, Lekki",

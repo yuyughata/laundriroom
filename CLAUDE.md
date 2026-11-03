@@ -105,6 +105,31 @@ promote an admin → deploy edge functions → wire Paystack).
   asked to accept again. More than 3 paragraphs → scrollable box
   (`components/ui/AgreementText.tsx`). `src/lib/legal.ts` holds the title and
   the fallback clause.
+- **Printable tags (`0036`):** Vendor → Tags and Admin → Tags (per vendor).
+  `generate_tags(vendor, count, prefix?)` (business-wide manager or platform
+  admin, 1–500) makes a `tag_batches` row + `free` tags coded
+  `PREFIX-VID-NNNNN` — prefix 2–5 chars (default: name initials,
+  `vendor_tag_prefix_default`), VID a 4-char code unique to the vendor
+  (`vendors.tag_vid`), number from `vendors.tag_seq` under a row lock (never
+  reused). `/api/tags/pdf?batch=|ids=[&only=missing,damaged][&reprint=1]`
+  renders A4 sheets (`src/lib/tagPdf.ts`: 3×5 grid, dashed cut lines, punch
+  ring on the left, QR = the code, code in Courier) and counts prints; a
+  reprint puts missing/damaged tags back in service. Staff mark tags
+  `missing`/`damaged`/found (`src/lib/tagActions.ts`); closing an order only
+  frees `in_use` tags. UI: `components/tags/TagManager.tsx`.
+- **Bad reviews (`0037`/`0038`):** a 1–2★ review fires `review_low` (vendor
+  staff for that branch + business-wide, and admins) from `submitReview`.
+  Admin → Vendor quality reads `get_review_watchlist()` (flagged: 3+ bad in
+  30 days, or 2+ and rising vs the previous 30, or 30%+ of 5+ reviews; watch:
+  any bad in 30 days) and escalates in order inquiry → warning → suspension
+  (`vendor_quality_actions`, `admin/quality/actions.ts`; suspension sets the
+  vendor suspended; `resolved` closes a case). Each step emails/WhatsApps the
+  business-wide managers (`vendor_inquiry`/`vendor_warning`/
+  `vendor_suspended`, payload `vendor_action_id`); they reply at
+  Vendor → Reviews (`respond_quality_action`).
+- **Manual DB updates:** if MCP/CLI can't apply migrations, paste
+  `supabase/manual/apply-0033-0038.sql` into the SQL Editor (two
+  transactions, self-checks, re-runnable).
 - **Password fields** use `components/ui/PasswordInput.tsx` (Show/Hide).
 - **Responsive dashboards:** admin and vendor shells share `ShellNav` — a fixed
   sidebar on desktop (lg+), a top bar with a Menu button (all links + account)

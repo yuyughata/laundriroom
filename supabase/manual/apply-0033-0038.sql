@@ -1,12 +1,19 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- laundriroom — database update: multi-branch vendors (0033), Partner
--- Agreement clauses (0034), distance-based delivery pricing (0035).
+-- laundriroom — database update 0033 → 0038:
+--   0033 multi-branch vendors          0036 printable tag batches
+--   0034 Partner Agreement clauses     0037 review-quality notification events
+--   0035 distance delivery pricing     0038 bad-review flags + escalation
 --
 -- HOW TO RUN: Supabase → your laundriroom project → SQL Editor → New query →
--- paste this whole file → Run. It runs as one transaction: if any step or the
--- built-in self-check fails, NOTHING is changed and you'll see the reason.
--- Success shows "Success. No rows returned".
+-- paste this whole file → Run. Success shows "Success. No rows returned".
+--
+-- It runs in two transactions (Postgres must commit new event names before
+-- they can be used): PART 1 = 0033–0037, PART 2 = 0038. If a step or a
+-- self-check fails, that part changes nothing and you'll see the reason.
+-- Safe to run again — already-applied parts are skipped or re-applied as-is.
 -- ═══════════════════════════════════════════════════════════════════════════
+
+-- ═══ PART 1 of 2 ═══════════════════════════════════════════════════════════
 begin;
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -558,9 +565,363 @@ comment on column orders.delivery_distance_km is 'Driving km used to price the d
 comment on column orders.pickup_address_id is 'The customer''s address, used for pickup and/or delivery.';
 
 
--- Record the three changes in the migration history.
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 0036 — Printable tag batches.
+--
+-- Vendors (and admins on their behalf) generate batches of garment tags,
+-- print them as QR codes, and keep a history.
+--
+-- Tag code format:  PREFIX-VID-NNNNN   e.g.  FPL-7KQ2-00042
+--   PREFIX  the vendor's tag prefix (2–5 letters/digits, set by the vendor or
+--           admin; defaults to the initials of the vendor's name)
+--   VID     a short code unique to the vendor, generated once — so two
+--           vendors with the same prefix can never print the same code
+--   NNNNN   the vendor's running tag number (never reused)
+-- The code is what's printed under the QR and what staff type in.
+--
+-- 1. vendors.tag_prefix / tag_vid / tag_seq.
+-- 2. tag_batches: one row per generated batch (who, when, numbers, prints).
+-- 3. tags: batch_id, serial, print tracking, status note; two new statuses
+--    'missing' and 'damaged' (kept as they are when an order closes — only
+--    in-use tags go back to 'free').
+-- 4. generate_tags(vendor, count, prefix?) — business-wide managers and
+--    platform admins; numbers are allocated under a row lock, so two people
+--    generating at once can't collide.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+alter type tag_status add value if not exists 'missing';
+alter type tag_status add value if not exists 'damaged';
+
+-- ─── 1. Vendor tag settings ─────────────────────────────────────────────────
+alter table vendors add column if not exists tag_prefix text;
+alter table vendors add column if not exists tag_vid text;
+alter table vendors add column if not exists tag_seq int not null default 0;
+alter table vendors drop constraint if exists vendors_tag_prefix_format;
+alter table vendors add constraint vendors_tag_prefix_format
+  check (tag_prefix is null or tag_prefix ~ '^[A-Z0-9]{2,5}$');
+create unique index if not exists vendors_tag_vid_key on vendors (tag_vid);
+comment on column vendors.tag_prefix is 'Printed tag codes start with this (2–5 A–Z/0–9).';
+comment on column vendors.tag_vid is 'Short code unique to the vendor, the middle part of every tag code.';
+comment on column vendors.tag_seq is 'Last tag number used by the vendor.';
+
+-- ─── 2. Batches ─────────────────────────────────────────────────────────────
+create table if not exists tag_batches (
+  id              uuid primary key default gen_random_uuid(),
+  vendor_id       uuid not null references vendors (id) on delete cascade,
+  prefix          text not null,
+  first_serial    int not null,
+  last_serial     int not null,
+  quantity        int not null check (quantity between 1 and 500),
+  created_by      uuid references profiles (id) on delete set null,
+  created_at      timestamptz not null default now(),
+  print_count     int not null default 0,
+  last_printed_at timestamptz
+);
+create index if not exists tag_batches_vendor_idx on tag_batches (vendor_id, created_at desc);
+comment on table tag_batches is 'History of generated tag batches (printable as QR sheets).';
+
+-- ─── 3. Tags ────────────────────────────────────────────────────────────────
+alter table tags add column if not exists batch_id uuid references tag_batches (id) on delete set null;
+alter table tags add column if not exists serial int;
+alter table tags add column if not exists print_count int not null default 0;
+alter table tags add column if not exists last_printed_at timestamptz;
+alter table tags add column if not exists status_note text;
+alter table tags add column if not exists status_changed_at timestamptz;
+create index if not exists tags_batch_idx on tags (batch_id, serial);
+create index if not exists tags_vendor_status_idx on tags (vendor_id, status);
+
+-- Closing an order frees its in-use tags; missing / damaged / retired stay put.
+create or replace function on_order_closed() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.status = 'closed' then
+    update tags t
+      set status = 'free', current_item_id = null
+      from order_items oi
+      where oi.order_id = new.id
+        and t.current_item_id = oi.id
+        and t.status = 'in_use';
+
+    perform schedule_payout_if_ready(new.id);
+  end if;
+  return new;
+end;
+$$;
+
+-- ─── 4. Generate a batch ────────────────────────────────────────────────────
+-- Default prefix: initials of the vendor's name ("Fold & Press, Lekki" → FPL).
+create or replace function vendor_tag_prefix_default(p_name text) returns text
+language sql immutable set search_path = public as $$
+  select coalesce(nullif(left(upper(string_agg(left(w, 1), '')), 5), ''), 'LR')
+    from regexp_split_to_table(regexp_replace(coalesce(p_name, ''), '[^A-Za-z0-9 ]', ' ', 'g'), '\s+') w
+   where w <> '' and lower(w) not in ('and', 'the', 'of', 'ltd', 'limited');
+$$;
+
+create or replace function generate_tags(p_vendor uuid, p_count int, p_prefix text default null)
+returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v vendors%rowtype;
+  pfx text;
+  vid text;
+  first_no int;
+  batch uuid;
+  alphabet text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   -- no 0/O/1/I: easier to type
+begin
+  if not (is_vendor_manager(p_vendor) or is_platform_admin()) then
+    raise exception 'Only the business''s main manager or a platform admin can generate tags.' using errcode = '42501';
+  end if;
+  if p_count is null or p_count < 1 or p_count > 500 then
+    raise exception 'Generate between 1 and 500 tags at a time.' using errcode = '22023';
+  end if;
+
+  select * into v from vendors where id = p_vendor for update;
+  if v.id is null then raise exception 'vendor not found'; end if;
+
+  pfx := upper(btrim(coalesce(nullif(btrim(p_prefix), ''), v.tag_prefix, vendor_tag_prefix_default(v.name))));
+  if pfx !~ '^[A-Z0-9]{2,5}$' then
+    raise exception 'Use 2–5 letters or numbers for the tag prefix.' using errcode = '22023';
+  end if;
+
+  vid := v.tag_vid;
+  while vid is null loop
+    vid := '';
+    for i in 1..4 loop
+      vid := vid || substr(alphabet, 1 + floor(random() * length(alphabet))::int, 1);
+    end loop;
+    if exists (select 1 from vendors where tag_vid = vid) then vid := null; end if;
+  end loop;
+
+  first_no := v.tag_seq + 1;
+  update vendors set tag_prefix = pfx, tag_vid = vid, tag_seq = v.tag_seq + p_count where id = p_vendor;
+
+  insert into tag_batches (vendor_id, prefix, first_serial, last_serial, quantity, created_by)
+  values (p_vendor, pfx, first_no, first_no + p_count - 1, p_count, auth.uid())
+  returning id into batch;
+
+  insert into tags (code, batch, batch_id, serial, status, vendor_id)
+  select format('%s-%s-%s', pfx, vid, lpad(n::text, 5, '0')), batch::text, batch, n, 'free', p_vendor
+    from generate_series(first_no, first_no + p_count - 1) n;
+
+  return batch;
+end;
+$$;
+
+revoke execute on function generate_tags(uuid, int, text) from public, anon;
+grant execute on function generate_tags(uuid, int, text) to authenticated;
+revoke execute on function vendor_tag_prefix_default(text) from public, anon;
+
+-- Vendor tag columns: a business manager may set the prefix; only the
+-- generator moves the counter and the vendor code.
+create or replace function guard_vendor_columns() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if current_user in ('anon', 'authenticated') and not is_platform_admin() then
+    if new.status                   is distinct from old.status
+    or new.plan_id                  is distinct from old.plan_id
+    or new.kyc_verified             is distinct from old.kyc_verified
+    or new.slug                     is distinct from old.slug
+    or new.tag_vid                  is distinct from old.tag_vid
+    or new.tag_seq                  is distinct from old.tag_seq
+    then
+      raise exception 'only a platform admin can change these vendor settings' using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function guard_vendor_columns() from public, anon, authenticated;
+
+-- ─── Access ─────────────────────────────────────────────────────────────────
+alter table tag_batches enable row level security;
+drop policy if exists tag_batches_read on tag_batches;
+create policy tag_batches_read on tag_batches for select
+  using (is_vendor_staff(vendor_id) or is_admin());
+-- Print tracking only (rows are created by generate_tags).
+drop policy if exists tag_batches_update on tag_batches;
+create policy tag_batches_update on tag_batches for update
+  using (is_vendor_staff(vendor_id) or is_platform_admin())
+  with check (is_vendor_staff(vendor_id) or is_platform_admin());
+
+-- ─── Self-check for 0036 (aborts the update if anything is off) ────────────
+do $$
+begin
+  if vendor_tag_prefix_default('Fold & Press, Lekki') <> 'FPL' then raise exception 'self-check: tag prefix'; end if;
+  if not exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'tag_status' and e.enumlabel = 'damaged')
+    then raise exception 'self-check: tag_status'; end if;
+  if to_regclass('public.tag_batches') is null then raise exception 'self-check: tag_batches'; end if;
+end $$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 0037 — Notification events for review quality (values only; the rules that
+-- use them are in 0038, since Postgres can't use a new enum value in the same
+-- transaction that adds it).
+--   review_low        a 1–2★ review: tell the vendor (and admins)
+--   vendor_inquiry    admin asks the vendor what's going on
+--   vendor_warning    admin warns the vendor
+--   vendor_suspended  admin suspends the vendor for repeated bad reviews
+-- ═══════════════════════════════════════════════════════════════════════════
+alter type notif_event add value if not exists 'review_low';
+alter type notif_event add value if not exists 'vendor_inquiry';
+alter type notif_event add value if not exists 'vendor_warning';
+alter type notif_event add value if not exists 'vendor_suspended';
+
+-- Record 0033–0037 in the migration history.
 insert into supabase_migrations.schema_migrations (version, name, statements)
-values ('0033', 'multi_branch_vendors', '{}'), ('0034', 'partner_agreement', '{}'), ('0035', 'distance_delivery_pricing', '{}')
+values ('0033', 'multi_branch_vendors', '{}'), ('0034', 'partner_agreement', '{}'),
+       ('0035', 'distance_delivery_pricing', '{}'), ('0036', 'tag_batches', '{}'),
+       ('0037', 'review_quality_events', '{}')
+on conflict (version) do nothing;
+
+commit;
+
+-- ═══ PART 2 of 2 ═══════════════════════════════════════════════════════════
+begin;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 0038 — Bad reviews: tell the vendor, flag to admins, escalate in steps.
+--
+-- A "bad" review is 1 or 2 stars.
+-- 1. Every bad review emails/WhatsApps the vendor (that branch's staff and
+--    business-wide staff) asking them to look into it, contact the customer
+--    and resolve it promptly — and alerts admins (event review_low). The app
+--    fires it when the review is saved.
+-- 2. get_review_watchlist() — admins: per vendor, bad reviews in the last 30
+--    days vs the 30 days before, last 90 days, average ratings, and a level:
+--      flagged  3+ bad in 30 days, or 2+ and more than the previous 30 days
+--               (rising), or 30%+ of 5+ reviews in 30 days were bad
+--      watch    at least one bad review in 30 days
+--    plus the current escalation step.
+-- 3. vendor_quality_actions — the escalation trail an admin takes:
+--      inquiry → warning → suspension (and 'resolved' to close a case).
+--    Each step messages the vendor; suspension also sets the vendor's status.
+--    The vendor's main manager can reply to an inquiry/warning in the app
+--    (respond_quality_action).
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- ─── Notification rules + WhatsApp text ─────────────────────────────────────
+insert into notification_rules (event, channels, fallback_order, recipients, enabled)
+select e::notif_event, '{email,whatsapp}'::notif_channel[], '{whatsapp,email}'::notif_channel[], r::text[], true
+from (values ('review_low', '{vendor,admin}'), ('vendor_inquiry', '{vendor}'),
+             ('vendor_warning', '{vendor}'), ('vendor_suspended', '{vendor}')) as x(e, r)
+where not exists (select 1 from notification_rules n where n.event = x.e::notif_event);
+
+insert into notification_templates (event, channel, subject, body)
+select x.e::notif_event, 'whatsapp', null, x.b
+from (values
+  ('review_low', 'laundriroom: order {{order_code}} at {{vendor_name}} got a {{rating}}★ review: "{{review_comment}}". Please look into it, contact the customer ({{customer_phone}}) and resolve it promptly.'),
+  ('vendor_inquiry', 'laundriroom: we''d like to understand recent customer reviews at {{vendor_name}}. {{action_message}} Please reply in your dashboard: {{reviews_url}}'),
+  ('vendor_warning', 'laundriroom WARNING for {{vendor_name}}: {{action_message}} Continued bad reviews may lead to suspension. Respond in your dashboard: {{reviews_url}}'),
+  ('vendor_suspended', 'laundriroom: {{vendor_name}} has been suspended from the platform. {{action_message}} Contact support to discuss: {{support_url}}')
+) as x(e, b)
+where not exists (select 1 from notification_templates t where t.event = x.e::notif_event and t.channel = 'whatsapp');
+
+-- ─── Escalation trail ───────────────────────────────────────────────────────
+create table if not exists vendor_quality_actions (
+  id              uuid primary key default gen_random_uuid(),
+  vendor_id       uuid not null references vendors (id) on delete cascade,
+  stage           text not null check (stage in ('inquiry', 'warning', 'suspension', 'resolved')),
+  message         text not null check (length(btrim(message)) > 0),
+  created_by      uuid references profiles (id) on delete set null,
+  created_at      timestamptz not null default now(),
+  vendor_response text,
+  responded_by    uuid references profiles (id) on delete set null,
+  responded_at    timestamptz
+);
+create index if not exists vendor_quality_actions_vendor_idx on vendor_quality_actions (vendor_id, created_at desc);
+comment on table vendor_quality_actions is 'Admin steps on a vendor with bad reviews: inquiry → warning → suspension, or resolved.';
+
+alter table vendor_quality_actions enable row level security;
+drop policy if exists vqa_read on vendor_quality_actions;
+create policy vqa_read on vendor_quality_actions for select using (is_vendor_staff(vendor_id) or is_admin());
+drop policy if exists vqa_admin_write on vendor_quality_actions;
+create policy vqa_admin_write on vendor_quality_actions for all
+  using (is_platform_admin()) with check (is_platform_admin());
+
+-- The vendor's main manager answers an inquiry or warning.
+create or replace function respond_quality_action(p_action uuid, p_response text) returns void
+language plpgsql security definer set search_path = public as $$
+declare a vendor_quality_actions%rowtype;
+begin
+  select * into a from vendor_quality_actions where id = p_action;
+  if a.id is null then raise exception 'not found'; end if;
+  if not is_vendor_manager(a.vendor_id) then raise exception 'Only the business''s main manager can respond.' using errcode = '42501'; end if;
+  if a.stage not in ('inquiry', 'warning') then raise exception 'This step doesn''t take a response.'; end if;
+  if length(btrim(coalesce(p_response, ''))) < 10 then raise exception 'Please write a short explanation (10+ characters).'; end if;
+  update vendor_quality_actions
+     set vendor_response = left(btrim(p_response), 4000), responded_by = auth.uid(), responded_at = now()
+   where id = p_action;
+end;
+$$;
+revoke execute on function respond_quality_action(uuid, text) from public, anon;
+grant execute on function respond_quality_action(uuid, text) to authenticated;
+
+-- ─── Watchlist ──────────────────────────────────────────────────────────────
+create or replace function get_review_watchlist()
+returns table (
+  vendor_id uuid, vendor_name text, vendor_status vendor_status,
+  reviews_30 int, bad_30 int, bad_prev_30 int, bad_90 int,
+  avg_30 numeric, avg_all numeric, reviews_all int, last_bad_at timestamptz,
+  level text, reason text, stage text, stage_at timestamptz, vendor_responded boolean
+)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not is_admin() then raise exception 'admins only' using errcode = '42501'; end if;
+  return query
+  with s as (
+    select v.id, v.name, v.status,
+      count(r.*) filter (where r.created_at > now() - interval '30 days')::int as r30,
+      count(r.*) filter (where r.rating <= 2 and r.created_at > now() - interval '30 days')::int as b30,
+      count(r.*) filter (where r.rating <= 2 and r.created_at <= now() - interval '30 days'
+                                            and r.created_at > now() - interval '60 days')::int as bp30,
+      count(r.*) filter (where r.rating <= 2 and r.created_at > now() - interval '90 days')::int as b90,
+      round(avg(r.rating) filter (where r.created_at > now() - interval '30 days'), 1) as a30,
+      round(avg(r.rating), 1) as aall,
+      count(r.*)::int as rall,
+      max(r.created_at) filter (where r.rating <= 2) as lastbad
+    from vendors v left join reviews r on r.vendor_id = v.id
+    group by v.id
+  ), a as (
+    select distinct on (q.vendor_id) q.vendor_id, q.stage, q.created_at, q.vendor_response is not null as responded
+      from vendor_quality_actions q order by q.vendor_id, q.created_at desc
+  ), lv as (
+    select s.*, a.stage as st, a.created_at as st_at, coalesce(a.responded, false) as resp,
+      case
+        when s.b30 >= 3 then 'flagged'
+        when s.b30 >= 2 and s.b30 > s.bp30 then 'flagged'
+        when s.r30 >= 5 and s.b30::numeric / s.r30 >= 0.3 then 'flagged'
+        when s.b30 >= 1 then 'watch'
+        else 'ok' end as lvl,
+      case
+        when s.b30 >= 3 then format('%s bad reviews in the last 30 days', s.b30)
+        when s.b30 >= 2 and s.b30 > s.bp30 then format('Bad reviews rising: %s in the last 30 days (was %s)', s.b30, s.bp30)
+        when s.r30 >= 5 and s.b30::numeric / s.r30 >= 0.3 then format('%s%% of recent reviews are bad', round(100.0 * s.b30 / s.r30))
+        when s.b30 >= 1 then format('%s bad review%s in the last 30 days', s.b30, case when s.b30 = 1 then '' else 's' end)
+        else '' end as why
+    from s left join a on a.vendor_id = s.id
+  )
+  select lv.id, lv.name, lv.status, lv.r30, lv.b30, lv.bp30, lv.b90, lv.a30, lv.aall, lv.rall, lv.lastbad,
+         lv.lvl, lv.why, lv.st, lv.st_at, lv.resp
+    from lv
+   where lv.lvl <> 'ok' or (lv.st is not null and lv.st <> 'resolved')
+   order by case lv.lvl when 'flagged' then 0 when 'watch' then 1 else 2 end, lv.b30 desc, lv.lastbad desc nulls last;
+end;
+$$;
+revoke execute on function get_review_watchlist() from public, anon;
+grant execute on function get_review_watchlist() to authenticated;
+
+-- ─── Self-check for 0038 ────────────────────────────────────────────────────
+do $$
+begin
+  if (select count(*) from notification_rules where event in ('review_low','vendor_inquiry','vendor_warning','vendor_suspended')) <> 4
+    then raise exception 'self-check: notification rules'; end if;
+  if to_regclass('public.vendor_quality_actions') is null then raise exception 'self-check: vendor_quality_actions'; end if;
+  if to_regprocedure('public.get_review_watchlist()') is null then raise exception 'self-check: get_review_watchlist'; end if;
+end $$;
+
+insert into supabase_migrations.schema_migrations (version, name, statements)
+values ('0038', 'review_quality', '{}')
 on conflict (version) do nothing;
 
 commit;
