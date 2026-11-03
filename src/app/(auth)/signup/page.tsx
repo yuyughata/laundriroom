@@ -4,8 +4,11 @@ import Link from "next/link";
 import { useFormState } from "react-dom";
 import { signUp } from "../actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { safeNext } from "@/lib/nav";
 
-export default function SignupPage() {
+export default function SignupPage({ searchParams }: { searchParams: { next?: string } }) {
+  const next = safeNext(searchParams?.next);
+  const carry = next ? `?next=${encodeURIComponent(next)}` : "";
   const [state, action] = useFormState(signUp, null as { error?: string } | null);
 
   return (
@@ -16,6 +19,7 @@ export default function SignupPage() {
       </p>
 
       <form action={action} className="mt-8 space-y-4">
+        {next && <input type="hidden" name="next" value={next} />}
         <div>
           <label className="label" htmlFor="full_name">Full name</label>
           <input id="full_name" name="full_name" required className="field" placeholder="Barry Okeke" />
@@ -43,7 +47,7 @@ export default function SignupPage() {
 
       <p className="mt-6 text-center text-sm text-slate">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-ink underline">Sign in</Link>
+        <Link href={`/login${carry}`} className="font-medium text-ink underline">Sign in</Link>
       </p>
     </div>
   );

@@ -126,7 +126,20 @@ by the vendor manager at Vendor → Verification, stored on
 on a completed order; aggregated per vendor via the `vendor_ratings` view and
 shown on vendor selection, the vendor Reviews page, and admin — admins moderate
 under Admin → Reviews), automatic 24h payout scheduling, and tag release
-on order close.
+on order close, and **vendor profile pages** (public `/v/<slug>`, `0031`):
+every vendor gets a `slug` from its name the moment the row is created
+(trigger `set_vendor_slug`; unique with -2/-3; kept on rename; admin-only to
+change via `guard_vendor_columns`). Anyone — signed in or not — can open the
+page; it reads `get_vendor_profile(slug)` (SECURITY DEFINER, granted to anon,
+verified/pending vendors only) for name, location, hours, the KYC
+"Verified business" badge, rating summary + recent reviews (first name +
+initial) and the price list, with Open Graph tags for WhatsApp previews. Its
+Order button goes to `/customer/order?vendor=<slug>` (signed-out visitors via
+`/signup?next=…` / `/login?next=…` — `safeNext` in `src/lib/nav.ts` keeps
+return paths same-site); that pre-selects the vendor and sets
+`orders.via_vendor_link`. Vendors copy/share the link, send it on WhatsApp and
+download a QR code at Vendor → My page (with orders-from-link stats); admins
+see each link under Admin → Vendors. Links use `NEXT_PUBLIC_SITE_URL`.
 
 **Stubbed, ready for keys:**
 - Payments — `create-payment` picks the provider from

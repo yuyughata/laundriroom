@@ -49,7 +49,13 @@ export default async function AdminVendors() {
           <tbody className="divide-y divide-ink/5">
             {vs.map((v) => (
               <tr key={v.id}>
-                <td className="px-4 py-3 font-medium text-ink">{v.name}</td>
+                <td className="px-4 py-3">
+                  <p className="font-medium text-ink">{v.name}</p>
+                  {v.slug && v.status !== "rejected" && v.status !== "suspended" && (
+                    <a href={`/v/${v.slug}`} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-slate underline hover:text-ink">/v/{v.slug}</a>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-slate">{[v.area, v.city].filter(Boolean).join(", ") || "—"}</td>
                 <td className="px-4 py-3 text-slate">{v.delivery.replace("_", " ")}</td>
                 <td className="px-4 py-3">

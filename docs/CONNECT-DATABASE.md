@@ -22,7 +22,9 @@ CLI — both routes are below.
 cp .env.example .env.local
 ```
 
-Fill in the three values above, plus `NEXT_PUBLIC_SITE_URL` (your app URL).
+Fill in the three values above, plus `NEXT_PUBLIC_SITE_URL` (your app URL —
+in production your public domain, because vendors share profile links built
+from it, e.g. `https://laundriroom.app/v/fold-and-press-lekki`).
 Then confirm:
 
 ```bash
