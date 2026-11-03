@@ -51,8 +51,8 @@ export function renderEmail(b: Block, iconUrl: string = brandIconUrl()): string 
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;border-collapse:collapse;">
         ${b.rows.map((r) => `
         <tr>
-          <td style="padding:10px 0;border-bottom:1px solid #ECE7DD;color:${SLATE};font-size:14px;">${esc(r.label)}</td>
-          <td align="right" style="padding:10px 0;border-bottom:1px solid #ECE7DD;color:${INK};font-size:14px;font-weight:600;">${esc(r.value)}</td>
+          <td style="padding:10px 12px 10px 0;border-bottom:1px solid #ECE7DD;font-family:Arial,Helvetica,sans-serif;color:${SLATE};font-size:14px;">${esc(r.label)}</td>
+          <td align="right" style="padding:10px 0;border-bottom:1px solid #ECE7DD;font-family:Arial,Helvetica,sans-serif;color:${INK};font-size:14px;font-weight:600;">${esc(r.value)}</td>
         </tr>`).join("")}
        </table>`
     : "";
