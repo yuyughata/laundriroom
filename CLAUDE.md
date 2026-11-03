@@ -106,12 +106,15 @@ promote an admin → deploy edge functions → wire Paystack).
   (`components/ui/AgreementText.tsx`). `src/lib/legal.ts` holds the title and
   the fallback clause.
 - **Printable tags (`0036`):** Vendor → Tags and Admin → Tags (per vendor).
-  `generate_tags(vendor, count, prefix?)` (business-wide manager or platform
-  admin, 1–500) makes a `tag_batches` row + `free` tags coded
-  `PREFIX-VID-NNNNN` — prefix 2–5 chars (default: name initials,
-  `vendor_tag_prefix_default`), VID a 4-char code unique to the vendor
-  (`vendors.tag_vid`), number from `vendors.tag_seq` under a row lock (never
-  reused). `/api/tags/pdf?batch=|ids=[&only=missing,damaged][&reprint=1]`
+  `generate_tags(vendor, count)` (business-wide manager or platform admin,
+  1–500) makes a `tag_batches` row + `free` tags coded `PREFIX-NNNN`
+  (e.g. `FPL-0042`; grows past 9999). `vendors.tag_prefix` is set
+  automatically when the vendor is created (trigger `set_vendor_tag_prefix`:
+  name initials, or a one-word name's first 3 letters —
+  `vendor_tag_prefix_base`), unique across vendors (FPL, FPL2, FPL3…), kept on
+  rename, and only an admin can change it (`guard_vendor_columns`). Numbers
+  come from `vendors.tag_seq` under a row lock and are never reused; a number
+  whose code already exists is skipped. `/api/tags/pdf?batch=|ids=[&only=missing,damaged][&reprint=1]`
   `&size=20|25|30` (square tags in mm, default 25; picker remembered per
   device, `src/lib/tagSizes.ts`) renders A4 sheets (`src/lib/tagPdf.ts`:
   tags edge to edge with shared dashed cut lines, punch mark on the left,

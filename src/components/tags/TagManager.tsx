@@ -46,7 +46,7 @@ function SizePicker() {
 }
 
 /**
- * Tags: generate a batch of QR tags (PREFIX-ID-NUMBER), print it, and keep
+ * Tags: generate a batch of QR tags (PREFIX-NUMBER, e.g. FPL-0042), print it, and keep
  * the history. Any staff member can mark a tag missing/damaged and reprint
  * it; generating is for the business's main manager or an admin.
  */
@@ -162,22 +162,20 @@ function Generator({ vendorId, vendorName, overview, basePath }: {
   vendorId: string; vendorName: string; overview: TagOverview; basePath: string;
 }) {
   const [count, setCount] = useState("50");
-  const [prefix, setPrefix] = useState(overview.prefix ?? "");
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [made, setMade] = useState<{ batchId: string; n: number } | null>(null);
   const pdf = usePdf();
   const n = Math.max(0, Math.min(500, Math.round(Number(count) || 0)));
-  const p = prefix.trim().toUpperCase();
-  const vid = overview.vid ?? "XXXX";
-  const sample = (k: number) => `${p || "??"}-${vid}-${String(k).padStart(5, "0")}`;
+  const code = (k: number) => `${overview.prefix}-${k < 10000 ? String(k).padStart(4, "0") : k}`;
 
   return (
     <section className="card p-5">
       <h2 className="font-display text-lg text-ink">Generate tags</h2>
       <p className="mt-1 text-xs text-slate">
-        Each tag gets a QR code and a code staff can type in: <span className="font-mono text-ink">PREFIX-ID-NUMBER</span>.
-        The middle ID is unique to {vendorName}, and numbers never repeat, so no two tags are ever the same.
+        Each tag gets a QR code and a short code staff can type in: your prefix and a number, like{" "}
+        <span className="font-mono text-ink">{code(42)}</span>. The prefix <span className="font-mono text-ink">{overview.prefix}</span> is
+        set from {vendorName}&apos;s name and belongs to you alone, and numbers never repeat, so no two tags are ever the same.
       </p>
       <div className="mt-4 flex flex-wrap items-end gap-4">
         <div>
@@ -185,15 +183,10 @@ function Generator({ vendorId, vendorName, overview, basePath }: {
           <input id="tag-count" className="field w-28" inputMode="numeric" value={count}
             onChange={(e) => { setCount(e.target.value.replace(/[^0-9]/g, "")); setMade(null); }} />
         </div>
-        <div>
-          <label className="label" htmlFor="tag-prefix">Prefix</label>
-          <input id="tag-prefix" className="field w-28 font-mono uppercase" maxLength={5} value={prefix}
-            onChange={(e) => { setPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")); setMade(null); }} />
-        </div>
         <button className="btn-primary" disabled={pending || n < 1}
           onClick={() => start(async () => {
             setErr(null);
-            const r = await generateTagBatch(vendorId, n, p);
+            const r = await generateTagBatch(vendorId, n);
             if ("error" in r) setErr(r.error ?? "Couldn't generate tags.");
             else setMade({ batchId: r.batchId, n });
           })}>
@@ -201,9 +194,8 @@ function Generator({ vendorId, vendorName, overview, basePath }: {
         </button>
       </div>
       <p className="mt-2 text-xs text-slate">
-        {n > 0 ? <>Codes <span className="font-mono text-ink">{sample(overview.nextSerial)}</span>
-          {n > 1 && <> to <span className="font-mono text-ink">{sample(overview.nextSerial + n - 1)}</span></>}
-          {!overview.vid && " (the ID part is assigned on your first batch)"}. Up to 500 at a time.</> : "Enter how many tags to make (1–500)."}
+        {n > 0 ? <>Codes <span className="font-mono text-ink">{code(overview.nextSerial)}</span>
+          {n > 1 && <> to <span className="font-mono text-ink">{code(overview.nextSerial + n - 1)}</span></>}. Up to 500 at a time.</> : "Enter how many tags to make (1–500)."}
       </p>
       <div className="mt-3"><SizePicker /></div>
       {err && <p className="mt-2 text-sm text-danger">{err}</p>}

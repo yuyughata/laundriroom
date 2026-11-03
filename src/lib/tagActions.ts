@@ -14,14 +14,12 @@ function refresh() {
   revalidatePath("/admin/tags");
 }
 
-export async function generateTagBatch(vendorId: string, count: number, prefix: string) {
+export async function generateTagBatch(vendorId: string, count: number) {
   const n = Math.round(Number(count));
   if (!Number.isFinite(n) || n < 1 || n > 500) return { error: "Generate between 1 and 500 tags at a time." };
-  const p = prefix.trim().toUpperCase();
-  if (p && !/^[A-Z0-9]{2,5}$/.test(p)) return { error: "Use 2–5 letters or numbers for the prefix." };
   const supabase = createClient();
   const { data, error } = await supabase.rpc("generate_tags" as never,
-    { p_vendor: vendorId, p_count: n, p_prefix: p || null } as never);
+    { p_vendor: vendorId, p_count: n } as never);
   if (error) {
     return { error: /function .* does not exist|generate_tags/.test(error.message) && /exist/.test(error.message)
       ? "Tag batches need database migration 0036." : error.message };

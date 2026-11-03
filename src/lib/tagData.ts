@@ -8,31 +8,32 @@ export type BatchRow = TagBatch & {
 
 export type TagOverview = {
   available: boolean;               // migration 0036 applied
-  prefix: string | null;            // current prefix (or the default suggestion)
+  prefix: string;                   // the vendor's tag prefix (set from its name)
   nextSerial: number;
-  vid: string | null;
   batches: BatchRow[];
   totals: BatchRow["counts"];
 };
 
 const zero = () => ({ free: 0, in_use: 0, missing: 0, damaged: 0, retired: 0 });
 
-/** Initials of the vendor's name, as the database's default prefix. */
+/** Same rule as the database's vendor_tag_prefix_base (before the
+ *  uniqueness suffix): initials, or a one-word name's first 3 letters. */
 export function defaultPrefix(name: string) {
-  const words = name.replace(/[^A-Za-z0-9 ]/g, " ").split(/\s+/)
-    .filter((w) => w && !["and", "the", "of", "ltd", "limited"].includes(w.toLowerCase()));
-  return (words.map((w) => w[0]).join("").toUpperCase().slice(0, 5) || "LR").padEnd(2, "X");
+  const words = name.toUpperCase().replace(/[^A-Z0-9 ]/g, " ").split(/\s+/)
+    .filter((w) => w && !["and", "the", "of", "ltd", "limited", "plc", "nig", "co"].includes(w.toLowerCase()));
+  const v = words.length >= 2 ? words.map((w) => w[0]).join("").slice(0, 4) : words.length === 1 ? words[0].slice(0, 3) : "LR";
+  return v.padEnd(2, "X");
 }
 
 export async function loadTagOverview(vendorId: string, vendorName: string): Promise<TagOverview> {
   const supabase = createClient();
   const [{ data: v, error: vErr }, { data: batches, error: bErr }, { data: tags }] = await Promise.all([
-    supabase.from("vendors").select("tag_prefix, tag_vid, tag_seq").eq("id", vendorId).maybeSingle(),
+    supabase.from("vendors").select("tag_prefix, tag_seq").eq("id", vendorId).maybeSingle(),
     supabase.from("tag_batches" as never).select("*").eq("vendor_id", vendorId).order("created_at", { ascending: false }),
     supabase.from("tags").select("batch_id, status, code, serial").eq("vendor_id", vendorId).limit(20000),
   ]);
-  if (vErr || bErr) return { available: false, prefix: defaultPrefix(vendorName), nextSerial: 1, vid: null, batches: [], totals: zero() };
-  const vv = v as { tag_prefix: string | null; tag_vid: string | null; tag_seq: number } | null;
+  if (vErr || bErr) return { available: false, prefix: defaultPrefix(vendorName), nextSerial: 1, batches: [], totals: zero() };
+  const vv = v as { tag_prefix: string | null; tag_seq: number } | null;
   const all = (tags ?? []) as Pick<Tag, "batch_id" | "status" | "code" | "serial">[];
   const totals = zero();
   const per = new Map<string, { counts: BatchRow["counts"]; first?: { s: number; c: string }; last?: { s: number; c: string } }>();
@@ -50,7 +51,6 @@ export async function loadTagOverview(vendorId: string, vendorName: string): Pro
     available: true,
     prefix: vv?.tag_prefix ?? defaultPrefix(vendorName),
     nextSerial: (vv?.tag_seq ?? 0) + 1,
-    vid: vv?.tag_vid ?? null,
     totals,
     batches: ((batches ?? []) as TagBatch[]).map((b) => ({
       ...b,

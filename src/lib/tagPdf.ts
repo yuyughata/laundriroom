@@ -114,8 +114,8 @@ function drawTag(
   page.drawLine({ start: { x: hx - c, y: hy }, end: { x: hx + c, y: hy }, thickness: 0.35, color: INK });
   page.drawLine({ start: { x: hx, y: hy - c }, end: { x: hx, y: hy + c }, thickness: 0.35, color: INK });
 
-  // The code: one line if it stays readable, else split after the vendor ID
-  // ("FPL-K7Q2-" / "00042").
+  // The code: one line if it stays readable, else split after the prefix
+  // ("FPL-" / "0042"); only needed for long prefixes on 2 cm tags.
   const cap = S * 0.115;
   let lines = [code];
   let size = Math.min(cap, (areaW - 1) / (mono.widthOfTextAtSize(code, 1)));
