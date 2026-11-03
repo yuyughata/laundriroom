@@ -175,7 +175,7 @@ function Generator({ vendorId, vendorName, overview, basePath }: {
       <p className="mt-1 text-xs text-slate">
         Each tag gets a QR code and a short code staff can type in: your prefix and a number, like{" "}
         <span className="font-mono text-ink">{code(42)}</span>. The prefix <span className="font-mono text-ink">{overview.prefix}</span> is
-        set from {vendorName}&apos;s name and belongs to you alone, and numbers never repeat, so no two tags are ever the same.
+        set from the business name and belongs to {vendorName} alone, and numbers never repeat, so no two tags are ever the same.
       </p>
       <div className="mt-4 flex flex-wrap items-end gap-4">
         <div>
