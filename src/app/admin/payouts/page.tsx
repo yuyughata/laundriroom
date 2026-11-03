@@ -23,9 +23,9 @@ export default async function AdminPayouts() {
 
   return (
     <AdminShell active="/admin/payouts" name={profile.full_name} role={profile.role}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Payouts</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="chip-warn">{money(totalDue)} due across {due.length}</span>
           <a className="btn-ghost px-3 py-2 text-xs" href="/api/reports/statement" download>Statement PDF</a>
           <a className="btn-ghost px-3 py-2 text-xs" href="/api/reports/payouts" download>Payouts PDF</a>
@@ -35,7 +35,7 @@ export default async function AdminPayouts() {
         Each payout falls due 24 hours after an order is completed and paid, net of commission or plan fee. Hold any that are disputed.
       </p>
 
-      <div className="mt-6 overflow-x-auto rounded-card border border-ink/10 bg-white">
+      <div className="mt-6 table-scroll rounded-card border border-ink/10 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-ink/5 text-left text-xs text-slate">
             <tr>

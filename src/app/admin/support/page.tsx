@@ -34,7 +34,7 @@ export default async function AdminSupport({ searchParams }: { searchParams: { s
 
   return (
     <AdminShell active="/admin/support" name={profile.full_name} role={profile.role}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Support</h1>
         <span className="chip-warn">{openCount} open</span>
       </div>
@@ -49,7 +49,7 @@ export default async function AdminSupport({ searchParams }: { searchParams: { s
         ))}
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-card border border-ink/10 bg-white">
+      <div className="mt-6 table-scroll rounded-card border border-ink/10 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-ink/5 text-left text-xs text-slate">
             <tr>

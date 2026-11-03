@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { homeFor } from "@/lib/auth";
 import { notifyUser } from "@/lib/notify";
+import { safeNext } from "@/lib/nav";
 
 export async function signIn(_prev: unknown, formData: FormData) {
   const email = String(formData.get("email") || "");
@@ -16,7 +17,11 @@ export async function signIn(_prev: unknown, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("profiles").select("role").eq("id", user!.id).single();
-  redirect(homeFor(profile?.role ?? "customer"));
+  const role = profile?.role ?? "customer";
+  // Back to where they were heading (e.g. a vendor's order form) — customer
+  // pages only make sense for customers.
+  const next = safeNext(formData.get("next"));
+  redirect(next && (role === "customer" || !next.startsWith("/customer")) ? next : homeFor(role));
 }
 
 export async function signUp(_prev: unknown, formData: FormData) {
@@ -43,8 +48,9 @@ export async function signUp(_prev: unknown, formData: FormData) {
   });
   if (error) return { error: error.message };
 
-  // signUp signs the user in (email confirmation pending) → straight to the app
-  redirect("/customer?welcome=1");
+  // signUp signs the user in (email confirmation pending) → straight to the
+  // app, or back to where they were heading (e.g. a vendor's order form).
+  redirect(safeNext(formData.get("next")) ?? "/customer?welcome=1");
 }
 
 export async function signOut() {

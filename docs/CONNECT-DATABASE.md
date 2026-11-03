@@ -22,7 +22,9 @@ CLI — both routes are below.
 cp .env.example .env.local
 ```
 
-Fill in the three values above, plus `NEXT_PUBLIC_SITE_URL` (your app URL).
+Fill in the three values above, plus `NEXT_PUBLIC_SITE_URL` (your app URL —
+in production your public domain, because vendors share profile links built
+from it, e.g. `https://laundriroom.app/v/fold-and-press-lekki`).
 Then confirm:
 
 ```bash
@@ -62,7 +64,9 @@ In **Authentication → URL Configuration**:
 
 In **Authentication → Email Templates**, replace Supabase's default emails with
 the laundriroom ones so every email matches. Run `npm run emails:auth`, then for
-each template paste the file from `supabase/templates/` and set the subject:
+each template paste the file from `supabase/templates/` and set the subject (the
+header shows the brand icon, loaded from `{{ .SiteURL }}/brand/mark-email.png`,
+so the Site URL must be your public app URL for it to appear):
 
 | Template | File | Subject |
 | --- | --- | --- |
@@ -147,6 +151,8 @@ to the simulator.
      WhatsApp message is sent inside it, with the text as `{{1}}` (Meta only
      allows free-form text within 24 hours of the person messaging you).
    - `supabase secrets set WHATSAPP_API_TOKEN=... SITE_URL=https://your-app`
+     (`SITE_URL` is also where emails load the brand icon from, so set it to
+     the public app URL even if you don't use WhatsApp.)
    - Admin → Integrations → WhatsApp: enter the phone number ID, the template
      name and language code (`en`), and save so the status shows Connected.
    - Admins and support agents get alerts on the phone number in their profile

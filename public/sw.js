@@ -5,9 +5,9 @@
  * falling back to a cached shell / offline page when the network is unavailable.
  * Static assets are served cache-first. Supabase/API calls are never cached.
  */
-const CACHE = "laundriroom-v1";
+const CACHE = "laundriroom-v2";
 const OFFLINE_URL = "/offline.html";
-const PRECACHE = ["/offline.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const PRECACHE = ["/offline.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/brand/mark-light.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));

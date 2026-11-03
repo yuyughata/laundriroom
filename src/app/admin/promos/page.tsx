@@ -19,7 +19,7 @@ export default async function AdminPromos() {
 
   return (
     <AdminShell active="/admin/promos" name={profile.full_name} role={profile.role}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Promo codes</h1>
         <NewPromo />
       </div>
@@ -36,7 +36,7 @@ export default async function AdminPromos() {
       </div>
 
       <h2 className="mt-8 font-display text-lg text-ink">Promo codes</h2>
-      <div className="mt-3 overflow-x-auto rounded-card border border-ink/10 bg-white">
+      <div className="mt-3 table-scroll rounded-card border border-ink/10 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-ink/5 text-left text-xs text-slate">
             <tr>

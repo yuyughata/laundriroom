@@ -25,6 +25,8 @@ export async function createOrder(formData: FormData) {
   const delivered_by = (formData.get("delivered_by") as DeliveredBy | null) || null;
   const notes = String(formData.get("notes") || "") || null;
   const extraIds = formData.getAll("extras").map(String).filter(Boolean);
+  // Placed from the vendor's own profile link (/v/<slug>)?
+  const via_vendor_link = formData.get("via_vendor_link") === "1";
 
   if (!vendor_id) return { error: "Please choose a laundry." };
 
@@ -61,6 +63,7 @@ export async function createOrder(formData: FormData) {
       delivery_fee,
       total: delivery_fee, // items/extras/markups recompute via triggers
       notes,
+      via_vendor_link,
       status: entry_mode === "pickup" ? "pickup_requested" : "awaiting_dropoff",
     })
     .select("id")

@@ -50,7 +50,25 @@
 
   /* Status chips */
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-pill px-3 py-1 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill px-3 py-1 text-xs font-medium;
+  }
+
+  /* Data tables: below desktop width the table keeps a readable width and
+     scrolls sideways inside its card. Soft edge shadows appear on whichever
+     side has more columns, so it's clear there's more to swipe to. */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    background:
+      linear-gradient(to right, #fff 30%, rgba(255, 255, 255, 0)) left center / 40px 100% no-repeat local,
+      linear-gradient(to left, #fff 30%, rgba(255, 255, 255, 0)) right center / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgba(15, 27, 45, 0.16), transparent) left center / 14px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgba(15, 27, 45, 0.16), transparent) right center / 14px 100% no-repeat scroll,
+      #fff;
+  }
+  @media (max-width: 1023px) {
+    .table-scroll > table { min-width: 44rem; }
+    .table-scroll > table :is(th, td):first-child { white-space: nowrap; }
   }
   .chip-ok { @apply chip bg-teal/15 text-teal; }
   .chip-warn { @apply chip bg-warn/15 text-warn; }

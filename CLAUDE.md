@@ -72,6 +72,11 @@ promote an admin → deploy edge functions → wire Paystack).
   change their own status/plan/KYC flag (`guard_vendor_columns`).
 - Server Components fetch; interactive bits are small client components calling
   server actions in each area's `actions.ts`.
+- **Responsive dashboards:** admin and vendor shells share `ShellNav` — a fixed
+  sidebar on desktop (lg+), a top bar with a Menu button (all links + account)
+  below that. Wrap data tables in `table-scroll` (globals.css): it scrolls
+  sideways with edge shadows and keeps a readable min-width below lg. Page
+  heading rows use `flex flex-wrap … gap-3` so badges/buttons wrap on phones.
 
 ## State of the build
 
@@ -121,7 +126,20 @@ by the vendor manager at Vendor → Verification, stored on
 on a completed order; aggregated per vendor via the `vendor_ratings` view and
 shown on vendor selection, the vendor Reviews page, and admin — admins moderate
 under Admin → Reviews), automatic 24h payout scheduling, and tag release
-on order close.
+on order close, and **vendor profile pages** (public `/v/<slug>`, `0031`):
+every vendor gets a `slug` from its name the moment the row is created
+(trigger `set_vendor_slug`; unique with -2/-3; kept on rename; admin-only to
+change via `guard_vendor_columns`). Anyone — signed in or not — can open the
+page; it reads `get_vendor_profile(slug)` (SECURITY DEFINER, granted to anon,
+verified/pending vendors only) for name, location, hours, the KYC
+"Verified business" badge, rating summary + recent reviews (first name +
+initial) and the price list, with Open Graph tags for WhatsApp previews. Its
+Order button goes to `/customer/order?vendor=<slug>` (signed-out visitors via
+`/signup?next=…` / `/login?next=…` — `safeNext` in `src/lib/nav.ts` keeps
+return paths same-site); that pre-selects the vendor and sets
+`orders.via_vendor_link`. Vendors copy/share the link, send it on WhatsApp and
+download a QR code at Vendor → My page (with orders-from-link stats); admins
+see each link under Admin → Vendors. Links use `NEXT_PUBLIC_SITE_URL`.
 
 **Stubbed, ready for keys:**
 - Payments — `create-payment` picks the provider from
@@ -164,7 +182,11 @@ on order close.
   `WHATSAPP_API_TOKEN` secret, the phone number ID and an approved template
   (one body variable `{{1}}`) set on Admin → Integrations. Email uses designed Ink &
   Ivory HTML templates in `src/lib/emails.ts` (one per event), mirrored to
-  `supabase/functions/_shared/emails.ts` (keep both in sync). Admins preview
+  `supabase/functions/_shared/emails.ts` (keep both in sync). Every email header
+  shows the brand icon + wordmark; the icon is `public/brand/mark-email.png`,
+  loaded from `SITE_URL` (edge function) or `{{ .SiteURL }}` (auth templates).
+  Branding everywhere is icon + wordmark: `components/ui/Logo.tsx` in the app
+  shells, `src/lib/brandMark.ts` (embedded PNG) in PDF reports. Admins preview
   all templates at `/api/emails/preview`. Account emails (password changed,
   details updated, suspended, reactivated) are sent by the app via
   `src/lib/notify.ts → send-notification` with `user_id`. Sign-in emails that

@@ -20,7 +20,7 @@ export default async function AdminApplications() {
 
   return (
     <AdminShell active="/admin/applications" name={profile.full_name} role={profile.role}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Vendor applications</h1>
         <span className="chip-warn text-xs">{pendingCount} pending</span>
       </div>

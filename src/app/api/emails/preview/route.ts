@@ -104,7 +104,9 @@ export async function GET(req: Request) {
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>laundriroom email templates</title></head>
 <body style="margin:0;background:#F8F5EF;font-family:Arial,Helvetica,sans-serif;">
 <div style="max-width:680px;margin:0 auto;padding:40px 20px;">
-  <p style="font-family:Arial,Helvetica,sans-serif;font-size:21px;color:#0F1B2D;font-weight:700;letter-spacing:-.3px;margin:0;">laundriroom</p>
+  <p style="margin:0;display:flex;align-items:center;gap:9px;font-family:Arial,Helvetica,sans-serif;font-size:21px;color:#0F1B2D;font-weight:700;letter-spacing:-.3px;">
+    <img src="/brand/mark-email.png" width="32" height="24" alt="" style="display:block;">laundriroom
+  </p>
   <h1 style="font-family:Georgia,serif;color:#0F1B2D;">Email templates</h1>
   <p style="color:#5B6678;">Every communication, rendered with sample data. Click any one to open it.</p>
   <ul style="list-style:none;padding:0;margin:24px 0 0;">${items}</ul>

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
+import { safeNext } from "@/lib/nav";
 
 /** Role → home dashboard. */
 const HOME: Record<string, string> = {
@@ -12,7 +13,7 @@ const HOME: Record<string, string> = {
   support_agent: "/admin",
 };
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/verify-email", "/auth", "/apply", "/api/health", "/forgot-password", "/reset-password"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/verify-email", "/auth", "/apply", "/api/health", "/forgot-password", "/reset-password", "/v"];
 
 /**
  * Refreshes the Supabase session on every request and guards the role areas.
@@ -51,7 +52,8 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("next", path);
+    url.search = "";
+    url.searchParams.set("next", path + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 
@@ -59,8 +61,12 @@ export async function updateSession(request: NextRequest) {
     const { data: profile } = await supabase
       .from("profiles").select("role").eq("id", user.id).single();
     const url = request.nextUrl.clone();
+    // Already signed in: go where the sign-in link was taking them (e.g. a
+    // vendor's order form), else to their dashboard.
+    const next = path === "/" ? null : safeNext(request.nextUrl.searchParams.get("next"));
     url.pathname = HOME[profile?.role ?? "customer"] ?? "/customer";
     url.search = "";
+    if (next) return NextResponse.redirect(new URL(next, request.url));
     return NextResponse.redirect(url);
   }
 

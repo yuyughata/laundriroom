@@ -21,7 +21,7 @@
 // Deploy:  supabase functions deploy send-notification
 // ============================================================================
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { EMAIL_TEMPLATES } from "../_shared/emails.ts";
+import { EMAIL_TEMPLATES, setEmailAssetBase } from "../_shared/emails.ts";
 
 type Channel = "email" | "whatsapp" | "sms";
 type Recipient = { email: string | null; phone: string | null; vars: Record<string, string> };
@@ -34,6 +34,7 @@ Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const SITE = (Deno.env.get("SITE_URL") ?? "http://localhost:3000").replace(/\/$/, "");
+  setEmailAssetBase(SITE); // email header icon is served by the app
 
   // Server-to-server only: the caller must present the service-role key.
   // Otherwise anyone holding the public anon key could make us message people.

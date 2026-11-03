@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from "pdf-lib";
+import { BRAND_MARK_PNG_BASE64, BRAND_MARK_ASPECT } from "./brandMark";
 
 /**
  * Lightweight PDF report builder (pdf-lib — pure JS, no headless browser).
@@ -19,7 +20,6 @@ export type ReportInput = {
 const INK = rgb(0.06, 0.11, 0.18);
 const SLATE = rgb(0.36, 0.4, 0.47);
 const LINE = rgb(0.85, 0.85, 0.85);
-const CHAMP = rgb(0.78, 0.65, 0.39);
 
 const PAGE_W = 842;
 const PAGE_H = 595;
@@ -54,6 +54,7 @@ export async function buildReportPdf(input: ReportInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const mark = await doc.embedPng(Buffer.from(BRAND_MARK_PNG_BASE64, "base64"));
 
   const usableW = PAGE_W - MARGIN * 2;
   const totalColW = input.columns.reduce((s, c) => s + c.width, 0);
@@ -64,7 +65,11 @@ export async function buildReportPdf(input: ReportInput): Promise<Uint8Array> {
   let y = PAGE_H - MARGIN;
 
   const drawHeader = (p: PDFPage) => {
-    p.drawText("laundriroom", { x: MARGIN, y: PAGE_H - MARGIN, size: 16, font: bold, color: CHAMP });
+    // Brand: icon + wordmark, baseline-aligned on the first header line.
+    const markH = 18;
+    const markW = markH * BRAND_MARK_ASPECT;
+    p.drawImage(mark, { x: MARGIN, y: PAGE_H - MARGIN - 4, width: markW, height: markH });
+    p.drawText("laundriroom", { x: MARGIN + markW + 6, y: PAGE_H - MARGIN, size: 16, font: bold, color: INK });
     p.drawText(pdfSafe(input.title), { x: MARGIN, y: PAGE_H - MARGIN - 22, size: 15, font: bold, color: INK });
     let my = PAGE_H - MARGIN - 40;
     for (const m of input.meta) {

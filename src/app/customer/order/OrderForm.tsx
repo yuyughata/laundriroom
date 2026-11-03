@@ -8,19 +8,24 @@ import { Stars } from "@/components/ui/Stars";
 import type { ServiceExtra } from "@/lib/database.types";
 
 export type OrderVendor = {
-  id: string; name: string; area: string | null; city: string | null;
+  id: string; slug: string; name: string; area: string | null; city: string | null;
   delivery: string; openNow: boolean; hours: string;
   rating: number; reviewCount: number;
 };
 
 export function OrderForm({
-  vendors, deliveryFee, deliveryFeeLabel, extras,
+  vendors, deliveryFee, deliveryFeeLabel, extras, linkedVendorId,
 }: {
   vendors: OrderVendor[]; deliveryFee: number; deliveryFeeLabel: string;
   extras: ServiceExtra[];
+  /** Opened from this vendor's profile link: order from them, list collapsed. */
+  linkedVendorId?: string;
 }) {
   const firstOpen = vendors.find((v) => v.openNow) ?? vendors[0];
-  const [vendorId, setVendorId] = useState(firstOpen?.id ?? "");
+  const [vendorId, setVendorId] = useState(linkedVendorId ?? firstOpen?.id ?? "");
+  const [showAll, setShowAll] = useState(!linkedVendorId);
+  const viaLink = !!linkedVendorId && vendorId === linkedVendorId;
+  const shown = showAll ? vendors : vendors.filter((v) => v.id === linkedVendorId);
   const [entry, setEntry] = useState<"pickup" | "drop_off">("drop_off");
   const [ret, setRet] = useState<"delivery" | "collection">("collection");
   const [tier, setTier] = useState<"standard" | "premium">("standard");
@@ -54,12 +59,13 @@ export function OrderForm({
   return (
     <form action={onSubmit} className="mt-6 space-y-6">
       <input type="hidden" name="vendor_id" value={vendorId} />
+      {viaLink && <input type="hidden" name="via_vendor_link" value="1" />}
       {tier === "premium" && chosenExtras.map((id) => <input key={id} type="hidden" name="extras" value={id} />)}
 
       <section>
-        <p className="label">Choose a laundry</p>
+        <p className="label">{showAll ? "Choose a laundry" : "Your laundry"}</p>
         <div className="space-y-2">
-          {vendors.map((v) => (
+          {shown.map((v) => (
             <button type="button" key={v.id} onClick={() => setVendorId(v.id)}
               className={`card flex w-full items-center justify-between p-4 text-left ${
                 vendorId === v.id ? "ring-2 ring-ink" : ""} ${v.openNow ? "" : "opacity-70"}`}>
@@ -78,6 +84,11 @@ export function OrderForm({
             </button>
           ))}
         </div>
+        {!showAll && vendors.length > 1 && (
+          <button type="button" onClick={() => setShowAll(true)} className="mt-2 text-xs text-slate underline">
+            Choose a different laundry
+          </button>
+        )}
       </section>
 
       {/* Service tier */}

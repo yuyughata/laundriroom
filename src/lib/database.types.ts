@@ -71,6 +71,8 @@ export type Vendor = {
   lat: number | null; lng: number | null; service_radius_km: number;
   opens_at: string | null; closes_at: string | null; is_open: boolean;
   kyc_verified: boolean; terms_accepted_at: string | null;
+  /** Shareable profile link name: /v/<slug> (auto-generated, admin-only to change). */
+  slug: string;
   created_at: string; updated_at: string;
 }
 export type VendorPlan = {
@@ -96,6 +98,8 @@ export type Order = {
   handover_code: string | null; pickup_code: string | null; picked_up_at: string | null;
   dispatch_reference: string | null; rider_name: string | null; rider_phone: string | null;
   created_by: string | null;
+  /** Placed from the vendor's public profile link. */
+  via_vendor_link: boolean;
   promo_code: string | null; discount: number;
   discount_type: "percent" | "fixed" | null; discount_value: number | null; discount_max: number | null;
   pickup_address_id: string | null; notes: string | null;

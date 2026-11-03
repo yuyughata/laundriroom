@@ -31,7 +31,7 @@ export default async function AdminTicket({ params }: { params: { id: string } }
 
       <div className="mt-3 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         <div>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="font-display text-xl text-ink">#{t.number} · {t.subject}</h1>
             <span className={ticketChip(t.status)}>{TICKET_STATUS_LABEL[t.status]}</span>
           </div>
