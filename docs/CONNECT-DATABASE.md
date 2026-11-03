@@ -111,6 +111,20 @@ The migrations create three private buckets: `item-photos`, `vendor-docs`,
 `invoices`, with access policies. Nothing more to do unless you want public
 buckets.
 
+## 6b. Google Maps (optional — distance-based delivery fees)
+
+1. In Google Cloud, create an API key and enable the **Geocoding API** and the
+   **Distance Matrix API** (billing must be on). Restrict the key to those two
+   APIs; it's used only by the app server.
+2. Add `GOOGLE_MAPS_API_KEY` to the app's environment and redeploy.
+3. Admin → Fees & charges → Delivery pricing → **By distance**: set the amount
+   per km, a base fare and a minimum fee. Branch and customer addresses are
+   placed on the map when saved; re-save older branches (Vendor → Branches →
+   Edit → Save) so they get coordinates.
+
+Without the key, or whenever a distance can't be found, deliveries use the
+flat fee.
+
 ## 7. Payments (Paystack)
 
 1. Get your keys from the Paystack dashboard (test keys to start).

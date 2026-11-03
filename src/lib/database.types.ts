@@ -100,6 +100,8 @@ export type Order = {
   created_by: string | null;
   /** Placed from the vendor's public profile link. */
   via_vendor_link: boolean;
+  /** The branch (shop location) handling the order. */
+  branch_id: string;
   promo_code: string | null; discount: number;
   discount_type: "percent" | "fixed" | null; discount_value: number | null; discount_max: number | null;
   pickup_address_id: string | null; notes: string | null;
@@ -186,6 +188,21 @@ export type DeliveryFeeRule = {
 }
 export type VendorMembership = {
   id: string; vendor_id: string; profile_id: string; role: UserRole; created_at: string;
+  /** NULL = business-wide (all branches); set = this branch only. */
+  branch_id: string | null;
+}
+/** A customer's saved address (pickup / delivery). lat/lng are set when Google Maps places it. */
+export type CustomerAddress = {
+  id: string; customer_id: string; label: string; line1: string; area: string | null; city: string | null;
+  lat: number | null; lng: number | null; is_default: boolean; created_at: string;
+}
+/** A vendor's shop location (migration 0033). Orders and branch staff belong to one. */
+export type Branch = {
+  id: string; vendor_id: string; name: string; is_main: boolean; active: boolean;
+  phone: string | null; address_line: string | null; area: string | null; city: string | null;
+  lat: number | null; lng: number | null; service_radius_km: number;
+  opens_at: string; closes_at: string; is_open: boolean;
+  created_at: string; updated_at: string;
 }
 export type NotificationTemplate = {
   id: string; event: string; channel: NotifChannel;
@@ -198,6 +215,7 @@ export type OrderSummary = {
   delivery_fee: number; created_at: string; ready_at: string | null; closed_at: string | null;
   vendor_id: string; vendor_name: string; customer_id: string; customer_name: string;
   item_count: number; is_paid: boolean;
+  branch_id?: string; branch_name?: string | null;
 }
 
 export type SupportTicket = {
@@ -251,6 +269,8 @@ export type Database = {
       integration_settings: Table<IntegrationSetting>;
       delivery_fee_rules: Table<DeliveryFeeRule>;
       vendor_memberships: Table<VendorMembership>;
+      branches: Table<Branch>;
+      customer_addresses: Table<CustomerAddress>;
       service_extras: Table<ServiceExtra>;
       order_extras: Table<OrderExtra>;
       platform_settings: Table<PlatformSettings>;

@@ -3,6 +3,7 @@
 import { useFormState } from "react-dom";
 import { setNewPassword, changePassword } from "./actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 type State = { error?: string; ok?: boolean } | null;
 
@@ -25,17 +26,17 @@ export function PasswordForm({ mode }: { mode: "reset" | "change" }) {
       {mode === "change" && (
         <div>
           <label className="label" htmlFor="current">Current password</label>
-          <input id="current" name="current" type="password" required autoComplete="current-password" className="field" />
+          <PasswordInput id="current" name="current" required autoComplete="current-password" className="field" />
         </div>
       )}
       <div>
         <label className="label" htmlFor="password">New password</label>
-        <input id="password" name="password" type="password" required minLength={8} autoComplete="new-password"
+        <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password"
           className="field" placeholder="At least 8 characters" />
       </div>
       <div>
         <label className="label" htmlFor="confirm">Confirm new password</label>
-        <input id="confirm" name="confirm" type="password" required minLength={8} autoComplete="new-password" className="field" />
+        <PasswordInput id="confirm" name="confirm" required minLength={8} autoComplete="new-password" className="field" />
       </div>
       {state?.error && <p className="text-sm text-danger">{state.error}</p>}
       <SubmitButton>{mode === "change" ? "Change password" : "Save new password"}</SubmitButton>

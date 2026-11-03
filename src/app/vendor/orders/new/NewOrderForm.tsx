@@ -27,8 +27,14 @@ function Choice<T extends string>({
 }
 
 export function NewOrderForm({
-  vendorDelivery, extras, deliveryFee,
-}: { vendorDelivery: string; extras: ServiceExtra[]; deliveryFee: number }) {
+  vendorDelivery, extras, deliveryFee, branches, pricedByDistance,
+}: {
+  vendorDelivery: string; extras: ServiceExtra[]; deliveryFee: number;
+  /** Branches this staff member can take orders for (one = no picker). */
+  branches: { id: string; name: string }[];
+  /** Delivery priced by Google Maps distance (shown on the next screen). */
+  pricedByDistance: boolean;
+}) {
   // Customer
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<FoundCustomer[] | null>(null);
@@ -46,6 +52,7 @@ export function NewOrderForm({
   const [speed, setSpeed] = useState<"normal" | "express">("normal");
   const [pay, setPay] = useState<"on_delivery" | "online">("on_delivery");
   const [chosen, setChosen] = useState<string[]>([]);
+  const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
 
   const [state, action] = useFormState<State, FormData>(createVendorOrder as (s: State, f: FormData) => Promise<State>, null);
 
@@ -140,6 +147,14 @@ export function NewOrderForm({
 
       {/* ── Order ────────────────────────────────────────────────── */}
       <section className={`card space-y-5 p-5 ${hasCustomer ? "" : "pointer-events-none opacity-50"}`}>
+        {branches.length > 1 ? (
+          <div>
+            <label className="label" htmlFor="branch_id">Branch</label>
+            <select id="branch_id" name="branch_id" className="field" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+        ) : branchId ? <input type="hidden" name="branch_id" value={branchId} /> : null}
         <div>
           <p className="label">Getting it in</p>
           <Choice name="entry_mode" value={entry} onChange={setEntry} options={[
@@ -151,7 +166,8 @@ export function NewOrderForm({
           <p className="label">Getting it back</p>
           <Choice name="return_mode" value={ret} onChange={setRet} options={[
             ["collection", "Customer collects", "From this laundry"],
-            ["delivery", "Delivery", deliveryFee ? `${money(deliveryFee)} delivery fee` : "Deliver to the customer"],
+            ["delivery", "Delivery", pricedByDistance ? "Fee by distance (Google Maps)"
+              : deliveryFee ? `${money(deliveryFee)} delivery fee` : "Deliver to the customer"],
           ] as const} />
         </div>
         {ret === "delivery" && vendorDelivery === "both" && (
@@ -164,10 +180,21 @@ export function NewOrderForm({
           </div>
         )}
         {ret === "delivery" && vendorDelivery !== "both" && <input type="hidden" name="delivered_by" value={deliveredBy} />}
+        {(entry === "pickup" || ret === "delivery") && (
+          <div>
+            <p className="label">Customer&apos;s address</p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <input name="address_line1" className="field sm:col-span-3" required placeholder="House number and street" aria-label="Street address" />
+              <input name="address_area" className="field sm:col-span-2" placeholder="Area" aria-label="Area" />
+              <input name="address_city" className="field" defaultValue="Lagos" aria-label="City" />
+            </div>
+            <p className="mt-1 text-xs text-slate">Saved to the customer&apos;s account{pricedByDistance ? " and used to price the delivery by distance" : ""}.</p>
+          </div>
+        )}
         <div>
           <p className="label">Payment</p>
           <Choice name="payment_timing" value={pay} onChange={setPay} options={[
-            ["on_delivery", "Pay on delivery", "Cash/transfer at handover"],
+            ["on_delivery", "Pay on delivery", "Customer pays in the app at handover"],
             ["online", "Pay online", "Customer pays in the app once priced"],
           ] as const} />
         </div>

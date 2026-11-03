@@ -16,10 +16,14 @@ export default async function AdminVerification() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  const [{ data: docs }, { data: vendors }] = await Promise.all([
+  const [{ data: docs }, { data: vendors }, { data: settings }] = await Promise.all([
     supabase.from("vendor_documents").select("*").order("created_at", { ascending: false }),
     supabase.from("vendors").select("id, name, kyc_verified, terms_accepted_at"),
+    supabase.from("platform_settings").select("agreement_updated_at").eq("id", true).maybeSingle(),
   ]);
+  const agreementAt = (settings as { agreement_updated_at?: string } | null)?.agreement_updated_at ?? null;
+  const agreementState = (at: string | null | undefined) =>
+    !at ? "pending" : agreementAt && new Date(at) < new Date(agreementAt) ? "outdated" : "accepted";
   const documents = (docs ?? []) as VendorDocument[];
   const vmap = new Map(((vendors ?? []) as { id: string; name: string; kyc_verified: boolean; terms_accepted_at: string | null }[]).map((v) => [v.id, v]));
 
@@ -60,8 +64,8 @@ export default async function AdminVerification() {
                   <span className={v?.kyc_verified ? "chip-ok" : "chip-muted"}>
                     {v?.kyc_verified ? "KYC verified" : "Unverified"}
                   </span>
-                  <span className={v?.terms_accepted_at ? "chip-ok" : "chip-warn"}>
-                    {v?.terms_accepted_at ? "Terms accepted" : "Terms pending"}
+                  <span className={agreementState(v?.terms_accepted_at) === "accepted" ? "chip-ok" : "chip-warn"}>
+                    {{ accepted: "Agreement accepted", outdated: "Agreement outdated", pending: "Agreement pending" }[agreementState(v?.terms_accepted_at)]}
                   </span>
                 </div>
                 <KycToggle vendorId={vendorId} verified={Boolean(v?.kyc_verified)} />

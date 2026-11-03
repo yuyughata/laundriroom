@@ -5,6 +5,7 @@ import { ShellNav } from "./ShellNav";
 const NAV = [
   { href: "/vendor/queue", label: "Queue" },
   { href: "/vendor/profile", label: "My page" },
+  { href: "/vendor/branches", label: "Branches" },
   { href: "/vendor/requests", label: "Item requests" },
   { href: "/vendor/reviews", label: "Reviews" },
   { href: "/vendor/promos", label: "Promos" },
@@ -13,10 +14,12 @@ const NAV = [
 ];
 
 export function VendorShell({
-  children, active, vendorName, staffName, staffRole,
+  children, active, vendorName, staffName, staffRole, branchName,
 }: {
   children: React.ReactNode; active?: string;
   vendorName: string; staffName: string; staffRole: string;
+  /** Set when the staff member works at one branch. */
+  branchName?: string | null;
 }) {
   return (
     <div className="min-h-screen bg-ivory lg:flex">
@@ -35,7 +38,7 @@ export function VendorShell({
         <header className="flex items-center justify-between gap-3 border-b border-ink/10 bg-white px-4 py-3 sm:px-6 lg:py-4">
           <div>
             <p className="font-display text-lg text-ink">{vendorName}</p>
-            <p className="text-xs text-slate">{staffName} · {staffRole}</p>
+            <p className="text-xs text-slate">{staffName} · {staffRole}{branchName ? ` · ${branchName}` : ""}</p>
           </div>
           <div className="hidden items-center gap-4 lg:flex">
             <Link href="/account/password" className="text-xs text-slate hover:text-ink">Password</Link>

@@ -20,7 +20,7 @@ export default async function VendorReviews() {
 
   return (
     <VendorShell active="/vendor/reviews" vendorName={ctx.vendorName}
-      staffName={ctx.profile.full_name} staffRole={ctx.isManager ? "Manager" : "Attendant"}>
+      staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">Reviews</h1>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center">

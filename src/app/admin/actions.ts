@@ -43,6 +43,27 @@ export async function setGlobalDeliveryFee(amount: number) {
   return { ok: true };
 }
 
+/**
+ * How delivery fees are worked out: the flat fee, or by Google Maps driving
+ * distance (base fare + per-km rate, never below the minimum). Distance
+ * pricing falls back to the flat fee whenever the distance can't be found.
+ */
+export async function setDeliveryPricing(input: { mode: "flat" | "distance"; perKm: number; base: number; min: number }) {
+  await requireRole(["platform_admin"]);
+  const nums = [input.perKm, input.base, input.min];
+  if (!["flat", "distance"].includes(input.mode)) return { error: "Choose flat or distance pricing." };
+  if (!nums.every((n) => Number.isFinite(n) && n >= 0 && n <= 1_000_000)) return { error: "Amounts must be zero or more." };
+  if (input.mode === "distance" && input.perKm <= 0) return { error: "Set the amount per kilometre." };
+  const supabase = createClient();
+  const { error } = await supabase.from("platform_settings").update({
+    delivery_pricing: input.mode, delivery_per_km: input.perKm, delivery_base_fare: input.base,
+    delivery_min_fee: input.min, updated_at: new Date().toISOString(),
+  } as never).eq("id", true);
+  if (error) return { error: /column/.test(error.message) ? "Distance pricing needs database migration 0035." : error.message };
+  revalidatePath("/admin/fees");
+  return { ok: true };
+}
+
 /** Choose the online payment provider (Paystack or Flutterwave). */
 export async function setPaymentProvider(provider: "paystack" | "flutterwave") {
   const supabase = createClient();

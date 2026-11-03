@@ -26,7 +26,7 @@ export async function submitApplication(formData: FormData) {
   if (!contact_name) return { error: "Enter a contact name." };
   if (!email) return { error: "Enter an email." };
   if (!phone) return { error: "Enter a phone number." };
-  if (!agreed) return { error: "Please accept the Vendor Agreement to apply." };
+  if (!agreed) return { error: "Please accept the Partner Agreement to apply." };
 
   const { error } = await supabase.from("vendor_applications").insert({
     business_name, contact_name, email, phone, area, city, delivery, message,

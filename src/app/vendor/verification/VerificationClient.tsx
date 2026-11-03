@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { createClient as createBrowser } from "@/lib/supabase/client";
 import { uploadVendorDoc, acceptVendorTerms } from "../actions";
-import { NON_CIRCUMVENTION_TITLE, NON_CIRCUMVENTION_CLAUSE } from "@/lib/legal";
+import { PARTNER_AGREEMENT_TITLE, type AgreementClause } from "@/lib/legal";
+import { AgreementText } from "@/components/ui/AgreementText";
 import type { VendorDocument, VendorDocType } from "@/lib/database.types";
 
 const DOC_LABEL: Record<VendorDocType, string> = {
@@ -16,14 +17,16 @@ const STATUS_CHIP: Record<string, string> = {
 };
 
 export function VerificationClient({
-  vendorId, docs, kycVerified, termsAcceptedAt, isManager,
+  vendorId, docs, kycVerified, termsAcceptedAt, isManager, agreement, agreementUpdatedAt,
 }: {
   vendorId: string; docs: VendorDocument[]; kycVerified: boolean;
   termsAcceptedAt: string | null; isManager: boolean;
+  agreement: AgreementClause[]; agreementUpdatedAt: string | null;
 }) {
   return (
     <div className="mt-6 space-y-6">
-      <AgreementCard vendorId={vendorId} acceptedAt={termsAcceptedAt} isManager={isManager} />
+      <AgreementCard vendorId={vendorId} acceptedAt={termsAcceptedAt} isManager={isManager}
+        clauses={agreement} updatedAt={agreementUpdatedAt} />
       <div className="rounded-card border border-ink/10 bg-white p-5">
         <div className="flex items-center justify-between">
           <div>
@@ -68,23 +71,33 @@ export function VerificationClient({
   );
 }
 
-function AgreementCard({ vendorId, acceptedAt, isManager }: { vendorId: string; acceptedAt: string | null; isManager: boolean }) {
+function AgreementCard({ vendorId, acceptedAt, isManager, clauses, updatedAt }: {
+  vendorId: string; acceptedAt: string | null; isManager: boolean;
+  clauses: AgreementClause[]; updatedAt: string | null;
+}) {
   const [pending, start] = useTransition();
-  const [accepted, setAccepted] = useState(Boolean(acceptedAt));
+  // Accepted, and not before the agreement last changed.
+  const current = Boolean(acceptedAt) && !(updatedAt && acceptedAt && new Date(acceptedAt) < new Date(updatedAt));
+  const changedSince = Boolean(acceptedAt) && !current;
+  const [accepted, setAccepted] = useState(current);
   const [err, setErr] = useState<string | null>(null);
 
   return (
     <div className="rounded-card border border-ink/10 bg-white p-5">
       <div className="flex items-center justify-between">
-        <p className="font-display text-lg text-ink">{NON_CIRCUMVENTION_TITLE}</p>
+        <p className="font-display text-lg text-ink">{PARTNER_AGREEMENT_TITLE}</p>
         <span className={accepted ? "chip-ok" : "chip-warn"}>{accepted ? "Accepted" : "Action needed"}</span>
       </div>
-      <div className="mt-2 space-y-2 text-xs leading-relaxed text-slate">
-        {NON_CIRCUMVENTION_CLAUSE.map((p, i) => <p key={i}>{p}</p>)}
-      </div>
+      {changedSince && !accepted && (
+        <p className="mt-2 rounded-card bg-warn/10 px-3 py-2 text-xs text-warn">
+          The Partner Agreement was updated{updatedAt ? ` on ${new Date(updatedAt).toLocaleDateString()}` : ""} after you
+          accepted it. Please review the current version and accept it again.
+        </p>
+      )}
+      <AgreementText clauses={clauses} className="mt-2" />
       {accepted ? (
         <p className="mt-3 text-xs text-teal">
-          Agreement accepted{acceptedAt ? ` on ${new Date(acceptedAt).toLocaleDateString()}` : ""}.
+          Agreement accepted{acceptedAt && current ? ` on ${new Date(acceptedAt).toLocaleDateString()}` : ""}.
         </p>
       ) : isManager ? (
         <div className="mt-3">
@@ -97,7 +110,7 @@ function AgreementCard({ vendorId, acceptedAt, isManager }: { vendorId: string; 
                 else setAccepted(true);
               });
             }}>
-            {pending ? "Saving…" : "I agree to the Vendor Agreement"}
+            {pending ? "Saving…" : "I agree to the Partner Agreement"}
           </button>
           {err && <p className="mt-2 text-xs text-danger">{err}</p>}
         </div>

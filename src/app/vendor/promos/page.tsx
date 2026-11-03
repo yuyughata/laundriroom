@@ -13,7 +13,7 @@ export default async function VendorPromosPage() {
 
   return (
     <VendorShell active="/vendor/promos" vendorName={ctx.vendorName}
-      staffName={ctx.profile.full_name} staffRole={ctx.isManager ? "Manager" : "Attendant"}>
+      staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Promos & campaigns</h1>
         <NewVendorPromo vendorId={ctx.vendorId} canManage={ctx.isManager} />

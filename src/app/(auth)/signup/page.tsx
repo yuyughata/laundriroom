@@ -5,6 +5,7 @@ import { useFormState } from "react-dom";
 import { signUp } from "../actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { safeNext } from "@/lib/nav";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export default function SignupPage({ searchParams }: { searchParams: { next?: string } }) {
   const next = safeNext(searchParams?.next);
@@ -35,7 +36,7 @@ export default function SignupPage({ searchParams }: { searchParams: { next?: st
         </div>
         <div>
           <label className="label" htmlFor="password">Password</label>
-          <input id="password" name="password" type="password" required minLength={8} className="field" placeholder="At least 8 characters" />
+          <PasswordInput id="password" name="password" required minLength={8} className="field" placeholder="At least 8 characters" />
         </div>
         <div>
           <label className="label" htmlFor="ref">Referral code (optional)</label>

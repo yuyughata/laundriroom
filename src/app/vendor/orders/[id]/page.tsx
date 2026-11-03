@@ -26,7 +26,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
 
   return (
     <VendorShell active="/vendor/queue" vendorName={ctx.vendorName}
-      staffName={ctx.profile.full_name} staffRole={ctx.isManager ? "Manager" : "Attendant"}>
+      staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <Link href="/vendor/queue" className="text-sm text-slate">← Queue</Link>
       <OrderWorkspace
         order={o}
@@ -36,6 +36,8 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
         paid={((payments ?? []) as Payment[]).some((p) => p.status === "succeeded")}
         customerName={(customer as { full_name: string } | null)?.full_name ?? "Customer"}
         extras={(extras ?? []) as OrderExtra[]}
+        branchName={ctx.branches.length > 1 || !ctx.branchId
+          ? ctx.branches.find((b) => b.id === o.branch_id)?.name ?? null : null}
       />
     </VendorShell>
   );

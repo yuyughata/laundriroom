@@ -72,6 +72,40 @@ promote an admin → deploy edge functions → wire Paystack).
   change their own status/plan/KYC flag (`guard_vendor_columns`).
 - Server Components fetch; interactive bits are small client components calling
   server actions in each area's `actions.ts`.
+- **Multi-branch vendors (`0033`):** a vendor is the business (name, KYC,
+  commission, one shared price list, one payout account, one `/v/<slug>`
+  link); `branches` are its shop locations (address, hours, open switch). Every
+  vendor gets a main branch on creation (trigger), mirrored onto the vendor row
+  so older code keeps working. `orders.branch_id` is set on insert (chosen →
+  staff's own branch → main) and must be active. `vendor_memberships.branch_id`
+  NULL = business-wide; set = that branch only — staff see only their branch's
+  orders (`can_staff_branch` in orders RLS, `order_summaries`, `confirm_pickup`,
+  `apply_delivery_reschedule`; child tables follow via orders RLS).
+  `is_vendor_manager()` means a **business-wide** manager: only they (and
+  platform admins, at Admin → Vendors → a vendor) add/edit branches and move
+  staff (`src/lib/branchActions.ts`, `components/branches/BranchManager.tsx`,
+  Vendor → Branches). Customers pick a branch when ordering; the public page
+  lists branches with per-branch order links (`?branch=`); the queue has a
+  branch filter for business-wide staff; ledger has income by branch; vendor
+  new-order alerts go to that branch's staff + business-wide staff.
+- **Delivery pricing (`0035`):** Admin → Fees & charges → Delivery pricing:
+  flat fee, or by distance (`GOOGLE_MAPS_API_KEY`, server-side only,
+  `src/lib/maps.ts`): base + per-km × driving km (Distance Matrix) from the
+  branch to the customer's address, at least the minimum, rounded up to ₦50
+  (`src/lib/deliveryPricing.ts`). Any failure (no key, address not found) falls
+  back to the flat fee. The server prices the order at creation
+  (`orders.delivery_fee`, `delivery_distance_km`); the form shows a live quote
+  (`quoteDeliveryFee`). Pickup/delivery orders now take an address
+  (`customer_addresses`, geocoded on save; `orders.pickup_address_id` is the
+  customer's address for both legs).
+- **Partner Agreement (`0034`):** the terms vendors accept (`/apply`, Vendor →
+  Verification) are `agreement_clauses`, edited at Admin → Partner agreement
+  (add, edit, reorder, hide, delete). Any change bumps
+  `platform_settings.agreement_updated_at`; vendors who accepted earlier are
+  asked to accept again. More than 3 paragraphs → scrollable box
+  (`components/ui/AgreementText.tsx`). `src/lib/legal.ts` holds the title and
+  the fallback clause.
+- **Password fields** use `components/ui/PasswordInput.tsx` (Show/Hide).
 - **Responsive dashboards:** admin and vendor shells share `ShellNav` — a fixed
   sidebar on desktop (lg+), a top bar with a Menu button (all links + account)
   below that. Wrap data tables in `table-scroll` (globals.css): it scrolls

@@ -12,10 +12,12 @@ import type {
 const SERVICES: ServiceType[] = ["wash_and_fold", "dry_clean", "press_only"];
 
 export function OrderWorkspace({
-  order, items, itemTypes, prices, paid, customerName, extras,
+  order, items, itemTypes, prices, paid, customerName, extras, branchName,
 }: {
   order: Order; items: OrderItem[]; itemTypes: ItemType[];
   prices: PriceListRow[]; paid: boolean; customerName: string; extras: OrderExtra[];
+  /** Shown for business-wide staff of a multi-branch business. */
+  branchName?: string | null;
 }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export function OrderWorkspace({
             {customerName} · {order.entry_mode === "pickup" ? "Pickup" : "Drop-off"} ·{" "}
             {isDelivery ? "Deliver back" : "Collect"} ·{" "}
             {order.payment_timing === "on_delivery" ? "Pay on delivery" : "Pay online"}
+            {branchName ? ` · ${branchName} branch` : ""}
           </p>
         </div>
         <span className="chip-ink">{STATUS_LABEL[order.status]}</span>

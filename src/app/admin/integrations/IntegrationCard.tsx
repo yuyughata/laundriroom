@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { saveIntegration } from "../actions";
 import { dateTime } from "@/lib/format";
 import type { IntegrationSetting, IntegrationProvider } from "@/lib/database.types";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const META: Record<IntegrationProvider, { title: string; blurb: string; fields: { key: string; label: string; placeholder: string }[] }> = {
   resend: {
@@ -67,7 +68,7 @@ export function IntegrationCard({ setting }: { setting: IntegrationSetting }) {
           <input type="hidden" name="provider" value={setting.provider} />
           <div>
             <label className="label">API key</label>
-            <input className="field" name="api_key" type="password" placeholder="Paste the provider key" autoComplete="off" />
+            <PasswordInput className="field" name="api_key" placeholder="Paste the provider key" autoComplete="off" />
             <p className="mt-1 text-xs text-slate">
               Stored encrypted on the server and shown masked. Never exposed to the browser.
             </p>

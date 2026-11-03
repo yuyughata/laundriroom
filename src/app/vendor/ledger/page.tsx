@@ -43,12 +43,21 @@ export default async function LedgerPage() {
   const cashup = [...days.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, 30);
 
   const takings = closed.reduce((s, o) => s + Number(o.total), 0);
+  // Income by branch, for a business with more than one.
+  const byBranch = new Map<string, { name: string; orders: number; income: number }>();
+  for (const o of closed) {
+    const key = o.branch_id ?? "";
+    const row = byBranch.get(key) ?? { name: o.branch_name ?? "Main", orders: 0, income: 0 };
+    row.orders += 1; row.income += Number(o.total);
+    byBranch.set(key, row);
+  }
+  const showBranches = ctx.branches.filter((b) => b.active).length > 1 && !ctx.branchId;
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const dueNet = po.filter((p) => ["due", "held"].includes(p.status)).reduce((s, p) => s + Number(p.net), 0);
 
   return (
     <VendorShell active="/vendor/ledger" vendorName={ctx.vendorName}
-      staffName={ctx.profile.full_name} staffRole={ctx.isManager ? "Manager" : "Attendant"}>
+      staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Ledger & bookkeeping</h1>
         <div className="flex flex-wrap gap-2">
@@ -72,6 +81,31 @@ export default async function LedgerPage() {
           isManager={ctx.isManager}
         />
       </section>
+
+      {/* Income by branch */}
+      {showBranches && (
+        <section className="mt-8">
+          <h2 className="font-display text-lg text-ink">By branch</h2>
+          <p className="mt-1 text-xs text-slate">Completed, paid orders. All branches are paid out to the one business account.</p>
+          <div className="mt-3 table-scroll rounded-card border border-ink/10 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-ink/5 text-left text-xs text-slate">
+                <tr><th className="px-4 py-3">Branch</th><th className="px-4 py-3">Orders</th><th className="px-4 py-3">Income</th></tr>
+              </thead>
+              <tbody className="divide-y divide-ink/5">
+                {[...byBranch.values()].sort((a, b) => b.income - a.income).map((r) => (
+                  <tr key={r.name}>
+                    <td className="px-4 py-3 text-ink">{r.name}</td>
+                    <td className="px-4 py-3 text-slate">{r.orders}</td>
+                    <td className="px-4 py-3 font-medium text-ink">{money(r.income)}</td>
+                  </tr>
+                ))}
+                {byBranch.size === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-slate">No completed orders yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Daily cash-up */}
       <section className="mt-8">

@@ -26,7 +26,7 @@ export default async function VendorProfileLink() {
 
   return (
     <VendorShell active="/vendor/profile" vendorName={ctx.vendorName}
-      staffName={ctx.profile.full_name} staffRole={ctx.isManager ? "Manager" : "Attendant"}>
+      staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">My page</h1>
       <p className="mt-1 max-w-2xl text-sm text-slate">
         Your own laundriroom page — your name, location, verified badge, prices, ratings and reviews — with an

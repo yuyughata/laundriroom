@@ -134,13 +134,23 @@ async function resolveAdmins(db: any, extra: Record<string, string> = {}): Promi
   }));
 }
 
-/** The vendor's active managers and attendants (riders have no login). */
-async function resolveVendorStaff(db: any, vendorId: string, extra: Record<string, string> = {}): Promise<Recipient[]> {
-  const { data } = await db.from("vendor_memberships")
-    .select("role, profile:profile_id(email, phone, full_name, status)")
+/**
+ * The vendor's active managers and attendants (riders have no login). For a
+ * branch order: that branch's staff plus business-wide staff (branch_id null).
+ */
+async function resolveVendorStaff(db: any, vendorId: string, extra: Record<string, string> = {}, branchId: string | null = null): Promise<Recipient[]> {
+  let { data, error } = await db.from("vendor_memberships")
+    .select("role, branch_id, profile:profile_id(email, phone, full_name, status)")
     .eq("vendor_id", vendorId).in("role", ["vendor_manager", "attendant"]);
+  if (error) {
+    // Database without branches yet (migration 0033): everyone at the vendor.
+    ({ data } = await db.from("vendor_memberships")
+      .select("role, profile:profile_id(email, phone, full_name, status)")
+      .eq("vendor_id", vendorId).in("role", ["vendor_manager", "attendant"]));
+  }
   return (data ?? [])
     .filter((m: any) => m.profile && m.profile.status === "active")
+    .filter((m: any) => !branchId || !m.branch_id || m.branch_id === branchId)
     .map((m: any) => ({
       email: m.profile.email ?? null, phone: m.profile.phone ?? null,
       vars: { recipient_name: firstName(m.profile.full_name), ...extra },
@@ -156,7 +166,10 @@ async function resolveRecipients(
   }
   if (orderId && roles.includes("vendor")) {
     const { data: o } = await db.from("orders").select("vendor_id").eq("id", orderId).maybeSingle();
-    if (o?.vendor_id) out.push(...await resolveVendorStaff(db, o.vendor_id, { order_url: `${site}/vendor/orders/${orderId}` }));
+    const { data: ob } = await db.from("orders").select("branch_id").eq("id", orderId).maybeSingle(); // null before 0033
+    if (o?.vendor_id) {
+      out.push(...await resolveVendorStaff(db, o.vendor_id, { order_url: `${site}/vendor/orders/${orderId}` }, ob?.branch_id ?? null));
+    }
   }
   if (ticketId && roles.includes("customer")) {
     const { data: t } = await db.from("support_tickets")
@@ -201,6 +214,14 @@ async function orderVars(db: any, orderId: string, site: string): Promise<Record
     if (a) address = [a.line1, a.area, a.city].filter(Boolean).join(", ");
   }
   const { data: extras } = await db.from("order_extras").select("name").eq("order_id", orderId);
+  // Branch (migration 0033): named when the business has more than one.
+  let branchLine = "";
+  const { data: ob } = await db.from("orders").select("branch:branch_id(name, address_line, area, vendor_id)").eq("id", orderId).maybeSingle();
+  if (ob?.branch) {
+    const { count } = await db.from("branches").select("id", { count: "exact", head: true })
+      .eq("vendor_id", ob.branch.vendor_id).eq("active", true);
+    if ((count ?? 0) > 1) branchLine = [ob.branch.name, ob.branch.address_line || ob.branch.area].filter(Boolean).join(" · ");
+  }
   const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
   return {
     order_code: o.code,
@@ -217,6 +238,7 @@ async function orderVars(db: any, orderId: string, site: string): Promise<Record
     address_line: address,
     notes: o.notes ?? "",
     placed_by_line: placedBy,
+    branch_line: branchLine,
     track_url: `${site}/customer/orders/${o.id}`,
   };
 }

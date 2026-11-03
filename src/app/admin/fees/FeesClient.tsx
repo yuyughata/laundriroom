@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setPlatformRates, setOtherCharges, setGlobalDeliveryFee, setPayoutDelay } from "../actions";
+import { setPlatformRates, setOtherCharges, setGlobalDeliveryFee, setPayoutDelay, setDeliveryPricing } from "../actions";
 import { money } from "@/lib/format";
 
 /** Commission, express and premium — one set that applies to every vendor. */
@@ -59,7 +59,7 @@ export function DeliveryFeeEditor({ current }: { current: number }) {
           Save
         </button>
       </div>
-      <p className="mt-1 text-xs text-slate">Flat fee for pickup and delivery orders. Paid to the vendor.</p>
+      <p className="mt-1 text-xs text-slate">Flat fee for delivery orders, and the fallback when distance pricing can&apos;t find a distance. Paid to the vendor.</p>
       {saved && <p className="mt-1 text-xs text-teal">Saved · {money(Number(amount) || 0)}</p>}
     </div>
   );
@@ -144,6 +144,72 @@ export function PayoutDelayEditor({ hours }: { hours: number }) {
       </p>
       {err && <p className="mt-1 text-sm text-danger">{err}</p>}
       {saved && <p className="mt-1 text-xs text-teal">Saved.</p>}
+    </div>
+  );
+}
+
+/** Flat fee, or Google Maps distance pricing (base + per km, minimum fee). */
+export function DeliveryPricingEditor({
+  mode, perKm, base, min, flat, mapsReady,
+}: { mode: "flat" | "distance"; perKm: number; base: number; min: number; flat: number; mapsReady: boolean }) {
+  const [m, setM] = useState(mode);
+  const [km, setKm] = useState(String(perKm));
+  const [b, setB] = useState(String(base));
+  const [mn, setMn] = useState(String(min));
+  const [pending, start] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const fare = (d: number) => Math.ceil(Math.max(Number(mn) || 0, (Number(b) || 0) + (Number(km) || 0) * d) / 50) * 50;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-2 sm:grid-cols-2">
+        {([
+          ["flat", "Flat fee", `Every delivery costs ${money(flat)}.`],
+          ["distance", "By distance (Google Maps)", "Like a ride-hailing fare: base + amount per km of driving distance."],
+        ] as const).map(([val, title, sub]) => (
+          <button type="button" key={val} onClick={() => { setM(val); setSaved(false); }}
+            className={`rounded-card border p-3 text-left ${m === val ? "border-ink bg-ink text-ivory" : "border-ink/15 bg-white text-ink"}`}>
+            <p className="text-sm font-medium">{title}</p>
+            <p className={`text-xs ${m === val ? "text-ivory/70" : "text-slate"}`}>{sub}</p>
+          </button>
+        ))}
+      </div>
+
+      {m === "distance" && (
+        <>
+          {!mapsReady && (
+            <p className="rounded-card bg-warn/10 px-3 py-2 text-xs text-warn">
+              Google Maps isn&apos;t connected: add <span className="font-mono">GOOGLE_MAPS_API_KEY</span> to the app&apos;s
+              environment (Geocoding + Distance Matrix APIs enabled). Until then every delivery uses the flat fee.
+            </p>
+          )}
+          <div className="grid gap-5 sm:grid-cols-3">
+            <Field label="Per kilometre" unit="₦" value={km} onChange={(v) => { setKm(v); setSaved(false); }}
+              suffix="Charged for each km of driving distance from the branch to the customer." />
+            <Field label="Base fare" unit="₦" value={b} onChange={(v) => { setB(v); setSaved(false); }}
+              suffix="Added to every delivery (0 for none)." />
+            <Field label="Minimum fee" unit="₦" value={mn} onChange={(v) => { setMn(v); setSaved(false); }}
+              suffix="A delivery never costs less than this (0 for none)." />
+          </div>
+          <p className="text-xs text-slate">
+            Examples: 2 km → {money(fare(2))} · 5 km → {money(fare(5))} · 10 km → {money(fare(10))} (rounded up to the nearest ₦50).
+          </p>
+        </>
+      )}
+
+      {err && <p className="text-sm text-danger">{err}</p>}
+      <div className="flex items-center gap-3">
+        <button className="btn-primary" disabled={pending}
+          onClick={() => start(async () => {
+            setErr(null);
+            const r = await setDeliveryPricing({ mode: m, perKm: Number(km) || 0, base: Number(b) || 0, min: Number(mn) || 0 });
+            if (r?.error) setErr(r.error); else setSaved(true);
+          })}>
+          Save delivery pricing
+        </button>
+        {saved && <span className="text-sm text-teal">Saved.</span>}
+      </div>
     </div>
   );
 }

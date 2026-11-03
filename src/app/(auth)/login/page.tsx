@@ -5,6 +5,7 @@ import { useFormState } from "react-dom";
 import { signIn } from "../actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { safeNext } from "@/lib/nav";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export default function LoginPage({ searchParams }: { searchParams: { next?: string } }) {
   const next = safeNext(searchParams?.next);
@@ -27,7 +28,7 @@ export default function LoginPage({ searchParams }: { searchParams: { next?: str
             <label className="label" htmlFor="password">Password</label>
             <Link href="/forgot-password" className="text-xs text-slate underline">Forgot password?</Link>
           </div>
-          <input id="password" name="password" type="password" required className="field" placeholder="••••••••" />
+          <PasswordInput id="password" name="password" required className="field" placeholder="••••••••" />
         </div>
         {state?.error && <p className="text-sm text-danger">{state.error}</p>}
         <SubmitButton>Sign in</SubmitButton>

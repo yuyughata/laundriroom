@@ -76,7 +76,10 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
                     {o.turnaround === "express" ? " · Express" : ""}
                   </p>
                 </td>
-                <td className="px-4 py-3 text-slate">{o.vendor_name}</td>
+                <td className="px-4 py-3 text-slate">
+                  {o.vendor_name}
+                  {o.branch_name && o.branch_name !== o.vendor_name && <span className="block text-xs">{o.branch_name}</span>}
+                </td>
                 <td className="px-4 py-3 text-slate">{o.customer_name}</td>
                 <td className="px-4 py-3 text-slate">{o.item_count}</td>
                 <td className="px-4 py-3">{money(o.total)}</td>

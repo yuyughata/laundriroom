@@ -1,7 +1,9 @@
 import { AdminShell } from "@/components/shells/AdminShell";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PlatformRatesEditor, DeliveryFeeEditor, OtherChargesEditor, PayoutDelayEditor } from "./FeesClient";
+import { PlatformRatesEditor, DeliveryFeeEditor, OtherChargesEditor, PayoutDelayEditor, DeliveryPricingEditor } from "./FeesClient";
+import { loadPricing } from "@/lib/deliveryPricing";
+import { mapsConfigured } from "@/lib/maps";
 
 const pct = (frac: unknown) => Math.round(Number(frac ?? 0) * 10000) / 100; // 0.15 → 15
 
@@ -9,11 +11,12 @@ export default async function AdminFees() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  const [{ data: s }, { data: plan }, { data: fee }] = await Promise.all([
+  const [{ data: s }, { data: plan }, { data: fee }, pricing] = await Promise.all([
     supabase.from("platform_settings")
       .select("express_pct, premium_pct, noncollection_penalty_pct, referral_reward, payout_delay_hours").eq("id", true).maybeSingle(),
     supabase.from("vendor_plans").select("commission_rate").eq("is_default", true).limit(1).maybeSingle(),
     supabase.from("delivery_fee_rules").select("flat_amount").eq("scope", "global").limit(1).maybeSingle(),
+    loadPricing(supabase),
   ]);
 
   const settings = s as { express_pct: number; premium_pct: number; noncollection_penalty_pct: number; referral_reward: number; payout_delay_hours: number } | null;
@@ -35,6 +38,13 @@ export default async function AdminFees() {
         <h2 className="font-display text-lg text-ink">Platform rates</h2>
         <p className="mb-5 text-xs text-slate">Applies to all vendors.</p>
         <PlatformRatesEditor commissionPct={rates.commission} expressPct={rates.express} premiumPct={rates.premium} />
+      </section>
+
+      <section className="card mt-6 max-w-4xl p-6">
+        <h2 className="font-display text-lg text-ink">Delivery pricing</h2>
+        <p className="mb-5 text-xs text-slate">How the delivery fee is worked out when a customer chooses delivery.</p>
+        <DeliveryPricingEditor mode={pricing.mode} perKm={pricing.perKm} base={pricing.base} min={pricing.min}
+          flat={pricing.flat} mapsReady={mapsConfigured()} />
       </section>
 
       <section className="card mt-6 max-w-4xl p-6">

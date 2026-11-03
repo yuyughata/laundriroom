@@ -6,9 +6,81 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isVendorOpenNow } from "@/lib/hours";
 import { notifyUser, notifyOrder } from "@/lib/notify";
+import { loadPricing, quoteDelivery, type DeliveryQuote } from "@/lib/deliveryPricing";
+import { geocode, addressText, mapsConfigured } from "@/lib/maps";
 import type {
   EntryMode, ReturnMode, DeliveredBy, PaymentTiming, ServiceTier, Turnaround,
 } from "@/lib/database.types";
+
+type BranchRow = {
+  id: string; vendor_id: string; active: boolean; is_open: boolean; opens_at: string | null; closes_at: string | null;
+  lat: number | null; lng: number | null; address_line: string | null; area: string | null; city: string | null;
+};
+
+/**
+ * The branch an order goes to: the one chosen, else the vendor's main branch.
+ * Returns null on a database without branches yet (migration 0033).
+ */
+async function resolveBranch(supabase: ReturnType<typeof createClient>, vendorId: string, branchId: string) {
+  let q = supabase.from("branches")
+    .select("id, vendor_id, active, is_open, opens_at, closes_at, lat, lng, address_line, area, city")
+    .eq("vendor_id", vendorId);
+  q = branchId ? q.eq("id", branchId) : q.eq("is_main", true);
+  const { data, error } = await q.maybeSingle();
+  if (error) return { missingTable: true as const };
+  return { branch: (data as BranchRow | null) ?? null };
+}
+
+/** The customer's address for pickup/delivery: a saved one, or a new one (saved, placed on the map). */
+async function resolveAddress(supabase: ReturnType<typeof createClient>, userId: string, formData: FormData) {
+  const addressId = String(formData.get("address_id") || "");
+  if (addressId && addressId !== "new") {
+    const { data } = await supabase.from("customer_addresses")
+      .select("id, line1, area, city, lat, lng").eq("id", addressId).eq("customer_id", userId).maybeSingle();
+    if (!data) return { error: "Choose one of your saved addresses, or add a new one." };
+    return { address: data as { id: string; line1: string; area: string | null; city: string | null; lat: number | null; lng: number | null } };
+  }
+  const line1 = String(formData.get("address_line1") || "").trim();
+  const area = String(formData.get("address_area") || "").trim() || null;
+  const city = String(formData.get("address_city") || "").trim() || null;
+  if (!line1) return { error: "Enter the address for pickup or delivery." };
+  const at = mapsConfigured() ? await geocode(addressText({ line1, area, city })) : null;
+  const { count } = await supabase.from("customer_addresses").select("id", { count: "exact", head: true }).eq("customer_id", userId);
+  const { data, error } = await supabase.from("customer_addresses")
+    .insert({ customer_id: userId, label: count ? "Address" : "Home", line1, area, city,
+              lat: at?.lat ?? null, lng: at?.lng ?? null, is_default: !count } as never)
+    .select("id, line1, area, city, lat, lng").single();
+  if (error) return { error: error.message };
+  return { address: data as { id: string; line1: string; area: string | null; city: string | null; lat: number | null; lng: number | null } };
+}
+
+/**
+ * Delivery fee preview for the order form. Uses the admin's pricing: the flat
+ * fee, or the Google Maps distance from the branch to the address. The order
+ * itself is priced again on the server when it's placed.
+ */
+export async function quoteDeliveryFee(input: {
+  vendorId: string; branchId?: string; addressId?: string; line1?: string; area?: string; city?: string;
+}): Promise<DeliveryQuote | { error: string }> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Please sign in again." };
+  const pricing = await loadPricing(supabase);
+  if (pricing.mode === "flat") return { fee: pricing.flat, km: null, pricedBy: "flat" };
+
+  const b = await resolveBranch(supabase, input.vendorId, input.branchId ?? "");
+  const branch = "branch" in b ? b.branch ?? null : null;
+  let to: { line1?: string | null; area?: string | null; city?: string | null; lat?: number | null; lng?: number | null } | null = null;
+  if (input.addressId && input.addressId !== "new") {
+    const { data } = await supabase.from("customer_addresses")
+      .select("line1, area, city, lat, lng").eq("id", input.addressId).eq("customer_id", user.id).maybeSingle();
+    to = data as typeof to;
+  } else if ((input.line1 ?? "").trim()) {
+    to = { line1: input.line1, area: input.area, city: input.city };
+  }
+  if (!to) return { fee: pricing.flat, km: null, pricedBy: "flat", note: "Add your address to see the delivery fee." };
+  return quoteDelivery(pricing, branch, to);
+}
 
 /** Create an order. Items are added by the vendor at check-in (plan rule). */
 export async function createOrder(formData: FormData) {
@@ -17,6 +89,7 @@ export async function createOrder(formData: FormData) {
   if (!user) redirect("/login");
 
   const vendor_id = String(formData.get("vendor_id") || "");
+  const branchChoice = String(formData.get("branch_id") || "");
   const entry_mode = String(formData.get("entry_mode") || "drop_off") as EntryMode;
   const return_mode = String(formData.get("return_mode") || "collection") as ReturnMode;
   const payment_timing = String(formData.get("payment_timing") || "online") as PaymentTiming;
@@ -30,21 +103,35 @@ export async function createOrder(formData: FormData) {
 
   if (!vendor_id) return { error: "Please choose a laundry." };
 
-  // Drop-off and pickup follow the laundry's opening hours.
   const { data: vendor } = await supabase
     .from("vendors").select("status, is_open, opens_at, closes_at").eq("id", vendor_id).maybeSingle();
   if (!vendor || vendor.status !== "verified") return { error: "That laundry isn't available." };
-  if (!isVendorOpenNow(vendor)) {
-    return { error: "That laundry is closed right now. Drop-off and pickup follow its opening hours." };
+
+  // The branch, and its opening hours (drop-off and pickup follow them).
+  const b = await resolveBranch(supabase, vendor_id, branchChoice);
+  const branch = "branch" in b ? b.branch ?? null : null;
+  if ("branch" in b && (!branch || !branch.active)) return { error: "That branch isn't taking orders. Please choose another." };
+  if (!isVendorOpenNow(branch ?? vendor)) {
+    return { error: "That branch is closed right now. Drop-off and pickup follow its opening hours." };
   }
 
-  // delivery fee: global flat rule (admin can refine by zone/vendor later)
+  // The customer's address, needed for a pickup or a delivery.
+  let addressId: string | null = null;
+  let address: { line1: string; area: string | null; city: string | null; lat: number | null; lng: number | null } | null = null;
+  if (entry_mode === "pickup" || return_mode === "delivery") {
+    const a = await resolveAddress(supabase, user.id, formData);
+    if ("error" in a) return { error: a.error };
+    addressId = a.address.id;
+    address = a.address;
+  }
+
+  // Delivery fee: the admin's flat fee, or priced by distance (Google Maps).
   let delivery_fee = 0;
+  let distanceKm: number | null = null;
   if (return_mode === "delivery") {
-    const { data: rule } = await supabase
-      .from("delivery_fee_rules").select("flat_amount")
-      .eq("scope", "global").eq("active", true).limit(1).maybeSingle();
-    delivery_fee = Number(rule?.flat_amount ?? 0);
+    const q = await quoteDelivery(await loadPricing(supabase), branch, address);
+    delivery_fee = q.fee;
+    distanceKm = q.km;
   }
 
   // Express/premium markups are percentages applied by DB triggers once items
@@ -54,6 +141,7 @@ export async function createOrder(formData: FormData) {
     .insert({
       customer_id: user.id,
       vendor_id,
+      ...(branch ? { branch_id: branch.id } : {}),
       entry_mode,
       return_mode,
       delivered_by: return_mode === "delivery" ? delivered_by : null,
@@ -61,32 +149,35 @@ export async function createOrder(formData: FormData) {
       service_tier,
       turnaround,
       delivery_fee,
+      ...(distanceKm != null ? { delivery_distance_km: distanceKm } : {}),
+      pickup_address_id: addressId,
       total: delivery_fee, // items/extras/markups recompute via triggers
       notes,
       via_vendor_link,
       status: entry_mode === "pickup" ? "pickup_requested" : "awaiting_dropoff",
-    })
+    } as never)
     .select("id")
     .single();
 
   if (error) return { error: error.message };
+  const orderId = (data as { id: string }).id;
 
   // Snapshot chosen premium extras onto the order (premium tier only).
   if (service_tier === "premium" && extraIds.length > 0) {
     const { data: extras } = await supabase
       .from("service_extras").select("id, name, price").in("id", extraIds).eq("active", true);
     const rows = (extras ?? []).map((e) => ({
-      order_id: data.id, extra_id: e.id, name: e.name, price: e.price,
+      order_id: orderId, extra_id: e.id, name: e.name, price: e.price,
     }));
     if (rows.length > 0) await supabase.from("order_extras").insert(rows as never);
   }
 
   // Tell admins + the vendor's staff, and confirm to the customer (best-effort,
   // in parallel; never blocks the order).
-  await Promise.all([notifyOrder("order_placed", data.id), notifyOrder("order_confirmed", data.id)]);
+  await Promise.all([notifyOrder("order_placed", orderId), notifyOrder("order_confirmed", orderId)]);
 
   revalidatePath("/customer");
-  redirect(`/customer/orders/${data.id}`);
+  redirect(`/customer/orders/${orderId}`);
 }
 
 /** Apply a promo code to an order (validated + redeemed in the DB). */

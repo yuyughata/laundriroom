@@ -36,7 +36,7 @@ export async function GET() {
     rows: orders.map((o) => [
       o.code,
       dateShort(o.created_at),
-      o.vendor_name,
+      o.branch_name ? `${o.vendor_name} (${o.branch_name})` : o.vendor_name,
       o.customer_name,
       String(o.item_count),
       pdfMoney(o.total),

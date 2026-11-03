@@ -19,7 +19,7 @@ export default async function RequestsPage() {
 
   return (
     <VendorShell active="/vendor/requests" vendorName={ctx.vendorName}
-      staffName={ctx.profile.full_name} staffRole={ctx.isManager ? "Manager" : "Attendant"}>
+      staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">Item type requests</h1>
       <p className="mt-1 text-sm text-slate">
         Attendants propose new item types; a manager approves before they join the catalogue.
