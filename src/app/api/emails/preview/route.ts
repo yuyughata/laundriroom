@@ -86,7 +86,10 @@ export async function GET(req: Request) {
   }
 
   if (event && EMAIL_TEMPLATES[event]) {
-    const { html } = EMAIL_TEMPLATES[event](SAMPLE);
+    // ?to=vendor previews the copy a vendor's staff get (e.g. review_low,
+    // which has an admin version and a vendor version).
+    const ctx = new URL(req.url).searchParams.get("to") === "vendor" ? { ...SAMPLE, admin_name: undefined } : SAMPLE;
+    const { html } = EMAIL_TEMPLATES[event](ctx);
     return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
   }
 
