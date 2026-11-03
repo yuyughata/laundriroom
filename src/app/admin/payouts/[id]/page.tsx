@@ -46,7 +46,7 @@ export default async function PayoutDetail({ params }: { params: { id: string } 
 
       <section className="mt-8">
         <h2 className="font-display text-lg text-ink">Orders in this payout ({os.length})</h2>
-        <div className="mt-3 overflow-x-auto rounded-card border border-ink/10 bg-white">
+        <div className="mt-3 table-scroll rounded-card border border-ink/10 bg-white">
           <table className="w-full text-sm">
             <thead className="bg-ink/5 text-left text-xs text-slate">
               <tr>

@@ -72,6 +72,11 @@ promote an admin → deploy edge functions → wire Paystack).
   change their own status/plan/KYC flag (`guard_vendor_columns`).
 - Server Components fetch; interactive bits are small client components calling
   server actions in each area's `actions.ts`.
+- **Responsive dashboards:** admin and vendor shells share `ShellNav` — a fixed
+  sidebar on desktop (lg+), a top bar with a Menu button (all links + account)
+  below that. Wrap data tables in `table-scroll` (globals.css): it scrolls
+  sideways with edge shadows and keeps a readable min-width below lg. Page
+  heading rows use `flex flex-wrap … gap-3` so badges/buttons wrap on phones.
 
 ## State of the build
 

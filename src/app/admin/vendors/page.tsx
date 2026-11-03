@@ -24,16 +24,16 @@ export default async function AdminVendors() {
   const ratingMap = new Map(((ratings ?? []) as VendorRating[]).map((r) => [r.vendor_id, r]));
   return (
     <AdminShell active="/admin/vendors" name={profile.full_name} role={profile.role}>
-      <div className="relative flex items-center justify-between">
+      <div className="relative flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Vendors</h1>
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className="chip-ok">{vs.filter((v) => v.status === "verified").length} verified</span>
           <span className="chip-warn">{vs.filter((v) => v.status === "pending").length} pending</span>
           <NewVendor />
         </div>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-card border border-ink/10 bg-white">
+      <div className="mt-6 table-scroll rounded-card border border-ink/10 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-ink/5 text-left text-xs text-slate">
             <tr>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/ui/SignOutButton";
-import { Logo } from "@/components/ui/Logo";
+import { ShellNav } from "./ShellNav";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", exact: true },
@@ -47,27 +47,13 @@ export function AdminShell({
 }: { children: React.ReactNode; active?: string; name: string; role: string }) {
   return (
     <div className="min-h-screen bg-ivory lg:flex">
-      <aside className="shrink-0 bg-ink text-ivory lg:min-h-screen lg:w-60">
-        <div className="px-5 py-5">
-          <Logo variant="light" className="text-lg" />
-          <p className="mt-1 text-xs text-ivory/50">Platform admin</p>
-        </div>
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:gap-0.5 lg:pb-0">
-          {NAV.map((n) => {
-            const on = n.exact ? active === n.href : active === n.href;
-            return (
-              <Link key={n.href} href={n.href}
-                className={`whitespace-nowrap rounded-card px-4 py-2.5 text-sm ${
-                  on ? "bg-ivory/15 text-ivory" : "text-ivory/70 hover:bg-ivory/10"}`}>
-                {n.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
+      <ShellNav items={NAV} active={active} subtitle="Platform admin"
+        account={<AccountBlock name={name} role={role} />} />
 
       <div className="flex-1">
-        <header className="flex items-center justify-between border-b border-ink/10 bg-white px-6 py-4">
+        {/* Desktop header; on smaller screens the page title and account
+            live in the top bar's menu instead. */}
+        <header className="hidden items-center justify-between border-b border-ink/10 bg-white px-6 py-4 lg:flex">
           <p className="font-display text-lg text-ink">{TITLES[active ?? ""] ?? "Admin"}</p>
           <div className="flex items-center gap-4">
             <span className="text-xs text-slate">{name} · {role.replace("_", " ")}</span>
@@ -75,7 +61,19 @@ export function AdminShell({
             <SignOutButton />
           </div>
         </header>
-        <main className="px-6 py-6">{children}</main>
+        <main className="px-4 py-6 sm:px-6">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+function AccountBlock({ name, role }: { name: string; role: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <p className="min-w-0 truncate text-xs text-ivory/60">{name} · {role.replace("_", " ")}</p>
+      <div className="flex shrink-0 items-center gap-4">
+        <Link href="/account/password" className="text-sm text-ivory/80 hover:text-ivory">Password</Link>
+        <SignOutButton className="text-sm text-ivory/80 hover:text-ivory" />
       </div>
     </div>
   );

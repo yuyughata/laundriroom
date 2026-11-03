@@ -25,9 +25,9 @@ export default async function AdminReviews() {
 
   return (
     <AdminShell active="/admin/reviews" name={profile.full_name} role={profile.role}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Reviews</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Stars value={avg} size={16} showValue count={rows.length} />
         </div>
       </div>

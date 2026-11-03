@@ -40,7 +40,7 @@ export default async function AdminVerification() {
 
   return (
     <AdminShell active="/admin/verification" name={profile.full_name} role={profile.role}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Verification</h1>
         <span className="chip-warn text-xs">{pendingCount} pending</span>
       </div>
@@ -54,7 +54,7 @@ export default async function AdminVerification() {
           const v = vmap.get(vendorId);
           return (
             <div key={vendorId} className="rounded-card border border-ink/10 bg-white">
-              <div className="flex items-center justify-between border-b border-ink/10 px-5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink/10 px-5 py-3">
                 <div className="flex items-center gap-2">
                   <p className="font-medium text-ink">{v?.name ?? "Vendor"}</p>
                   <span className={v?.kyc_verified ? "chip-ok" : "chip-muted"}>

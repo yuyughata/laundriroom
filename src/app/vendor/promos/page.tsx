@@ -14,7 +14,7 @@ export default async function VendorPromosPage() {
   return (
     <VendorShell active="/vendor/promos" vendorName={ctx.vendorName}
       staffName={ctx.profile.full_name} staffRole={ctx.isManager ? "Manager" : "Attendant"}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Promos & campaigns</h1>
         <NewVendorPromo vendorId={ctx.vendorId} canManage={ctx.isManager} />
       </div>
@@ -24,7 +24,7 @@ export default async function VendorPromosPage() {
       </p>
       {!ctx.isManager && <p className="mt-1 text-xs text-slate">Only a manager can create promos.</p>}
 
-      <div className="mt-6 overflow-x-auto rounded-card border border-ink/10 bg-white">
+      <div className="mt-6 table-scroll rounded-card border border-ink/10 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-ink/5 text-left text-xs text-slate">
             <tr>

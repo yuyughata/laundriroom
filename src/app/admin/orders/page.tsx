@@ -33,7 +33,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
     <AdminShell active="/admin/orders" name={profile.full_name} role={profile.role}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Orders</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-2 text-xs">
             <span className="chip-ink">{orders.length} shown</span>
             <span className="chip-ok">{money(revenue)} paid</span>
@@ -52,7 +52,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
         ))}
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-card border border-ink/10 bg-white">
+      <div className="mt-6 table-scroll rounded-card border border-ink/10 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-ink/5 text-left text-xs text-slate">
             <tr>

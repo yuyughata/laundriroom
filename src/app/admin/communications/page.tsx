@@ -30,7 +30,7 @@ export default async function AdminComms() {
         use the Ink &amp; Ivory HTML templates; WhatsApp and SMS use plain text.
       </p>
 
-      <div className="mt-6 overflow-x-auto rounded-card border border-ink/10 bg-white">
+      <div className="mt-6 table-scroll rounded-card border border-ink/10 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-ink/5 text-left text-xs text-slate">
             <tr>
