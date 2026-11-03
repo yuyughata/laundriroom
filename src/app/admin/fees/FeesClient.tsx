@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setPlatformRates, setOtherCharges, setGlobalDeliveryFee } from "../actions";
+import { setPlatformRates, setOtherCharges, setGlobalDeliveryFee, setPayoutDelay } from "../actions";
 import { money } from "@/lib/format";
 
 /** Commission, express and premium — one set that applies to every vendor. */
@@ -109,6 +109,41 @@ function Field({
         {unit === "%" && <span className="text-lg text-slate">%</span>}
       </div>
       <p className="mt-1 max-w-xs text-xs text-slate">{suffix}</p>
+    </div>
+  );
+}
+
+/** Payout timing: 0 hours (default) pays vendors the moment an order is completed and paid. */
+export function PayoutDelayEditor({ hours }: { hours: number }) {
+  const [h, setH] = useState(String(hours));
+  const [pending, start] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const n = Number(h);
+
+  return (
+    <div>
+      <label className="label">Hold payouts for</label>
+      <div className="flex flex-wrap items-center gap-2">
+        <input className="field max-w-[120px]" inputMode="numeric" value={h}
+          onChange={(e) => { setH(e.target.value); setSaved(false); }} />
+        <span className="text-sm text-slate">hours</span>
+        <button className="btn-primary" disabled={pending}
+          onClick={() => start(async () => {
+            setErr(null);
+            const r = await setPayoutDelay(Math.round(Number(h)));
+            if (r?.error) setErr(r.error); else setSaved(true);
+          })}>
+          Save
+        </button>
+      </div>
+      <p className="mt-1 max-w-md text-xs text-slate">
+        {Number.isFinite(n) && n > 0
+          ? `Vendors are paid ${n} hour${n === 1 ? "" : "s"} after an order is completed and paid. Set 0 to pay immediately.`
+          : "0 = vendors are paid through Paystack immediately once an order is completed and paid (recommended). Add hours only if you want a window to catch disputes first."}
+      </p>
+      {err && <p className="mt-1 text-sm text-danger">{err}</p>}
+      {saved && <p className="mt-1 text-xs text-teal">Saved.</p>}
     </div>
   );
 }

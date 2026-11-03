@@ -1,7 +1,7 @@
 import { AdminShell } from "@/components/shells/AdminShell";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PlatformRatesEditor, DeliveryFeeEditor, OtherChargesEditor } from "./FeesClient";
+import { PlatformRatesEditor, DeliveryFeeEditor, OtherChargesEditor, PayoutDelayEditor } from "./FeesClient";
 
 const pct = (frac: unknown) => Math.round(Number(frac ?? 0) * 10000) / 100; // 0.15 → 15
 
@@ -11,12 +11,12 @@ export default async function AdminFees() {
 
   const [{ data: s }, { data: plan }, { data: fee }] = await Promise.all([
     supabase.from("platform_settings")
-      .select("express_pct, premium_pct, noncollection_penalty_pct, referral_reward").eq("id", true).maybeSingle(),
+      .select("express_pct, premium_pct, noncollection_penalty_pct, referral_reward, payout_delay_hours").eq("id", true).maybeSingle(),
     supabase.from("vendor_plans").select("commission_rate").eq("is_default", true).limit(1).maybeSingle(),
     supabase.from("delivery_fee_rules").select("flat_amount").eq("scope", "global").limit(1).maybeSingle(),
   ]);
 
-  const settings = s as { express_pct: number; premium_pct: number; noncollection_penalty_pct: number; referral_reward: number } | null;
+  const settings = s as { express_pct: number; premium_pct: number; noncollection_penalty_pct: number; referral_reward: number; payout_delay_hours: number } | null;
   const rates = {
     commission: pct((plan as { commission_rate?: number } | null)?.commission_rate),
     express: pct(settings?.express_pct),
@@ -47,6 +47,11 @@ export default async function AdminFees() {
         </div>
       </section>
 
+      <section className="card mt-6 max-w-4xl p-6">
+        <h2 className="font-display text-lg text-ink">Vendor payouts</h2>
+        <p className="mb-5 text-xs text-slate">When vendors receive their share through Paystack.</p>
+        <PayoutDelayEditor hours={Number(settings?.payout_delay_hours ?? 0)} />
+      </section>
     </AdminShell>
   );
 }

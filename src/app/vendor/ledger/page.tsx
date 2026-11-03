@@ -128,7 +128,7 @@ export default async function LedgerPage() {
       <section className="mt-8">
         <h2 className="font-display text-lg text-ink">Payouts</h2>
         <p className="mt-1 text-xs text-slate">
-          A payout falls due 24 hours after an order is completed and paid, less commission. A disputed payout is held.
+          You're paid automatically to your payout account as soon as an order is completed and paid, less commission. A disputed payout is held until it's resolved.
         </p>
         {po.length === 0 ? (
           <p className="mt-3 text-sm text-slate">No payouts yet.</p>

@@ -125,7 +125,7 @@ by the vendor manager at Vendor → Verification, stored on
 `vendors.terms_accepted_at`; admins see acceptance beside KYC), **customer reviews & ratings** (1–5 stars + comment
 on a completed order; aggregated per vendor via the `vendor_ratings` view and
 shown on vendor selection, the vendor Reviews page, and admin — admins moderate
-under Admin → Reviews), automatic 24h payout scheduling, and tag release
+under Admin → Reviews), automatic instant payouts (see Automated payouts below), and tag release
 on order close, and **vendor profile pages** (public `/v/<slug>`, `0031`):
 every vendor gets a `slug` from its name the moment the row is created
 (trigger `set_vendor_slug`; unique with -2/-3; kept on rename; admin-only to
@@ -151,10 +151,22 @@ see each link under Admin → Vendors. Links use `NEXT_PUBLIC_SITE_URL`.
   (delivery/collection) are generated per order (`0010`, `confirm_pickup`).
 - Automated payouts (Paystack Transfers) — a vendor sets their bank account at
   Vendor → Ledger → Payout account (`vendor_payout_accounts`, name resolved via
-  Paystack `/bank/resolve`). The `process-payouts` edge function runs on a cron
-  (see `docs/CONNECT-DATABASE.md`): for each `due` payout it lazily creates the
-  Paystack transfer recipient, checks balance, initiates the transfer
-  (reference = payout id, idempotent) and sets the payout `processing`. The
+  Paystack `/bank/resolve`). Pay-on-delivery is paid in the app too (Pay now at
+  the door), so every completed order's money is in the Paystack balance.
+  Payouts are paid **immediately on reconciliation** (`0032`):
+  `schedule_payout_if_ready` makes the payout due at completion + the admin
+  hold window (`platform_settings.payout_delay_hours`, default 0, set on
+  Admin → Fees & charges), and the `payouts_pay_when_due` trigger calls
+  `process-payouts` for that payout via `request_payout_run` (pg_net + the
+  Vault secrets). The hourly cron (`0019`) is the retry/hold-window sweep.
+  Admin → Payouts **Release** (platform_admin only) calls `process-payouts`
+  with `{payout_id, release: true}` + the service key to transfer a due or
+  held payout now; without a Paystack key it only simulates in dev /
+  `ALLOW_SIMULATED_PAYMENTS`. The function claims each payout (due/held →
+  `processing`, so it's never sent twice), lazily creates the Paystack transfer
+  recipient, checks balance, initiates the transfer (reference = payout id,
+  idempotent); anything that blocks it puts the payout back to `due` with a
+  `failure_reason`. The
   `paystack-webhook` settles `transfer.success` → `sent` and
   `transfer.failed`/`reversed` → back to `due` with a `failure_reason`. Needs
   Transfers enabled + OTP disabled on Paystack; test keys simulate the full path.

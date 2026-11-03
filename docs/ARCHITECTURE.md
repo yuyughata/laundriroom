@@ -50,11 +50,15 @@
 3. Attendant presses stages → `stage_events`; `final_completion` marks the order
    `ready` and stamps `completed_at`.
 4. Return leg → delivery (out for delivery) or collection.
-5. Payment → online (Paystack, confirmed by webhook) or on delivery (Pay now).
-   A succeeded pay-on-delivery payment closes the order; a prepaid order closes
-   on the handover code.
-6. On close + paid → a payout is scheduled for `completed_at + 24h`, net of
-   commission (on the whole order total) or plan fee. Admin releases or holds it.
+5. Payment is always made in the app through Paystack (confirmed by webhook):
+   up front, or "on delivery" — the customer taps Pay now in the app at the
+   door. A succeeded pay-on-delivery payment closes the order; a prepaid order
+   closes on the handover code. There is no cash path.
+6. On close + paid (reconciled) → the payout is created due immediately
+   (optional hold window: `platform_settings.payout_delay_hours`, default 0),
+   net of commission, and the database calls `process-payouts` at once to send
+   the Paystack transfer. The hourly job retries anything that couldn't go.
+   Admins can Hold a payout, or Release it to send it now.
 
 ## Key files
 

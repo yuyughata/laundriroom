@@ -197,8 +197,12 @@ npm run db:types     # supabase gen types typescript --local > src/lib/database.
 
 ## Automated vendor payouts (Paystack Transfers)
 
-A payout row is created 24h after an order is `closed` and paid, with its `net`
-(gross − commission) ready to send. To pay vendors automatically:
+A payout is created the moment an order is `closed` and paid (reconciled), with
+its `net` (gross − commission), and the database immediately asks
+`process-payouts` to transfer it. Pay-on-delivery orders are paid in the app too
+(the customer taps Pay now at the door), so the money is always in your Paystack
+balance first. An admin can add a hold window (Admin → Fees & charges → Vendor
+payouts; default 0 = pay immediately). To pay vendors automatically:
 
 **1. Activate Transfers on Paystack.** Complete business verification, then
 enable Transfers in the dashboard. Collections and transfers share one balance —
@@ -222,7 +226,8 @@ at the `paystack-webhook` URL. It already handles `charge.success`; it now also
 settles `transfer.success` / `transfer.failed` / `transfer.reversed` onto the
 payout (success → `sent`; failed/reversed → back to `due` with a reason).
 
-**5. Schedule `process-payouts` hourly.** Migration `0019_payout_schedule.sql`
+**5. Connect the database to `process-payouts`** (used both for the instant
+payout on reconciliation, `0032`, and the hourly retry sweep). Migration `0019_payout_schedule.sql`
 enables `pg_cron` + `pg_net` and creates the `process-payouts-hourly` job. The
 job reads the URL and secret from Supabase Vault, so nothing secret is stored in
 the job itself, and it does nothing until both Vault entries exist. Once per
@@ -240,12 +245,15 @@ runs with `select * from cron.job_run_details order by start_time desc;` and
 the function's replies with
 `select status_code, content from net._http_response order by created desc;`.
 
-Each run transfers every `due` payout whose `due_at` has passed: it creates the
+Each payout is sent straight after reconciliation; the hourly run then retries
+every `due` payout whose `due_at` has passed. Each attempt creates the
 Paystack recipient from the vendor's saved bank account on first use, checks the
 balance, initiates the transfer (reference = payout id, so no double-pay), and
 moves the payout to `processing`. The webhook then settles it. Payouts with no
-vendor bank account, or when the balance is short, stay `due` with a
-`failure_reason` and retry next run. Vendors set their bank account under
+vendor bank account, or when the balance is short, go back to `due` with a
+`failure_reason` and retry next hour. **Admin → Payouts → Release** sends a due
+or held payout through Paystack immediately (platform admins only); **Hold**
+stops a disputed one. Vendors set their bank account under
 **Vendor → Ledger → Payout account**; admins see unpayable payouts flagged on
 **Admin → Payouts**.
 
