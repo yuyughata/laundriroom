@@ -5,7 +5,7 @@ import { getVendorContext } from "@/lib/vendor";
 import { createClient } from "@/lib/supabase/server";
 import { OrderWorkspace } from "./OrderWorkspace";
 import { OrderActivity, type ActivityRow } from "@/components/orders/OrderActivity";
-import type { Order, OrderItem, ItemType, PriceListRow, Payment, OrderExtra } from "@/lib/database.types";
+import type { Order, OrderItem, ItemType, PriceListRow, Payment, OrderExtra, RiderContact } from "@/lib/database.types";
 
 export default async function VendorOrderDetail({ params }: { params: { id: string } }) {
   const ctx = await getVendorContext();
@@ -15,7 +15,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
   if (!order || (order as Order).vendor_id !== ctx.vendorId) notFound();
   const o = order as Order;
 
-  const [{ data: items }, { data: itemTypes }, { data: prices }, { data: payments }, { data: customer }, { data: extras }, { data: activity }] =
+  const [{ data: items }, { data: itemTypes }, { data: prices }, { data: payments }, { data: customer }, { data: extras }, { data: activity }, { data: riders }] =
     await Promise.all([
       supabase.from("order_items").select("*").eq("order_id", o.id).order("sub_code"),
       supabase.from("item_types").select("*").or(`is_global.eq.true,vendor_id.eq.${ctx.vendorId}`).eq("active", true).order("name"),
@@ -25,6 +25,9 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
       supabase.from("order_extras").select("*").eq("order_id", o.id).order("created_at"),
       // Who did each step (0039); empty if the function isn't there yet.
       supabase.rpc("get_order_activity" as never, { p_order: o.id } as never),
+      // Saved riders this staff member can see (their branch's + business-wide); newest use first.
+      supabase.from("rider_contacts").select("*").eq("vendor_id", ctx.vendorId).eq("active", true)
+        .order("last_used_at", { ascending: false, nullsFirst: false }).order("name").limit(300),
     ]);
   const rows = (Array.isArray(activity) ? activity : []) as ActivityRow[];
   // Item sub-code → the staff member who checked it in.
@@ -47,6 +50,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
         branchName={ctx.branches.length > 1 || !ctx.branchId
           ? ctx.branches.find((b) => b.id === o.branch_id)?.name ?? null : null}
         checkedInBy={checkedInBy}
+        riders={((riders ?? []) as RiderContact[]).filter((r) => !r.branch_id || r.branch_id === o.branch_id)}
       />
       <OrderActivity rows={rows} />
     </VendorShell>

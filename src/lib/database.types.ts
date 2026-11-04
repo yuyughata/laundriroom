@@ -48,6 +48,14 @@ export type Profile = {
   created_at: string; updated_at: string;
 }
 
+/** A laundry's saved rider (0045). No login — a contact. */
+export type RiderContact = {
+  id: string; vendor_id: string; branch_id: string | null;
+  name: string; phone: string; phone_key: string;
+  kind: "own" | "dispatch"; company: string | null; notes: string | null;
+  active: boolean; created_by: string | null; created_at: string; updated_at: string; last_used_at: string | null;
+}
+
 export type NewsletterGroup = "customers" | "vendor_managers" | "vendor_staff" | "team" | "everyone";
 export type NewsletterAudience = { groups: NewsletterGroup[]; user_ids: string[] };
 export type Newsletter = {
@@ -124,6 +132,8 @@ export type Order = {
   vendor_earnings?: number;
   handover_code: string | null; pickup_code: string | null; picked_up_at: string | null; picked_up_by?: string | null;
   dispatch_reference: string | null; rider_name: string | null; rider_phone: string | null;
+  /** The saved rider used (0045); rider_name/phone are this order's own copy. */
+  rider_contact_id?: string | null;
   created_by: string | null;
   /** Placed from the vendor's public profile link. */
   via_vendor_link: boolean;
@@ -324,6 +334,7 @@ export type Database = {
       vendor_documents: Table<VendorDocument>;
       vendor_payout_accounts: Table<VendorPayoutAccount>;
       newsletters: Table<Newsletter>;
+      rider_contacts: Table<RiderContact>;
       newsletter_recipients: Table<NewsletterRecipient>;
     };
     Views: {

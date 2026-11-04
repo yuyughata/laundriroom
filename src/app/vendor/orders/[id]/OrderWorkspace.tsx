@@ -1,19 +1,20 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { checkInItem, pressStage, confirmHandover, markOutForDelivery, rescheduleDelivery, confirmPickup, logDispatch, assignRider } from "../../actions";
+import { checkInItem, pressStage, confirmHandover, markOutForDelivery, rescheduleDelivery, confirmPickup, logDispatch } from "../../actions";
+import { RiderPicker } from "@/components/riders/RiderPicker";
 import { createClient as createBrowser } from "@/lib/supabase/client";
 import { QrScanner } from "@/components/ui/QrScanner";
 import { customerPrice } from "@/lib/pricing";
 import { money, SERVICE_LABEL, STATUS_LABEL, PROCESSING_STAGES, STAGE_LABEL, TIER_LABEL } from "@/lib/format";
 import type {
-  Order, OrderItem, ItemType, PriceListRow, ServiceType, StageKind, OrderExtra,
+  Order, OrderItem, ItemType, PriceListRow, ServiceType, StageKind, OrderExtra, RiderContact,
 } from "@/lib/database.types";
 
 const SERVICES: ServiceType[] = ["wash_and_fold", "dry_clean", "press_only"];
 
 export function OrderWorkspace({
-  order, items, itemTypes, prices, paid, customerName, extras, branchName, checkedInBy = {}, showEarnings = false,
+  order, items, itemTypes, prices, paid, customerName, extras, branchName, checkedInBy = {}, showEarnings = false, riders = [],
 }: {
   order: Order; items: OrderItem[]; itemTypes: ItemType[];
   prices: PriceListRow[]; paid: boolean; customerName: string; extras: OrderExtra[];
@@ -23,6 +24,8 @@ export function OrderWorkspace({
   checkedInBy?: Record<string, string>;
   /** Show what the vendor receives (business-wide managers only). */
   showEarnings?: boolean;
+  /** The laundry's saved riders this staff member can use (0045). */
+  riders?: RiderContact[];
 }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -38,8 +41,6 @@ export function OrderWorkspace({
   const [code, setCode] = useState("");
   const [pickupPin, setPickupPin] = useState("");
   const [dispatchRef, setDispatchRef] = useState(order.dispatch_reference ?? "");
-  const [riderName, setRiderName] = useState(order.rider_name ?? "");
-  const [riderPhone, setRiderPhone] = useState(order.rider_phone ?? "");
 
   const priceFor = (t: string, s: ServiceType) =>
     prices.find((p) => p.item_type_id === t && p.service === s)?.price ?? 0;
@@ -219,34 +220,9 @@ export function OrderWorkspace({
               <p className="label">{isDelivery ? "Delivery" : "Collection"}</p>
 
               {isDelivery && (
-                <div className="mb-3 rounded-card border border-ink/10 p-3">
-                  <p className="text-xs font-medium text-ink">Assign a rider</p>
-                  <p className="mt-1 text-xs text-slate">
-                    Your own rider or a dispatch driver. Give them the code below —
-                    they bring it to the customer at handover.
-                  </p>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    <input className="field" placeholder="Rider name" value={riderName}
-                      onChange={(e) => setRiderName(e.target.value)} />
-                    <input className="field" placeholder="Rider phone" value={riderPhone}
-                      onChange={(e) => setRiderPhone(e.target.value)} />
-                  </div>
-                  <button className="btn-ghost mt-2 w-full justify-center text-xs" disabled={pending}
-                    onClick={() => run(() => assignRider(order.id, riderName, riderPhone))}>
-                    {order.rider_name ? "Update rider" : "Assign rider"}
-                  </button>
-                  {order.rider_name && (
-                    <div className="mt-2 rounded-card bg-ink/5 p-2 text-xs text-ink">
-                      <p className="font-medium">{order.rider_name}{order.rider_phone ? ` · ${order.rider_phone}` : ""}</p>
-                      <p className="mt-1 text-slate">
-                        Order code <span className="font-mono text-ink">{order.code}</span>
-                        {order.payment_timing === "online" && order.handover_code
-                          ? <> · handover code <span className="font-mono text-ink">{order.handover_code}</span></>
-                          : null}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <RiderPicker orderId={order.id} orderCode={order.code} contacts={riders}
+                  handoverCode={order.payment_timing === "online" ? order.handover_code : null}
+                  current={{ name: order.rider_name, phone: order.rider_phone, contactId: order.rider_contact_id ?? null }} />
               )}
 
               {isDelivery && order.delivered_by === "dispatch_partner" && (

@@ -157,8 +157,8 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0044 are applied to the hosted project
-  (0033–0038 on 2026-11-03, 0039–0044 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
+- **Live database:** migrations 0001–0045 are applied to the hosted project
+  (0033–0038 on 2026-11-03, 0039–0045 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`
   statements, so live changes went in drop-free (`create or replace trigger`,
@@ -253,6 +253,23 @@ promote an admin → deploy edge functions → wire Paystack).
   `redeem_promo` right after the order is created; the order page says
   whether it applied (`promo_applied` / `promo_error`). Signed-out scans go
   through sign-in/sign-up and come back to the same link.
+- **Rider list (`0045`):** `rider_contacts` — one list per business of the
+  laundry's own riders and dispatch-company riders (name, phone, own/dispatch,
+  company, notes, optional `branch_id`; NULL = every branch). Riders have no
+  login. Phones match by digits (`phone_key()`: 0803… = +234 803…; unique per
+  vendor; `src/lib/phone.ts` mirrors it and builds Call/WhatsApp links). Any
+  staff member reads (their branch + business-wide riders) and adds; only
+  managers edit/archive (`can_manage_riders`: business-wide managers any
+  rider, branch managers their branch's); `guard_rider_contact` keeps
+  `vendor_id`/`created_by` fixed. On a delivery order the rider box is
+  `components/riders/RiderPicker.tsx`: search/pick, or "+ New rider" with
+  "Save to rider list" → `assign_order_rider()` (branch staff/admin; reuses an
+  existing number and un-archives it; a new contact gets the adder's branch;
+  empty name+phone clears). The order keeps its own copy (`rider_name`,
+  `rider_phone`, plus `rider_contact_id`), so editing/archiving a contact never
+  changes past orders. Vendor → Riders (`app/vendor/riders`,
+  `components/riders/RiderManager.tsx`) lists them with order counts.
+  Pickups don't use the picker yet.
 - **Training decks:** `docs/presentations/` holds the team training deck and
   the Partner Playbook: PDFs, speaker notes and the slide sources (claude.ai
   Slides format, with images). Rebuild the PDFs with
@@ -282,7 +299,7 @@ from the vendor's gross while a platform discount leaves it whole) and
 order by a referee auto-issues an owner-scoped reward promo to the referrer),
 dispatch-partner logging (`dispatch_reference`), **rider assignment**
 (vendor/attendant assigns a rider — own or dispatch — on the order workspace via
-`assignRider`, storing `rider_name`/`rider_phone`; the rider is shown the order
+`assignRider` → `assign_order_rider`, picked from the saved rider list or typed in, storing `rider_name`/`rider_phone`; the rider is shown the order
 code + handover PIN to carry, and the vendor manages delivery status in-app, so
 riders need no login), **QR camera scanning** (`QrScanner` + `html5-qrcode`:
 attendants scan a tag's QR into the check-in form instead of typing it),

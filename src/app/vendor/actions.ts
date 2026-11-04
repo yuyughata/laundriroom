@@ -77,13 +77,24 @@ export async function markOutForDelivery(order_id: string) {
 }
 
 /** Assign a rider to an order (own rider or a dispatch driver). They're given the code. */
-export async function assignRider(order_id: string, name: string, phone: string) {
+/**
+ * Put a rider on an order: a saved one (contactId), or a name + phone typed
+ * on the spot — saved to the rider list when `save` (the DB reuses a contact
+ * with the same number). Empty name + phone clears the rider. 0045.
+ */
+export async function assignRider(order_id: string, rider: {
+  contactId?: string | null; name?: string; phone?: string; kind?: "own" | "dispatch"; company?: string; save?: boolean;
+}) {
   const supabase = createClient();
-  const { error } = await supabase.from("orders")
-    .update({ rider_name: name.trim() || null, rider_phone: phone.trim() || null } as never)
-    .eq("id", order_id);
-  if (error) return { error: error.message };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.rpc as any)("assign_order_rider", {
+    p_order: order_id, p_contact: rider.contactId ?? null,
+    p_name: rider.name ?? "", p_phone: rider.phone ?? "",
+    p_kind: rider.kind ?? "own", p_company: rider.company ?? null, p_save: rider.save ?? true,
+  });
+  if (error) return { error: error.message.replace(/^.*?:\s*(?=[A-Z])/, "") };
   revalidatePath(`/vendor/orders/${order_id}`);
+  revalidatePath("/vendor/riders");
   return { ok: true };
 }
 
