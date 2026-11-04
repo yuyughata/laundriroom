@@ -36,6 +36,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <Link href="/vendor/queue" className="text-sm text-slate">← Queue</Link>
       <OrderWorkspace
+        showEarnings={ctx.isManager}
         order={o}
         items={(items ?? []) as OrderItem[]}
         itemTypes={(itemTypes ?? []) as ItemType[]}

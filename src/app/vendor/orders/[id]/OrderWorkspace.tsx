@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { checkInItem, pressStage, confirmHandover, markOutForDelivery, rescheduleDelivery, confirmPickup, logDispatch, assignRider } from "../../actions";
 import { createClient as createBrowser } from "@/lib/supabase/client";
 import { QrScanner } from "@/components/ui/QrScanner";
+import { customerPrice } from "@/lib/pricing";
 import { money, SERVICE_LABEL, STATUS_LABEL, PROCESSING_STAGES, STAGE_LABEL, TIER_LABEL } from "@/lib/format";
 import type {
   Order, OrderItem, ItemType, PriceListRow, ServiceType, StageKind, OrderExtra,
@@ -12,7 +13,7 @@ import type {
 const SERVICES: ServiceType[] = ["wash_and_fold", "dry_clean", "press_only"];
 
 export function OrderWorkspace({
-  order, items, itemTypes, prices, paid, customerName, extras, branchName, checkedInBy = {},
+  order, items, itemTypes, prices, paid, customerName, extras, branchName, checkedInBy = {}, showEarnings = false,
 }: {
   order: Order; items: OrderItem[]; itemTypes: ItemType[];
   prices: PriceListRow[]; paid: boolean; customerName: string; extras: OrderExtra[];
@@ -20,6 +21,8 @@ export function OrderWorkspace({
   branchName?: string | null;
   /** Item sub-code → name of the staff member who checked it in. */
   checkedInBy?: Record<string, string>;
+  /** Show what the vendor receives (business-wide managers only). */
+  showEarnings?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -40,6 +43,10 @@ export function OrderWorkspace({
 
   const priceFor = (t: string, s: ServiceType) =>
     prices.find((p) => p.item_type_id === t && p.service === s)?.price ?? 0;
+  // laundriroom's commission is added on top of the vendor's price for the customer
+  // (null on orders placed before that change).
+  const markup = order.commission_markup ?? null;
+  const addPrice = priceFor(typeId, service);
 
   const canCheckIn = ["awaiting_dropoff", "pickup_requested", "checked_in", "processing"].includes(order.status);
   const nextStageIndex = 0; // processing stages are free-press in this build
@@ -118,7 +125,12 @@ export function OrderWorkspace({
                     {it.condition_notes && <p className="text-xs text-warn">Condition: {it.condition_notes}</p>}
                     {it.photos?.length > 0 && <p className="text-xs text-slate">📷 {it.photos.length} photo{it.photos.length === 1 ? "" : "s"}</p>}
                   </div>
-                  <p className="text-sm text-ink">{money(it.price_at_checkin)}</p>
+                  <div className="text-right">
+                    <p className="text-sm text-ink">{money(it.price_at_checkin)}</p>
+                    {markup != null && it.customer_price != null && Number(it.customer_price) !== Number(it.price_at_checkin) && (
+                      <p className="text-xs text-slate">customer pays {money(it.customer_price)}</p>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -174,7 +186,7 @@ export function OrderWorkspace({
                   if (!(r && "error" in r)) { setTag(""); setComment(""); setCondNotes(""); setPhotoFiles([]); }
                   return r;
                 })}>
-                {uploading ? "Uploading…" : `Add item · ${money(priceFor(typeId, service))}`}
+                {uploading ? "Uploading…" : `Add item · ${money(addPrice)}${markup ? ` (customer pays ${money(customerPrice(addPrice, markup))})` : ""}`}
               </button>
             </div>
           )}
@@ -323,16 +335,30 @@ export function OrderWorkspace({
           )}
 
           <div className="card p-4">
+            {markup != null && <p className="label">What the customer pays</p>}
             <Row label="Items" value={money(order.items_total)} />
             {order.extras_total > 0 && <Row label="Premium extras" value={money(order.extras_total)} />}
             {order.premium_fee > 0 && <Row label="Premium service" value={money(order.premium_fee)} />}
             {order.express_fee > 0 && <Row label="Express" value={money(order.express_fee)} />}
             <Row label="Delivery" value={order.delivery_fee > 0 ? money(order.delivery_fee) : "Free"} />
             {order.reschedule_penalty > 0 && <Row label="Re-delivery penalty" value={money(order.reschedule_penalty)} />}
+            {order.discount > 0 && <Row label={`Promo ${order.promo_code ?? ""}`} value={`− ${money(order.discount)}`} />}
             {order.bulk_discount > 0 && <Row label="Bulk discount" value={`− ${money(order.bulk_discount)}`} />}
             <div className="my-2 border-t border-ink/10" />
             <Row label="Total" value={money(order.total)} strong />
             <Row label="Payment" value={paid ? "Paid" : order.payment_timing === "on_delivery" ? "On delivery" : "Online — pending"} />
+            {showEarnings && markup != null && (
+              <>
+                <div className="my-2 border-t border-ink/10" />
+                <Row label="You receive" value={money(order.vendor_earnings ?? 0)} strong />
+                <p className="mt-1 text-xs text-slate">
+                  Your prices{order.extras_total > 0 ? ", extras" : ""} and delivery, in full
+                  {order.discount_vendor_funded && order.discount > 0 ? ", less your share of the promo" : ""}.
+                  laundriroom&apos;s {Math.round(Number(markup) * 1000) / 10}% commission
+                  {order.express_fee > 0 || order.premium_fee > 0 ? " and the express/premium charges are" : " is"} added on top for the customer.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>

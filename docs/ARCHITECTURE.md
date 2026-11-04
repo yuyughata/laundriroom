@@ -56,7 +56,8 @@
    closes on the handover code. There is no cash path.
 6. On close + paid (reconciled) → the payout is created due immediately
    (optional hold window: `platform_settings.payout_delay_hours`, default 0),
-   net of commission, and the database calls `process-payouts` at once to send
+   for the vendor's own prices + delivery (commission was added to the
+   customer's price, `0041`), and the database calls `process-payouts` at once to send
    the Paystack transfer. The hourly job retries anything that couldn't go.
    Admins can Hold a payout, or Release it to send it now.
 

@@ -49,7 +49,7 @@ Six migrations build the whole model — 23 tables, all row-level-security prote
 - **Price snapshots** — an item's price is copied onto the order at check-in; later price changes never alter past orders.
 - **Stages** run in order and log who pressed each and when; the order status follows.
 - **Closing** — a prepaid order closes on the handover code; a pay-on-delivery order closes when payment is confirmed.
-- **Payouts** — sent automatically through Paystack Transfers as soon as an order is completed and paid (optional admin hold window), net of commission; admins can hold a disputed payout or release it to pay now.
+- **Payouts** — sent automatically through Paystack Transfers as soon as an order is completed and paid (optional admin hold window), the vendor's own prices + delivery in full (commission is added to the customer's price, `0041`); admins can hold a disputed payout or release it to pay now.
 - **Tags** bind to one open item at a time and free on close.
 - **Notifications** — one rule per event decides channels (email/WhatsApp/SMS), fallback order and recipients. SMS is fully built and turns on once a provider is connected on the Integrations page.
 

@@ -42,7 +42,7 @@ export async function GET() {
     meta: [
       scopeLabel(profile.role),
       vendorName ? `Vendor: ${vendorName}` : `${rows.length} payouts`,
-      `Paid to date: ${pdfMoney(sentTotal)}  ·  Outstanding: ${pdfMoney(dueTotal)}  ·  Commission: ${pdfMoney(feeTotal)}`,
+      `Paid to date: ${pdfMoney(sentTotal)}  ·  Outstanding: ${pdfMoney(dueTotal)}  ·  Deducted (older payouts): ${pdfMoney(feeTotal)}`,
       genDateLine(),
     ],
     columns: [
@@ -50,7 +50,7 @@ export async function GET() {
       { header: "Vendor", width: 140 },
       { header: "Orders", width: 55, align: "right" },
       { header: "Gross", width: 85, align: "right" },
-      { header: "Commission", width: 90, align: "right" },
+      { header: "Deducted", width: 90, align: "right" },
       { header: "Net", width: 85, align: "right" },
       { header: "Status", width: 65 },
       { header: "Sent", width: 70 },

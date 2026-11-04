@@ -46,7 +46,10 @@ promote an admin → deploy edge functions → wire Paystack).
   Those entity types are `type` aliases (not `interface`) on purpose — Supabase's
   generics need the implicit index signature.
 - **Money is NGN**, formatted via `src/lib/format.ts`. **Commission is the only
-  revenue model** — charged on the whole order total (delivery fee included).
+  revenue model** — since `0041` it is **added on top of the vendor's item
+  prices** for the customer (₦200 shirt at 30% → customer pays ₦260, vendor
+  receives ₦200), not deducted from the payout. Not added to delivery, premium
+  extras (admin-priced) or the penalty.
   Subscription/combined plans are retired (migration `0015`): any such plans are
   deactivated and their vendors moved to the default commission plan, and the
   admin Plans & fees UI only offers commission. The `plan_type` enum still holds
@@ -58,10 +61,22 @@ promote an admin → deploy edge functions → wire Paystack).
   with admin percentages in `platform_settings`). Order total =
   items + extras + delivery + express markup + premium markup + any reschedule
   penalty, all recomputed by DB triggers.
-- **Who earns what:** standard orders stay at the vendor's price (platform earns
-  via the commission, a vendor-funded discount). Express/premium markups are
-  percentages kept 100% by the platform — they are excluded from the vendor
-  payout (`schedule_payout_if_ready` pays on items+extras+delivery only). A
+- **Who earns what (`0041`):** the order snapshots the global rate in
+  `orders.commission_markup` on insert (trigger; can't be changed after).
+  `order_items.price_at_checkin` stays the **vendor's** price;
+  `order_items.customer_price` = price × (1 + rate), rounded to the whole naira
+  (`src/lib/pricing.ts` mirrors it). `orders.items_total` is the customer's
+  item sum, `vendor_items_total` the vendor's, `commission_total` the gap.
+  Express/premium markups are % of the **vendor's** price (items + extras),
+  kept 100% by the platform. A vendor-funded promo costs the vendor only its
+  share (vendor subtotal ÷ customer subtotal); the bulk discount is
+  platform-funded. `orders.vendor_earnings` (also on `order_summaries`) is what
+  the vendor receives: vendor prices + extras + delivery − its promo share;
+  `schedule_payout_if_ready` pays exactly that with `fee = 0`. Orders with
+  `commission_markup` NULL (placed before 0041) keep the old rules: customer
+  pays the vendor price and the commission is deducted as the payout `fee`.
+  The public page (`get_vendor_profile`) shows customer prices; the vendor
+  order page shows both prices and, for business-wide managers, "You receive". A
   non-collection penalty (% of delivery fee, admin-set) is added on reschedule
   when the customer was at fault (`apply_delivery_reschedule`). Everything
   lives on one page, Admin → Fees & charges (the old Plans & fees tab redirects
@@ -136,8 +151,8 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0040 are applied to the hosted project
-  (0033–0038 on 2026-11-03, 0039–0040 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
+- **Live database:** migrations 0001–0041 are applied to the hosted project
+  (0033–0038 on 2026-11-03, 0039–0041 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`
   statements, so live changes went in drop-free (`create or replace trigger`,

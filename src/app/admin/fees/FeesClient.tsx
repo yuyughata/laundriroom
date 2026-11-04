@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { setPlatformRates, setOtherCharges, setGlobalDeliveryFee, setPayoutDelay, setDeliveryPricing } from "../actions";
 import { money } from "@/lib/format";
+import { customerPrice } from "@/lib/pricing";
 
 /** Commission, express and premium — one set that applies to every vendor. */
 export function PlatformRatesEditor({
@@ -20,12 +21,13 @@ export function PlatformRatesEditor({
     <div className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-3">
         <Field label="Commission" unit="%" value={c} onChange={touch(setC)}
-          suffix="Taken from the vendor's items + extras + delivery when the payout is made." />
+          suffix="Added on top of the vendor's item prices for the customer. The vendor is paid their own price in full. Not added to delivery or extras." />
         <Field label="Express markup" unit="%" value={ex} onChange={touch(setEx)}
-          suffix="Added to express orders on the items + extras subtotal. Kept by the platform." />
+          suffix="% of the vendor's price (items + extras), added to express orders. Kept by the platform." />
         <Field label="Premium markup" unit="%" value={pr} onChange={touch(setPr)}
-          suffix="Added to premium orders on the items + extras subtotal. Kept by the platform." />
+          suffix="% of the vendor's price (items + extras), added to premium orders. Kept by the platform." />
       </div>
+      <Example c={Number(c) || 0} ex={Number(ex) || 0} pr={Number(pr) || 0} />
       {err && <p className="text-sm text-danger">{err}</p>}
       <div className="flex items-center gap-3">
         <button className="btn-primary" disabled={pending}
@@ -39,6 +41,21 @@ export function PlatformRatesEditor({
         {saved && <span className="text-sm text-teal">Saved — applies to every vendor.</span>}
       </div>
     </div>
+  );
+}
+
+/** Worked example: what the customer pays for a ₦200 item at these rates. */
+function Example({ c, ex, pr }: { c: number; ex: number; pr: number }) {
+  const base = 200;
+  const cust = customerPrice(base, c / 100);
+  const exAmt = Math.round(base * ex) / 100;
+  const prAmt = Math.round(base * pr) / 100;
+  return (
+    <p className="rounded-card bg-ink/5 px-4 py-3 text-xs text-slate">
+      Example — a {money(base)} item: the customer pays <span className="font-medium text-ink">{money(cust)}</span>
+      {" "}({money(cust)} standard · {money(cust + exAmt)} express · {money(cust + prAmt)} premium ·{" "}
+      {money(cust + exAmt + prAmt)} both). The vendor receives {money(base)} every time.
+    </p>
   );
 }
 

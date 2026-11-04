@@ -95,6 +95,12 @@ export type Order = {
   delivery_fee: number; express_fee: number; premium_fee: number;
   reschedule_penalty: number; delivery_attempts: number;
   items_total: number; extras_total: number; bulk_discount: number; total: number;
+  /** Commission added on top of the vendor's item prices (snapshot when placed). Null = older order: commission was deducted from the payout. */
+  commission_markup?: number | null;
+  /** The vendor's own item prices; items_total is what the customer pays. */
+  vendor_items_total?: number; commission_total?: number;
+  /** What the vendor receives for this order. */
+  vendor_earnings?: number;
   handover_code: string | null; pickup_code: string | null; picked_up_at: string | null; picked_up_by?: string | null;
   dispatch_reference: string | null; rider_name: string | null; rider_phone: string | null;
   created_by: string | null;
@@ -104,6 +110,7 @@ export type Order = {
   branch_id: string;
   promo_code: string | null; discount: number;
   discount_type: "percent" | "fixed" | null; discount_value: number | null; discount_max: number | null;
+  discount_vendor_funded?: boolean;
   pickup_address_id: string | null; notes: string | null;
   created_at: string; checked_in_at: string | null; ready_at: string | null;
   completed_at: string | null; closed_at: string | null;
@@ -111,7 +118,7 @@ export type Order = {
 }
 export type OrderItem = {
   id: string; order_id: string; sub_code: string; item_type_id: string;
-  service: ServiceType; price_at_checkin: number; customer_comment: string | null;
+  service: ServiceType; price_at_checkin: number; customer_price?: number | null; customer_comment: string | null;
   condition_notes: string | null; checked_in_by?: string | null;
   tag_code: string | null; status: OrderItemStatus; photos: string[]; created_at: string;
 }
@@ -224,6 +231,7 @@ export type OrderSummary = {
   vendor_id: string; vendor_name: string; customer_id: string; customer_name: string;
   item_count: number; is_paid: boolean;
   branch_id?: string; branch_name?: string | null;
+  vendor_earnings?: number;
 }
 
 export type SupportTicket = {

@@ -6,6 +6,7 @@ import { PayNowButton } from "@/components/ui/PayNowButton";
 import {
   money, dateTime, SERVICE_LABEL, STATUS_LABEL, statusChip, STAGE_LABEL, TIER_LABEL,
 } from "@/lib/format";
+import { itemCustomerPrice } from "@/lib/pricing";
 import { Stars } from "@/components/ui/Stars";
 import { PromoInput } from "@/components/ui/PromoInput";
 import { ReviewCard } from "./ReviewCard";
@@ -176,7 +177,7 @@ export default async function TrackOrder({
               <div key={it.id} className="card p-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-ink">{it.sub_code}</p>
-                  <p className="text-sm text-ink">{money(it.price_at_checkin)}</p>
+                  <p className="text-sm text-ink">{money(itemCustomerPrice(it))}</p>
                 </div>
                 <p className="text-xs text-slate">
                   {SERVICE_LABEL[it.service]}{it.tag_code ? ` · tag ${it.tag_code}` : ""}

@@ -39,11 +39,14 @@ export default async function LedgerPage() {
   const expenses = ledger.filter((e) => e.type === "expense");
 
   // Daily cash-up: income from paid orders + expenses, by Lagos day.
+  // Income = what the business receives per order: its own prices + delivery.
+  // (The customer's total also carries laundriroom's commission and markups.)
+  const earned = (o: OrderSummary) => Number(o.vendor_earnings ?? o.total);
   const days = new Map<string, { income: number; expense: number }>();
   for (const o of closed) {
     const d = lagosDay(o.closed_at ?? o.created_at);
     const row = days.get(d) ?? { income: 0, expense: 0 };
-    row.income += Number(o.total);
+    row.income += earned(o);
     days.set(d, row);
   }
   for (const e of expenses) {
@@ -54,13 +57,13 @@ export default async function LedgerPage() {
   }
   const cashup = [...days.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, 30);
 
-  const takings = closed.reduce((s, o) => s + Number(o.total), 0);
+  const takings = closed.reduce((s, o) => s + earned(o), 0);
   // Income by branch, for a business with more than one.
   const byBranch = new Map<string, { name: string; orders: number; income: number }>();
   for (const o of closed) {
     const key = o.branch_id ?? "";
     const row = byBranch.get(key) ?? { name: o.branch_name ?? "Main", orders: 0, income: 0 };
-    row.orders += 1; row.income += Number(o.total);
+    row.orders += 1; row.income += earned(o);
     byBranch.set(key, row);
   }
   const showBranches = ctx.branches.filter((b) => b.active).length > 1 && !ctx.branchId;
@@ -83,7 +86,7 @@ export default async function LedgerPage() {
         <Stat label="Income (paid orders)" value={money(takings)} sub={`${closed.length} orders`} />
         <Stat label="Expenses" value={money(totalExpenses)} sub={`${expenses.length} entries`} />
         <Stat label="Net" value={money(takings - totalExpenses)} sub="income − expenses" />
-        <Stat label="Payout due (net)" value={money(dueNet)} sub="after commission" />
+        <Stat label="Payout due" value={money(dueNet)} sub="your prices, in full" />
       </div>
 
       <section className="mt-8 max-w-md">
@@ -174,7 +177,7 @@ export default async function LedgerPage() {
       <section className="mt-8">
         <h2 className="font-display text-lg text-ink">Payouts</h2>
         <p className="mt-1 text-xs text-slate">
-          You're paid automatically to your payout account as soon as an order is completed and paid, less commission. A disputed payout is held until it's resolved.
+          You're paid automatically to your payout account as soon as an order is completed and paid. You receive your own prices and the delivery fee in full — laundriroom's commission is added on top of your prices for the customer. (Older payouts show the commission that used to be deducted as a fee.) A disputed payout is held until it's resolved.
         </p>
         {po.length === 0 ? (
           <p className="mt-3 text-sm text-slate">No payouts yet.</p>
@@ -193,7 +196,7 @@ export default async function LedgerPage() {
                   <tr key={p.id}>
                     <td className="px-4 py-2 text-slate">{dateShort(p.due_at)}</td>
                     <td className="px-4 py-2 text-right">{money(p.gross)}</td>
-                    <td className="px-4 py-2 text-right text-slate">−{money(p.fee)}</td>
+                    <td className="px-4 py-2 text-right text-slate">{Number(p.fee) > 0 ? `−${money(p.fee)}` : "—"}</td>
                     <td className="px-4 py-2 text-right font-medium text-ink">{money(p.net)}</td>
                     <td className="px-4 py-2">
                       <span className={p.status === "sent" ? "chip-ok" : p.status === "held" ? "chip-warn" : "chip-muted"}>{p.status}</span>

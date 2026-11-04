@@ -35,8 +35,8 @@ export default async function AdminPayouts() {
       </div>
       <p className="mt-1 text-sm text-slate">
         {delay === 0
-          ? "Vendors are paid automatically through Paystack as soon as an order is completed and paid, net of commission."
-          : `Payouts are held for ${delay} hour${delay === 1 ? "" : "s"} after an order is completed and paid, then sent automatically through Paystack, net of commission.`}{" "}
+          ? "Vendors are paid automatically through Paystack as soon as an order is completed and paid — their own prices and delivery in full (commission is added to the customer's price)."
+          : `Payouts are held for ${delay} hour${delay === 1 ? "" : "s"} after an order is completed and paid, then sent automatically through Paystack — the vendor's own prices and delivery in full (commission is added to the customer's price).`}{" "}
         Anything that can&apos;t be sent is retried every hour. <strong className="text-ink">Hold</strong> a disputed payout;{" "}
         <strong className="text-ink">Release</strong> sends a due or held payout immediately.
       </p>
@@ -61,7 +61,7 @@ export default async function AdminPayouts() {
                 </td>
                 <td className="px-4 py-3 text-slate">{dateTime(p.due_at)}</td>
                 <td className="px-4 py-3">{money(p.gross)}</td>
-                <td className="px-4 py-3 text-slate">−{money(p.fee)}</td>
+                <td className="px-4 py-3 text-slate">{Number(p.fee) > 0 ? `−${money(p.fee)}` : "—"}</td>
                 <td className="px-4 py-3 font-medium text-ink">{money(p.net)}</td>
                 <td className="px-4 py-3">
                   <span className={p.status === "sent" ? "chip-ok" : p.status === "processing" ? "chip-ink" : p.status === "held" ? "chip-warn" : "chip-muted"}>{p.status}</span>

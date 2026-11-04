@@ -70,7 +70,7 @@ export default async function VendorProfileLink() {
                   <Link href="/vendor/verification" className="text-ink underline">Verification</Link>.
                 </li>
               )}
-              <li>Keep your prices up to date — they show on your page.</li>
+              <li>Keep your prices up to date. Your page shows what customers pay — your price with laundriroom&apos;s commission added; you&apos;re paid your own price in full.</li>
               <li>Ask happy customers to rate their order in the app; ratings and reviews appear on your page.</li>
             </ul>
             <p className="mt-3 text-xs text-slate">
