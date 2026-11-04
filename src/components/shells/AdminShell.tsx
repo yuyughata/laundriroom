@@ -22,6 +22,7 @@ const NAV = [
   { href: "/admin/promos", label: "Promos" },
   { href: "/admin/payouts", label: "Payouts" },
   { href: "/admin/communications", label: "Communications" },
+  { href: "/admin/newsletters", label: "Newsletters" },
   { href: "/admin/integrations", label: "Integrations" },
 ];
 
@@ -45,6 +46,7 @@ const TITLES: Record<string, string> = {
   "/admin/promos": "Promo codes",
   "/admin/payouts": "Payouts",
   "/admin/communications": "Communications",
+  "/admin/newsletters": "Newsletters",
   "/admin/integrations": "Integrations",
 };
 

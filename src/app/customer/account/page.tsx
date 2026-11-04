@@ -2,6 +2,7 @@ import { CustomerShell } from "@/components/shells/CustomerShell";
 import { requireProfile } from "@/lib/auth";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { AccountDetails } from "./AccountDetails";
+import { NewsletterToggle } from "./NewsletterToggle";
 
 export default async function AccountPage() {
   const profile = await requireProfile();
@@ -12,6 +13,9 @@ export default async function AccountPage() {
 
       <AccountDetails fullName={profile.full_name} email={profile.email ?? ""}
         phone={profile.phone ?? ""} verified={profile.email_verified} />
+      {profile.email && (
+        <div className="mt-6"><NewsletterToggle optedOut={!!profile.newsletter_opt_out} /></div>
+      )}
 
       {!profile.email_verified && (
         <p className="mt-4 text-xs text-slate">

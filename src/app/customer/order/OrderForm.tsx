@@ -23,7 +23,7 @@ export type OrderVendor = {
 export type SavedAddress = { id: string; label: string; text: string };
 
 export function OrderForm({
-  vendors, deliveryFee, deliveryFeeLabel, pricedByDistance, extras, linkedVendorId, linkedBranchId, addresses,
+  vendors, deliveryFee, deliveryFeeLabel, pricedByDistance, extras, linkedVendorId, linkedBranchId, addresses, promoCode,
 }: {
   vendors: OrderVendor[]; deliveryFee: number; deliveryFeeLabel: string;
   /** Admin turned on Google Maps distance pricing for deliveries. */
@@ -34,6 +34,8 @@ export function OrderForm({
   /** …and a particular branch of theirs. */
   linkedBranchId?: string;
   addresses: SavedAddress[];
+  /** From a promo QR / link: applied when the order is placed. */
+  promoCode?: string;
 }) {
   const firstOpen = vendors.find((v) => v.openNow) ?? vendors[0];
   const [vendorId, setVendorId] = useState(linkedVendorId ?? firstOpen?.id ?? "");
@@ -105,6 +107,12 @@ export function OrderForm({
 
   return (
     <form action={onSubmit} className="mt-6 space-y-6">
+      {promoCode && (
+        <div className="rounded-card border border-champagne/50 bg-champagne/10 px-4 py-3 text-sm text-ink">
+          Promo code <span className="font-mono font-semibold tracking-wider">{promoCode}</span> will be applied when you place this order.
+          <input type="hidden" name="promo" value={promoCode} />
+        </div>
+      )}
       <input type="hidden" name="vendor_id" value={vendorId} />
       {branch?.id && <input type="hidden" name="branch_id" value={branch.id} />}
       {viaLink && <input type="hidden" name="via_vendor_link" value="1" />}

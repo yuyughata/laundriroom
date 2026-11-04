@@ -1,3 +1,4 @@
+import { cleanPromoParam } from "@/lib/promoLinks";
 import { CustomerShell } from "@/components/shells/CustomerShell";
 import { createClient } from "@/lib/supabase/server";
 import { money } from "@/lib/format";
@@ -6,7 +7,7 @@ import { OrderForm, type OrderVendor } from "./OrderForm";
 import type { Vendor, ServiceExtra, Branch, CustomerAddress } from "@/lib/database.types";
 import { loadPricing } from "@/lib/deliveryPricing";
 
-export default async function NewOrderPage({ searchParams }: { searchParams: { vendor?: string; branch?: string } }) {
+export default async function NewOrderPage({ searchParams }: { searchParams: { vendor?: string; branch?: string; promo?: string } }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -84,6 +85,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: { v
         extras={(extras ?? []) as ServiceExtra[]}
         linkedVendorId={linked?.id}
         linkedBranchId={linked && linked.branches.some((b) => b.id === searchParams?.branch) ? searchParams.branch : undefined}
+        promoCode={cleanPromoParam(searchParams?.promo) ?? undefined}
         addresses={((addresses ?? []) as CustomerAddress[]).map((a) => ({
           id: a.id, label: a.label, text: [a.line1, a.area, a.city].filter(Boolean).join(", "),
         }))}

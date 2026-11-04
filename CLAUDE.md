@@ -157,8 +157,8 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0042 are applied to the hosted project
-  (0033–0038 on 2026-11-03, 0039–0042 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
+- **Live database:** migrations 0001–0043 are applied to the hosted project
+  (0033–0038 on 2026-11-03, 0039–0043 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`
   statements, so live changes went in drop-free (`create or replace trigger`,
@@ -210,6 +210,41 @@ promote an admin → deploy edge functions → wire Paystack).
   sideways with edge shadows and keeps a readable min-width below lg. Page
   heading rows use `flex flex-wrap … gap-3` so badges/buttons wrap on phones.
 
+- **Newsletters (`0043`):** Admin → Newsletters (platform admins only; support
+  agents see a notice). "New newsletter" creates the draft first (reusing the
+  last header/footer images), then opens the editor
+  (`components/newsletter/NewsletterEditor.tsx`): subject, preview text,
+  header image, rich-text body (`RichTextEditor.tsx`: contentEditable +
+  toolbar — heading/subheading, bold/italic/underline/strike, lists, quote,
+  link, alignment, divider; paste is cleaned client-side), button text + link
+  (http/https only), footer image, live desktop/phone preview (sandboxed
+  iframe), audience = groups (customers, laundry managers, all laundry staff,
+  laundriroom team, everyone) and/or chosen people, recipient count, Save
+  draft / Send test to me / Send (confirm). Images go to the public
+  `newsletter-images` bucket (`ImageSlot.tsx`, shrunk to 1200px). Server
+  actions (`app/admin/newsletters/actions.ts`) clean the body with
+  `sanitize-html` (`src/lib/newsletterHtml.ts`) on every save. The email is
+  rendered by `src/lib/newsletter.ts`, mirrored to
+  `supabase/functions/_shared/newsletter.ts` (keep in sync). Edge function
+  `send-newsletter` (service key only) claims the draft (draft → sending, so
+  it never goes twice), resolves `newsletter_audience()` (active, has email,
+  not `profiles.newsletter_opt_out`), logs `newsletter_recipients`, then sends
+  via the Resend batch API in the background, each email with its own
+  unsubscribe link (`/unsubscribe?t=<profiles.unsubscribe_token>`, asks for a
+  click) and one-click `List-Unsubscribe` (POST `/api/unsubscribe`). A sent
+  newsletter is locked (`guard_newsletter`) and shows a delivery report;
+  Duplicate makes a new draft. Customers also toggle "News and offers by
+  email" on their account page. Needs Resend connected (Admin → Integrations)
+  + `RESEND_API_KEY`, and `SITE_URL` (secret) or `NEXT_PUBLIC_SITE_URL`.
+- **Promo QR codes:** Admin → Promos shows a QR for the website and, per
+  promo row, a QR for `/customer/order?promo=CODE` (plus `&vendor=<slug>` for
+  a laundry's own code); Vendor → Promos shows their `/v/<slug>` page QR and
+  one per promo (`components/promo/QrCard.tsx`: copy link, print-ready PNG
+  with the code under the QR; links built by `src/lib/promoLinks.ts`). The
+  order form shows a banner for `?promo=` and `createOrder` applies it with
+  `redeem_promo` right after the order is created; the order page says
+  whether it applied (`promo_applied` / `promo_error`). Signed-out scans go
+  through sign-in/sign-up and come back to the same link.
 - **Training decks:** `docs/presentations/` holds the team training deck and
   the Partner Playbook: PDFs, speaker notes and the slide sources (claude.ai
   Slides format, with images). Rebuild the PDFs with

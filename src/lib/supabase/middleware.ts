@@ -13,7 +13,7 @@ const HOME: Record<string, string> = {
   support_agent: "/admin",
 };
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/verify-email", "/auth", "/apply", "/api/health", "/forgot-password", "/reset-password", "/v"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/verify-email", "/auth", "/apply", "/api/health", "/forgot-password", "/reset-password", "/v", "/unsubscribe", "/api/unsubscribe"];
 
 /**
  * Refreshes the Supabase session on every request and guards the role areas.

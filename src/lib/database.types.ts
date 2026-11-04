@@ -43,7 +43,26 @@ export type Profile = {
   role: UserRole; status: "active" | "suspended" | "invited";
   email_verified: boolean; verify_reminders_sent: number;
   referral_code: string | null; referred_by: string | null;
+  /** Doesn't want newsletters (0043). */
+  newsletter_opt_out?: boolean;
   created_at: string; updated_at: string;
+}
+
+export type NewsletterGroup = "customers" | "vendor_managers" | "vendor_staff" | "team" | "everyone";
+export type NewsletterAudience = { groups: NewsletterGroup[]; user_ids: string[] };
+export type Newsletter = {
+  id: string; subject: string; preheader: string | null;
+  header_image_url: string | null; footer_image_url: string | null;
+  body_html: string; cta_label: string | null; cta_url: string | null;
+  audience: NewsletterAudience;
+  status: "draft" | "sending" | "sent" | "failed";
+  recipient_count: number; sent_count: number; failed_count: number;
+  last_error: string | null; last_test_at: string | null; sent_at: string | null;
+  created_by: string | null; created_at: string; updated_at: string;
+}
+export type NewsletterRecipient = {
+  newsletter_id: string; email: string; profile_id: string | null;
+  status: "queued" | "sent" | "failed"; error: string | null; sent_at: string | null;
 }
 export type ClaimType = "damage" | "loss";
 export type ClaimStatus = "open" | "investigating" | "approved" | "rejected" | "resolved";
@@ -302,6 +321,8 @@ export type Database = {
       vendor_applications: Table<VendorApplication>;
       vendor_documents: Table<VendorDocument>;
       vendor_payout_accounts: Table<VendorPayoutAccount>;
+      newsletters: Table<Newsletter>;
+      newsletter_recipients: Table<NewsletterRecipient>;
     };
     Views: {
       order_summaries: { Row: OrderSummary; Relationships: [] };

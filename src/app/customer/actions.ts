@@ -1,5 +1,6 @@
 "use server";
 
+import { cleanPromoParam } from "@/lib/promoLinks";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -176,8 +177,20 @@ export async function createOrder(formData: FormData) {
   // in parallel; never blocks the order).
   await Promise.all([notifyOrder("order_placed", orderId), notifyOrder("order_confirmed", orderId)]);
 
+  // A promo code from a QR code / link: apply it now. If it can't be used, the
+  // order still stands and the order page says why.
+  const promo = cleanPromoParam(formData.get("promo"));
+  let promoNote = "";
+  if (promo) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: pErr } = await (supabase.rpc as any)("redeem_promo", { p_code: promo, p_order: orderId });
+    promoNote = pErr
+      ? `?promo_error=${encodeURIComponent(`${promo}: ${pErr.message.replace(/^.*:\s*/, "")}`)}`
+      : `?promo_applied=${encodeURIComponent(promo)}`;
+  }
+
   revalidatePath("/customer");
-  redirect(`/customer/orders/${orderId}`);
+  redirect(`/customer/orders/${orderId}${promoNote}`);
 }
 
 /** Apply a promo code to an order (validated + redeemed in the DB). */
