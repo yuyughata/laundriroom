@@ -210,6 +210,12 @@ promote an admin → deploy edge functions → wire Paystack).
   sideways with edge shadows and keeps a readable min-width below lg. Page
   heading rows use `flex flex-wrap … gap-3` so badges/buttons wrap on phones.
 
+- **Training decks:** `docs/presentations/` holds the team training deck and
+  the Partner Playbook: PDFs, speaker notes and the slide sources (claude.ai
+  Slides format, with images). Rebuild the PDFs with
+  `scripts/render-deck-pdf.mjs` after editing a slide, and update the decks
+  when a workflow or money rule they describe changes.
+
 ## State of the build
 
 **Working end to end:** auth + role routing (6 roles), the full database

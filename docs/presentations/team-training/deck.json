@@ -1,0 +1,19 @@
+{
+  "v": 4,
+  "createdOnFiles": { "v": 1, "at": "2026-11-03T23:40:00Z" },
+  "lists": "css",
+  "title": "laundriroom — How an Order Flows",
+  "order": ["cover", "parts", "cast", "cycle", "s1-discover", "s2-order", "s3-pickup", "s4-checkin", "s5-process", "s6-pay", "s7-handover", "s8-review", "s9-paid", "money", "bts", "b1-join", "b2-branches", "b3-tags", "b4-page", "b5-ledger", "b6-quality", "pitch", "faq", "close"],
+  "sections": {
+    "intro": { "description": "Who is involved and the shape of an order, start to finish.", "start": "cover" },
+    "cycle": { "description": "The order cycle in nine steps, customer and vendor side by side, with the value each step delivers.", "start": "cycle" },
+    "money": { "description": "Where the customer’s money goes and how the vendor is paid.", "start": "money" },
+    "behind": { "description": "What vendors do outside a single order, and why it matters.", "start": "bts" },
+    "pitch": { "description": "How to explain laundriroom to a potential vendor.", "start": "pitch" }
+  },
+  "faces": {
+    "fraunces": { "family": "Fraunces", "href": "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&display=swap" },
+    "inter": { "family": "Inter", "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" }
+  },
+  "designSystems": []
+}

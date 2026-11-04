@@ -1,0 +1,19 @@
+{
+  "v": 4,
+  "createdOnFiles": { "v": 1, "at": "2026-11-04T09:30:00Z" },
+  "lists": "css",
+  "title": "laundriroom — Partner Playbook",
+  "order": ["cover", "inside", "roles", "day1", "signin", "verify", "branches", "team", "payout", "tags", "queue", "walkin", "pickup", "checkin", "process", "handover", "activity", "findtag", "requests", "mypage", "promos", "paid", "books", "reviews", "rules", "routine", "help"],
+  "sections": {
+    "intro": { "description": "What the playbook covers, who does what, and the first-day checklist.", "start": "cover" },
+    "setup": { "description": "Part 1: setting up the business — sign-in, verification, branches, team, payouts and tags.", "start": "signin" },
+    "orders": { "description": "Part 2: running every order on the tablet, from the queue to the handover.", "start": "queue" },
+    "grow": { "description": "Part 3: growing the business and getting paid.", "start": "mypage" },
+    "standards": { "description": "Part 4: reviews, golden rules, the daily routine and getting help.", "start": "reviews" }
+  },
+  "faces": {
+    "fraunces": { "family": "Fraunces", "href": "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&display=swap" },
+    "inter": { "family": "Inter", "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" }
+  },
+  "designSystems": []
+}
