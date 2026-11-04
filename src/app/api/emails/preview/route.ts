@@ -12,7 +12,7 @@ const SAMPLE: EmailContext = {
   reviews_url: "#",
   order_code: "ORD-261101-0042",
   customer_name: "Barry",
-  vendor_name: "Fold & Press, Lekki",
+  vendor_name: "Fold & Press, Rayfield",
   item_count: 5,
   total: "₦14,200",
   track_url: "#",
@@ -45,14 +45,14 @@ const SAMPLE: EmailContext = {
   customer_ticket_url: "#",
   recipient_name: "Chidi",
   entry_line: "Pickup from customer",
-  address_line: "Flat 4, 21 Fola Osibo Rd, Lekki Phase 1, Lagos",
+  address_line: "House 21, Lamingo Road, Lamingo, Jos",
   return_mode_line: "Deliver back to customer",
   service_line: "Premium · Express",
   extras_line: "Stain treatment, Fabric softener & scent",
   payment_line: "Pay online",
   notes: "Gate code 4412. Please handle the agbada with care.",
   order_url: "#",
-  placed_by_line: "Fold & Press, Lekki staff · Halima Bello",
+  placed_by_line: "Fold & Press, Rayfield staff · Halima Bello",
 };
 
 const LABEL: Record<string, string> = {

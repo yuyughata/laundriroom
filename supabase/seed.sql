@@ -14,12 +14,12 @@ with plan as (select id from vendor_plans where is_default limit 1)
 insert into vendors (id, name, status, delivery, plan_id, address_line, area, city, lat, lng, service_radius_km, opens_at, closes_at, is_open)
 select
   '00000000-0000-0000-0000-00000000f01d',
-  'Fold & Press, Lekki',
+  'Fold & Press, Rayfield',
   'verified',
   'both',
   plan.id,
-  '12 Admiralty Way', 'Lekki Phase 1', 'Lagos',
-  6.4446, 3.4731, 8, '07:00', '18:00', true
+  '12 Yakubu Gowon Way', 'Rayfield', 'Jos',
+  9.8530, 8.9010, 8, '07:00', '18:00', true
 from plan
 on conflict (id) do nothing;
 

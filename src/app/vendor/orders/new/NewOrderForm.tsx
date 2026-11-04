@@ -186,7 +186,7 @@ export function NewOrderForm({
             <div className="grid gap-2 sm:grid-cols-3">
               <input name="address_line1" className="field sm:col-span-3" required placeholder="House number and street" aria-label="Street address" />
               <input name="address_area" className="field sm:col-span-2" placeholder="Area" aria-label="Area" />
-              <input name="address_city" className="field" defaultValue="Lagos" aria-label="City" />
+              <input name="address_city" className="field" defaultValue="Jos" aria-label="City" />
             </div>
             <p className="mt-1 text-xs text-slate">Saved to the customer&apos;s account{pricedByDistance ? " and used to price the delivery by distance" : ""}.</p>
           </div>

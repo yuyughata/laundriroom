@@ -33,7 +33,7 @@ function RiderForm({ start, branches, canPickBranch, submitLabel, onSubmit, onCa
       {r.kind === "dispatch"
         ? <input className="field" placeholder="Company (e.g. GIG Logistics)" aria-label="Company" value={r.company ?? ""} onChange={set("company")} />
         : <span className="hidden sm:block" />}
-      <input className="field sm:col-span-2" placeholder="Notes (optional) — e.g. bike only, covers Lekki" aria-label="Notes" value={r.notes ?? ""} onChange={set("notes")} />
+      <input className="field sm:col-span-2" placeholder="Notes (optional) — e.g. bike only, covers Rayfield" aria-label="Notes" value={r.notes ?? ""} onChange={set("notes")} />
       {canPickBranch && branches.length > 0 && (
         <select className="field sm:col-span-2" aria-label="Branch" value={r.branchId ?? ""} onChange={set("branchId")}>
           <option value="">Every branch</option>

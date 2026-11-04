@@ -221,7 +221,7 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
             {[
               ["Hours", multi
                 ? "Each branch keeps its own hours (see Branches above). Drop-off and pickup follow them."
-                : `${hours} daily (Lagos time). Drop-off and pickup follow these hours.`],
+                : `${hours} daily (Nigerian time). Drop-off and pickup follow these hours.`],
               ["Getting it in", "Drop off at the shop, or book a pickup."],
               ["Getting it back", `Collect from the shop, or have it delivered. ${DELIVERY_LINE[v.delivery]}.`],
               ["Service", "Standard or Premium (with extras like stain treatment), normal or Express turnaround."],

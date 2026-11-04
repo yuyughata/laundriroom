@@ -21,7 +21,7 @@ function readBranch(fd: FormData) {
   const opens_at = String(fd.get("opens_at") || "07:00").trim();
   const closes_at = String(fd.get("closes_at") || "18:00").trim();
   const radius = Number(fd.get("service_radius_km") || 5);
-  if (!name) return { error: "Give the branch a name (e.g. Yaba, Lekki Phase 1)." } as const;
+  if (!name) return { error: "Give the branch a name (e.g. Rayfield, Tudun Wada)." } as const;
   if (name.length > 80) return { error: "Keep the branch name under 80 characters." } as const;
   if (!TIME.test(opens_at) || !TIME.test(closes_at)) return { error: "Enter opening and closing times as HH:MM." } as const;
   if (opens_at >= closes_at) return { error: "Closing time must be after opening time." } as const;

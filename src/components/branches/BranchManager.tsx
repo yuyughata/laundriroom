@@ -137,7 +137,7 @@ function BranchForm({ branch, submitLabel, onSubmit, onDone, onCancel, mapsOn }:
         <div className="sm:col-span-2">
           <label className="label" htmlFor={`n-${id}`}>Branch name</label>
           <input id={`n-${id}`} name="name" className="field" required maxLength={80}
-            defaultValue={branch?.name} placeholder="e.g. Yaba, Lekki Phase 1" />
+            defaultValue={branch?.name} placeholder="e.g. Rayfield, Tudun Wada" />
         </div>
         <div className="sm:col-span-2">
           <label className="label" htmlFor={`a-${id}`}>Street address</label>
@@ -146,11 +146,11 @@ function BranchForm({ branch, submitLabel, onSubmit, onDone, onCancel, mapsOn }:
         </div>
         <div>
           <label className="label" htmlFor={`ar-${id}`}>Area</label>
-          <input id={`ar-${id}`} name="area" className="field" defaultValue={branch?.area ?? ""} placeholder="Yaba" />
+          <input id={`ar-${id}`} name="area" className="field" defaultValue={branch?.area ?? ""} placeholder="Rayfield" />
         </div>
         <div>
           <label className="label" htmlFor={`c-${id}`}>City</label>
-          <input id={`c-${id}`} name="city" className="field" defaultValue={branch?.city ?? "Lagos"} />
+          <input id={`c-${id}`} name="city" className="field" defaultValue={branch?.city ?? "Jos"} />
         </div>
         <div>
           <label className="label" htmlFor={`o-${id}`}>Opens</label>

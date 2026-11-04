@@ -56,11 +56,11 @@ export function ApplyForm({ agreement }: { agreement: AgreementClause[] }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className="label">Area</label>
-          <input name="area" className="field" placeholder="Lekki Phase 1" />
+          <input name="area" className="field" placeholder="Rayfield" />
         </div>
         <div>
           <label className="label">City</label>
-          <input name="city" className="field" placeholder="Lagos" />
+          <input name="city" className="field" placeholder="Jos" />
         </div>
       </div>
       <div>

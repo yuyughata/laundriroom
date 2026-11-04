@@ -548,7 +548,7 @@ export const AUTH_EMAIL_TEMPLATES: Record<string, { label: string; subject: stri
 export function sampleAuthEmail(html: string): string {
   // Resolve Go {{ if .Data.x }}…{{ else }}…{{ end }} blocks as for a staff
   // invite (innermost first), then fill the remaining placeholders.
-  const data: Record<string, string> = { vendor_name: "Fold &amp; Press, Lekki", role_label: "Attendant" };
+  const data: Record<string, string> = { vendor_name: "Fold &amp; Press, Rayfield", role_label: "Attendant" };
   const block = /\{\{ if \.Data\.(\w+) \}\}((?:(?!\{\{ if )[\s\S])*?)(?:\{\{ else \}\}((?:(?!\{\{ if )[\s\S])*?))?\{\{ end \}\}/;
   for (let i = 0; i < 20 && block.test(html); i++) {
     html = html.replace(block, (_m, key: string, yes: string, no?: string) => (data[key] ? yes : no ?? ""));

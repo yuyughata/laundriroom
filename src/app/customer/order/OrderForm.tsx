@@ -42,7 +42,7 @@ export function OrderForm({
   const pickBranch = (v?: OrderVendor) => (v?.branches.find((b) => b.openNow) ?? v?.branches[0])?.id ?? "";
   const [branchId, setBranchId] = useState(linkedBranchId ?? pickBranch(vendors.find((v) => v.id === (linkedVendorId ?? firstOpen?.id))));
   const [addressId, setAddressId] = useState(addresses[0]?.id ?? "new");
-  const [addr, setAddr] = useState({ line1: "", area: "", city: "Lagos" });
+  const [addr, setAddr] = useState({ line1: "", area: "", city: "Jos" });
   const [quote, setQuote] = useState<{ fee: number; km: number | null; note?: string } | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [showAll, setShowAll] = useState(!linkedVendorId);
@@ -277,7 +277,7 @@ export function OrderForm({
             <div className="grid gap-2 sm:grid-cols-3">
               <input name="address_line1" className="field sm:col-span-3" required placeholder="House number and street"
                 value={addr.line1} onChange={(e) => setAddr({ ...addr, line1: e.target.value })} aria-label="Street address" />
-              <input name="address_area" className="field sm:col-span-2" placeholder="Area (e.g. Yaba)"
+              <input name="address_area" className="field sm:col-span-2" placeholder="Area (e.g. Rayfield)"
                 value={addr.area} onChange={(e) => setAddr({ ...addr, area: e.target.value })} aria-label="Area" />
               <input name="address_city" className="field" placeholder="City"
                 value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} aria-label="City" />

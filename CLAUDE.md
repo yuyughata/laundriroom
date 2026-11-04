@@ -45,6 +45,10 @@ promote an admin → deploy edge functions → wire Paystack).
   DB is live), then `npm run db:types` to regenerate `src/lib/database.types.ts`.
   Those entity types are `type` aliases (not `interface`) on purpose — Supabase's
   generics need the implicit index signature.
+- **Launch city: Jos.** Demo data, form defaults (city "Jos") and examples
+  use Jos areas (the demo laundry is Fold & Press, Rayfield —
+  `/v/fold-and-press-rayfield`, tag prefix FPR). Times use `Africa/Lagos`,
+  which is simply Nigerian time (WAT).
 - **Money is NGN**, formatted via `src/lib/format.ts`. **Commission is the only
   revenue model** — since `0041` it is **added on top of the vendor's item
   prices** for the customer (₦200 shirt at 30% → customer pays ₦260, vendor

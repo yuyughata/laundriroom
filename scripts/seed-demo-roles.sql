@@ -9,7 +9,7 @@
 update profiles set role = 'platform_admin', email_verified = true
 where email = 'admin@fresco.example';
 
--- 2) Vendor manager + attendant for "Fold & Press, Lekki"
+-- 2) Vendor manager + attendant for "Fold & Press, Rayfield"
 update profiles set role = 'vendor_manager' where email = 'manager@fresco.example';
 update profiles set role = 'attendant'      where email = 'attendant@fresco.example';
 
