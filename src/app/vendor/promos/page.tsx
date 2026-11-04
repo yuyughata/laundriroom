@@ -12,7 +12,7 @@ export default async function VendorPromosPage() {
   const promos = (data ?? []) as PromoCode[];
 
   return (
-    <VendorShell active="/vendor/promos" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/promos" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Promos & campaigns</h1>

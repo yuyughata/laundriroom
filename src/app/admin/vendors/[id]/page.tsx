@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/shells/AdminShell";
 import { BranchManager } from "@/components/branches/BranchManager";
+import { TeamManager } from "@/components/team/TeamManager";
+import { loadTeam } from "@/lib/teamData";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadBranches, loadStaff } from "@/lib/branchData";
@@ -18,7 +20,7 @@ export default async function AdminVendorDetail({ params }: { params: { id: stri
   if (!v) notFound();
 
   const isAdmin = profile.role === "platform_admin";
-  const [branches, staff] = await Promise.all([loadBranches(v.id), loadStaff(v.id)]);
+  const [branches, staff, team] = await Promise.all([loadBranches(v.id), loadStaff(v.id), loadTeam(v.id, profile.id)]);
 
   return (
     <AdminShell active="/admin/vendors" name={profile.full_name} role={profile.role}>
@@ -41,7 +43,7 @@ export default async function AdminVendorDetail({ params }: { params: { id: stri
       <h2 className="mt-8 font-display text-lg text-ink">Branches</h2>
       <p className="mb-4 text-xs text-slate">
         {isAdmin
-          ? "Add or edit branches on the vendor's behalf, and put staff at a branch. The vendor's main manager can do the same from their dashboard."
+          ? "Add or edit branches on the vendor's behalf. The vendor's main manager can do the same from their dashboard."
           : "Only platform admins can change branches."}
       </p>
       {branches.length === 0 ? (
@@ -49,6 +51,16 @@ export default async function AdminVendorDetail({ params }: { params: { id: stri
       ) : (
         <BranchManager vendorId={v.id} branches={branches} staff={staff} canManage={isAdmin} mapsOn={mapsConfigured()} />
       )}
+
+      <h2 className="mt-10 font-display text-lg text-ink">Team</h2>
+      <p className="mb-4 text-xs text-slate">
+        {isAdmin
+          ? "Add staff, change roles and branches, or send a login link on the vendor's behalf. Their main manager can do the same at Vendor → Team."
+          : "Only platform admins can change a vendor's team."}
+      </p>
+      <TeamManager vendorId={v.id} team={team}
+        branches={branches.filter((b) => b.active).map((b) => ({ id: b.id, name: b.name }))}
+        canManage={isAdmin} forAdmin />
     </AdminShell>
   );
 }

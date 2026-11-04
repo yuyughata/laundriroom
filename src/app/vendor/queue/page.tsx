@@ -28,7 +28,7 @@ export default async function VendorQueue({ searchParams }: { searchParams: { br
   const outbound = open.filter((o) => ["ready", "out_for_delivery", "awaiting_collection"].includes(o.status));
 
   return (
-    <VendorShell active="/vendor/queue" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/queue" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Order queue</h1>

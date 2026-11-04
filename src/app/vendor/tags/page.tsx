@@ -11,7 +11,7 @@ export default async function VendorTags({ searchParams }: { searchParams: { bat
   const batchTags = batch ? await loadBatchTags(batch.id) : undefined;
 
   return (
-    <VendorShell active="/vendor/tags" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/tags" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">Tags</h1>
       <p className="mb-6 mt-1 max-w-2xl text-sm text-slate">

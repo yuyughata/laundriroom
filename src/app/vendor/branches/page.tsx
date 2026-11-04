@@ -16,7 +16,7 @@ export default async function VendorBranches() {
   const staff = ctx.isManager ? await loadStaff(ctx.vendorId, ctx.profile.id) : undefined;
 
   return (
-    <VendorShell active="/vendor/branches" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/branches" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">Branches</h1>
       <p className="mt-1 max-w-2xl text-sm text-slate">

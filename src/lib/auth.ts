@@ -56,3 +56,17 @@ export async function myVendorId(): Promise<string | null> {
     .maybeSingle();
   return (data as { vendor_id: string } | null)?.vendor_id ?? null;
 }
+
+/**
+ * Money (ledger, payouts, statements) is for the business's main manager and
+ * laundriroom staff only — not attendants, riders or branch managers.
+ * Mirrors the database rules (0040: is_vendor_manager).
+ */
+export async function canSeeVendorFinances(profile: Profile): Promise<boolean> {
+  if (profile.role === "platform_admin" || profile.role === "support_agent") return true;
+  if (profile.role !== "vendor_manager") return false;
+  const supabase = createClient();
+  const { data } = await supabase.from("vendor_memberships" as never)
+    .select("branch_id").eq("profile_id", profile.id).limit(1).maybeSingle();
+  return !!data && (data as { branch_id: string | null }).branch_id === null;
+}

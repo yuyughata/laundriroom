@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { ShellNav } from "./ShellNav";
 
+// managerOnly: shown to the business's main manager only.
 const NAV = [
   { href: "/vendor/queue", label: "Queue" },
   { href: "/vendor/tags", label: "Tags" },
@@ -10,21 +11,25 @@ const NAV = [
   { href: "/vendor/requests", label: "Item requests" },
   { href: "/vendor/reviews", label: "Reviews" },
   { href: "/vendor/promos", label: "Promos" },
-  { href: "/vendor/ledger", label: "Ledger" },
+  { href: "/vendor/team", label: "Team", managerOnly: true },
+  { href: "/vendor/ledger", label: "Ledger", managerOnly: true },
   { href: "/vendor/verification", label: "Verification" },
 ];
 
 export function VendorShell({
-  children, active, vendorName, staffName, staffRole, branchName,
+  children, active, vendorName, staffName, staffRole, branchName, isManager = false,
 }: {
   children: React.ReactNode; active?: string;
   vendorName: string; staffName: string; staffRole: string;
   /** Set when the staff member works at one branch. */
   branchName?: string | null;
+  /** Business-wide manager: sees Team and Ledger. */
+  isManager?: boolean;
 }) {
+  const items = NAV.filter((n) => isManager || !n.managerOnly).map(({ href, label }) => ({ href, label }));
   return (
     <div className="min-h-screen bg-ivory lg:flex">
-      <ShellNav items={NAV} active={active} subtitle="Vendor station"
+      <ShellNav items={items} active={active} subtitle="Vendor station"
         account={
           <div className="flex items-center justify-between gap-3">
             <p className="min-w-0 truncate text-xs text-ivory/60">{staffName} · {staffRole}</p>

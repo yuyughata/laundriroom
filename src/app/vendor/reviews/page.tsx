@@ -25,7 +25,7 @@ export default async function VendorReviews() {
   const dist = [5, 4, 3, 2, 1].map((n) => ({ n, c: list.filter((r) => r.rating === n).length }));
 
   return (
-    <VendorShell active="/vendor/reviews" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/reviews" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">Reviews</h1>
       {openStep && <QualityNotice step={openStep} canRespond={ctx.isManager} />}

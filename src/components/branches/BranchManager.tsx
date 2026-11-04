@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createBranch, updateBranch, setBranchActive, setBranchOpen, setStaffBranch } from "@/lib/branchActions";
+import { createBranch, updateBranch, setBranchActive, setBranchOpen } from "@/lib/branchActions";
 import type { Branch } from "@/lib/database.types";
 
 export type StaffRow = { id: string; name: string; role: string; branch_id: string | null; isYou?: boolean };
@@ -45,25 +45,10 @@ export function BranchManager({
       ))}
 
       {staff && staff.length > 0 && (
-        <div className="card p-5">
-          <p className="font-display text-lg text-ink">Staff</p>
-          <p className="mt-1 text-xs text-slate">
-            Staff at a branch only see that branch&apos;s orders. <strong className="text-ink">All branches</strong> gives
-            access to every branch; a manager on all branches can also manage branches, prices, promos and payouts.
-          </p>
-          <div className="table-scroll mt-3 rounded-card border border-ink/10 bg-white">
-            <table className="w-full text-sm">
-              <thead className="bg-ink/5 text-left text-xs text-slate">
-                <tr><th className="px-4 py-2.5">Name</th><th className="px-4 py-2.5">Role</th><th className="px-4 py-2.5">Works at</th></tr>
-              </thead>
-              <tbody className="divide-y divide-ink/5">
-                {staff.map((s) => (
-                  <StaffRowView key={s.id} vendorId={vendorId} row={s} branches={active} canManage={canManage} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <p className="text-xs text-slate">
+          To add staff or move someone to another branch, use <strong className="text-ink">Team</strong>.
+          Staff at a branch only see that branch&apos;s orders.
+        </p>
       )}
     </div>
   );
@@ -195,42 +180,3 @@ function BranchForm({ branch, submitLabel, onSubmit, onDone, onCancel, mapsOn }:
   );
 }
 
-function StaffRowView({ vendorId, row, branches, canManage }: {
-  vendorId: string; row: StaffRow; branches: Branch[]; canManage: boolean;
-}) {
-  const [value, setValue] = useState(row.branch_id ?? "");
-  const [pending, start] = useTransition();
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const label = row.branch_id ? branches.find((b) => b.id === row.branch_id)?.name ?? "A closed branch" : "All branches";
-
-  return (
-    <tr>
-      <td className="px-4 py-2.5 text-ink">{row.name}{row.isYou && <span className="text-slate"> (you)</span>}</td>
-      <td className="px-4 py-2.5 text-slate">{ROLE[row.role] ?? row.role}</td>
-      <td className="px-4 py-2.5">
-        {canManage && !row.isYou ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <select className="field max-w-[14rem] py-2" value={value} disabled={pending}
-              aria-label={`Branch for ${row.name}`}
-              onChange={(e) => {
-                const v = e.target.value;
-                setValue(v);
-                start(async () => {
-                  setMsg(null);
-                  const r = await setStaffBranch(vendorId, row.id, v || null);
-                  setMsg("error" in r ? { ok: false, text: r.error } : { ok: true, text: "Saved" });
-                  if ("error" in r) setValue(row.branch_id ?? "");
-                });
-              }}>
-              <option value="">All branches</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            {msg && <span className={`text-xs ${msg.ok ? "text-teal" : "text-danger"}`}>{msg.text}</span>}
-          </div>
-        ) : (
-          <span className="text-ink">{label}</span>
-        )}
-      </td>
-    </tr>
-  );
-}

@@ -32,7 +32,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
   for (const r of rows) if (r.kind === "item" && r.staff_name) checkedInBy[r.label.split(" · ")[0]] = r.staff_name;
 
   return (
-    <VendorShell active="/vendor/queue" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/queue" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <Link href="/vendor/queue" className="text-sm text-slate">← Queue</Link>
       <OrderWorkspace

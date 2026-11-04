@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getProfile } from "@/lib/auth";
+import { getProfile, canSeeVendorFinances } from "@/lib/auth";
 import { buildReportPdf, pdfMoney } from "@/lib/pdf";
 import { scopeLabel, genDateLine, stamp, pdfResponse } from "@/lib/reports";
 import { dateTime } from "@/lib/format";
@@ -15,6 +15,11 @@ type Row = {
 export async function GET() {
   const profile = await getProfile();
   if (!profile) return new Response("Unauthorized", { status: 401 });
+  // Vendor money is for the business's manager only (attendants, riders and
+  // branch managers can't download it).
+  if (["attendant", "rider", "vendor_manager"].includes(profile.role) && !(await canSeeVendorFinances(profile))) {
+    return new Response("Only the business's manager can see this report.", { status: 403 });
+  }
 
   const supabase = createClient();
   const { data } = await supabase

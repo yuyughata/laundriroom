@@ -82,8 +82,8 @@ promote an admin → deploy edge functions → wire Paystack).
   orders (`can_staff_branch` in orders RLS, `order_summaries`, `confirm_pickup`,
   `apply_delivery_reschedule`; child tables follow via orders RLS).
   `is_vendor_manager()` means a **business-wide** manager: only they (and
-  platform admins, at Admin → Vendors → a vendor) add/edit branches and move
-  staff (`src/lib/branchActions.ts`, `components/branches/BranchManager.tsx`,
+  platform admins, at Admin → Vendors → a vendor) add/edit branches (staff
+  are placed at a branch from Team) (`src/lib/branchActions.ts`, `components/branches/BranchManager.tsx`,
   Vendor → Branches). Customers pick a branch when ordering; the public page
   lists branches with per-branch order links (`?branch=`); the queue has a
   branch filter for business-wide staff; ledger has income by branch; vendor
@@ -136,14 +136,33 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0039 are applied to the hosted project
-  (0033–0038 on 2026-11-03, 0039 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
+- **Live database:** migrations 0001–0040 are applied to the hosted project
+  (0033–0038 on 2026-11-03, 0039–0040 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`
   statements, so live changes went in drop-free (`create or replace trigger`,
   `alter policy`) — same end state as the migration files.
   `supabase/manual/apply-0033-0038.sql` is the SQL Editor fallback (two
   transactions, self-checks, re-runnable).
+- **Team (staff management):** Vendor → Team (business-wide manager only) and
+  Admin → Vendors → a vendor (platform admin, on the vendor's behalf) use
+  `components/team/TeamManager.tsx` + `src/lib/teamActions.ts`: invite by
+  email (Supabase invite → the person sets their own password at
+  `/reset-password`, then signs in at `/login`), set role (Manager /
+  Attendant) and branch, send a login link (password-reset email), remove
+  (membership deleted, account back to `customer`). An email that already
+  has an account is attached (a customer account becomes staff); laundriroom
+  admin/support emails and people at another vendor are refused; the last
+  main manager can't be demoted or removed; you can't change yourself.
+  Actions run with the service key after an explicit permission check and
+  are written to `audit_log`. `loadTeam` (`src/lib/teamData.ts`) shows sign-in
+  status ("Invite sent" until first sign-in). Branches page no longer moves
+  staff. Needs `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SITE_URL`.
+- **Money is manager-only (`0040`):** ledger, payouts and the payout account
+  are readable only by `is_vendor_manager` (business-wide) + admins; Ledger
+  and Team are hidden from attendants/riders/branch managers (`VendorShell`
+  `isManager`), the Ledger page refuses them, and the statement / payouts /
+  transactions PDFs return 403 for them (`canSeeVendorFinances`).
 - **Staff attribution (`0039`):** staff sign in with their own accounts (no
   name dropdown), so the DB records who acted: `order_items.checked_in_by`
   (default `auth.uid()`), `orders.picked_up_by` (set by `confirm_pickup`),

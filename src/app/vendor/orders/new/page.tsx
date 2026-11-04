@@ -20,7 +20,7 @@ export default async function VendorNewOrder() {
   ]);
 
   return (
-    <VendorShell active="/vendor/queue" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/queue" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <Link href="/vendor/queue" className="text-sm text-slate">← Queue</Link>
       <h1 className="mt-2 font-display text-2xl text-ink">New order</h1>

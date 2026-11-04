@@ -17,7 +17,7 @@ export default async function VendorVerification() {
   const v = vendor as { kyc_verified?: boolean; terms_accepted_at?: string | null } | null;
 
   return (
-    <VendorShell active="/vendor/verification" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/verification" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">Verification</h1>
       <p className="mt-1 max-w-2xl text-sm text-slate">

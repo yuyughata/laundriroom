@@ -12,6 +12,18 @@ const lagosDay = (iso: string | null) =>
 
 export default async function LedgerPage() {
   const ctx = await getVendorContext();
+  if (!ctx.isManager) {
+    // Money is for the business's main manager only (also enforced in the database).
+    return (
+      <VendorShell active="/vendor/ledger" vendorName={ctx.vendorName} isManager={false}
+        staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
+        <h1 className="font-display text-2xl text-ink">Ledger</h1>
+        <p className="mt-3 rounded-card bg-ink/5 px-4 py-3 text-sm text-slate">
+          Only the business&apos;s main manager can see income, expenses and payouts.
+        </p>
+      </VendorShell>
+    );
+  }
   const supabase = createClient();
 
   const [{ data: payouts }, { data: orders }, { data: entries }, { data: acct }] = await Promise.all([
@@ -56,7 +68,7 @@ export default async function LedgerPage() {
   const dueNet = po.filter((p) => ["due", "held"].includes(p.status)).reduce((s, p) => s + Number(p.net), 0);
 
   return (
-    <VendorShell active="/vendor/ledger" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/ledger" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-ink">Ledger & bookkeeping</h1>

@@ -18,7 +18,7 @@ export default async function RequestsPage() {
   const decided = reqs.filter((r) => r.status !== "pending");
 
   return (
-    <VendorShell active="/vendor/requests" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/requests" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">Item type requests</h1>
       <p className="mt-1 text-sm text-slate">

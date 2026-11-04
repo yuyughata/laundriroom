@@ -25,7 +25,7 @@ export default async function VendorProfileLink() {
   const completed = orders.filter((o) => o.status === "closed").length;
 
   return (
-    <VendorShell active="/vendor/profile" vendorName={ctx.vendorName}
+    <VendorShell active="/vendor/profile" vendorName={ctx.vendorName} isManager={ctx.isManager}
       staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">My page</h1>
       <p className="mt-1 max-w-2xl text-sm text-slate">
