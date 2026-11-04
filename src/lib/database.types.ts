@@ -95,7 +95,7 @@ export type Order = {
   delivery_fee: number; express_fee: number; premium_fee: number;
   reschedule_penalty: number; delivery_attempts: number;
   items_total: number; extras_total: number; bulk_discount: number; total: number;
-  handover_code: string | null; pickup_code: string | null; picked_up_at: string | null;
+  handover_code: string | null; pickup_code: string | null; picked_up_at: string | null; picked_up_by?: string | null;
   dispatch_reference: string | null; rider_name: string | null; rider_phone: string | null;
   created_by: string | null;
   /** Placed from the vendor's public profile link. */
@@ -112,7 +112,7 @@ export type Order = {
 export type OrderItem = {
   id: string; order_id: string; sub_code: string; item_type_id: string;
   service: ServiceType; price_at_checkin: number; customer_comment: string | null;
-  condition_notes: string | null;
+  condition_notes: string | null; checked_in_by?: string | null;
   tag_code: string | null; status: OrderItemStatus; photos: string[]; created_at: string;
 }
 export type StageEvent = {
@@ -235,6 +235,8 @@ export type SupportTicket = {
 export type SupportMessage = {
   id: string; ticket_id: string; author_id: string | null;
   from_support: boolean; body: string; created_at: string;
+  /** Storage paths in the support-attachments bucket (0039). */
+  attachments?: string[];
 };
 export type Review = {
   id: string; order_id: string; customer_id: string; vendor_id: string;

@@ -12,12 +12,14 @@ import type {
 const SERVICES: ServiceType[] = ["wash_and_fold", "dry_clean", "press_only"];
 
 export function OrderWorkspace({
-  order, items, itemTypes, prices, paid, customerName, extras, branchName,
+  order, items, itemTypes, prices, paid, customerName, extras, branchName, checkedInBy = {},
 }: {
   order: Order; items: OrderItem[]; itemTypes: ItemType[];
   prices: PriceListRow[]; paid: boolean; customerName: string; extras: OrderExtra[];
   /** Shown for business-wide staff of a multi-branch business. */
   branchName?: string | null;
+  /** Item sub-code → name of the staff member who checked it in. */
+  checkedInBy?: Record<string, string>;
 }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -110,6 +112,7 @@ export function OrderWorkspace({
                     <p className="text-sm font-medium text-ink">{it.sub_code} · {t?.name ?? "Item"}</p>
                     <p className="text-xs text-slate">
                       {SERVICE_LABEL[it.service]}{it.tag_code ? ` · tag ${it.tag_code}` : " · no tag"}
+                      {checkedInBy[it.sub_code] ? ` · checked in by ${checkedInBy[it.sub_code]}` : ""}
                     </p>
                     {it.customer_comment && <p className="text-xs text-slate">“{it.customer_comment}”</p>}
                     {it.condition_notes && <p className="text-xs text-warn">Condition: {it.condition_notes}</p>}
@@ -140,10 +143,10 @@ export function OrderWorkspace({
                 </div>
                 <input className="field" placeholder="Customer note (optional)" value={comment}
                   onChange={(e) => setComment(e.target.value)} />
-                <input className="field sm:col-span-2" placeholder="Condition notes — stains, damage, wear (evidence)"
+                <input className="field sm:col-span-2" placeholder="Condition notes — stains, damage, wear (optional)"
                   value={condNotes} onChange={(e) => setCondNotes(e.target.value)} />
                 <div className="sm:col-span-2">
-                  <label className="label">Photos (evidence)</label>
+                  <label className="label">Photos <span className="font-normal text-slate">(optional — useful as evidence of existing damage)</span></label>
                   <input type="file" accept="image/*" multiple className="text-sm"
                     onChange={(e) => setPhotoFiles(Array.from(e.target.files ?? []))} />
                   {photoFiles.length > 0 && <span className="ml-2 text-xs text-slate">{photoFiles.length} selected</span>}

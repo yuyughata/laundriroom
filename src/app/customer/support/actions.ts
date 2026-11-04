@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { notifyTicket } from "@/lib/notify";
+import { cleanAttachments } from "@/lib/supportPhotos";
 
 /** Customer opens a support ticket (with its first message). */
 export async function createTicket(formData: FormData) {
@@ -24,6 +25,8 @@ export async function createTicket(formData: FormData) {
   if ((subcategory === "Other" || category === "Other") && !other_text) {
     return { error: "Please describe your issue in the 'Other' box." };
   }
+  const attachments = cleanAttachments(formData.get("attachments"), user.id);
+  if (!Array.isArray(attachments)) return attachments;
 
   const { data: ticket, error } = await supabase
     .from("support_tickets")
@@ -34,7 +37,10 @@ export async function createTicket(formData: FormData) {
 
   const { error: msgErr } = await supabase
     .from("support_messages")
-    .insert({ ticket_id: ticket.id, author_id: user.id, from_support: false, body: message } as never);
+    .insert({
+      ticket_id: ticket.id, author_id: user.id, from_support: false, body: message,
+      ...(attachments.length ? { attachments } : {}),
+    } as never);
   if (msgErr) return { error: msgErr.message };
 
   await notifyTicket("ticket_opened", ticket.id);
@@ -43,15 +49,20 @@ export async function createTicket(formData: FormData) {
 }
 
 /** Customer adds a message to their ticket. */
-export async function addCustomerMessage(ticketId: string, body: string) {
+export async function addCustomerMessage(ticketId: string, body: string, photos: string[] = []) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (!body.trim()) return { error: "Message is empty." };
+  const attachments = cleanAttachments(photos, user.id);
+  if (!Array.isArray(attachments)) return attachments;
+  if (!body.trim() && !attachments.length) return { error: "Message is empty." };
 
   const { error } = await supabase
     .from("support_messages")
-    .insert({ ticket_id: ticketId, author_id: user.id, from_support: false, body: body.trim() } as never);
+    .insert({
+      ticket_id: ticketId, author_id: user.id, from_support: false,
+      body: body.trim() || "Photo attached", ...(attachments.length ? { attachments } : {}),
+    } as never);
   if (error) return { error: error.message };
   await notifyTicket("ticket_message", ticketId);
   revalidatePath(`/customer/support/${ticketId}`);

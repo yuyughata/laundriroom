@@ -136,14 +136,33 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0038 are applied to the hosted project
-  (0033–0038 on 2026-11-03 via the Supabase MCP `execute_sql`, versions
+- **Live database:** migrations 0001–0039 are applied to the hosted project
+  (0033–0038 on 2026-11-03, 0039 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`
   statements, so live changes went in drop-free (`create or replace trigger`,
   `alter policy`) — same end state as the migration files.
   `supabase/manual/apply-0033-0038.sql` is the SQL Editor fallback (two
   transactions, self-checks, re-runnable).
+- **Staff attribution (`0039`):** staff sign in with their own accounts (no
+  name dropdown), so the DB records who acted: `order_items.checked_in_by`
+  (default `auth.uid()`), `orders.picked_up_by` (set by `confirm_pickup`),
+  `stage_events.pressed_by` (stages, out for delivery, handover) and
+  `orders.created_by`. `get_order_activity(order)` (staff of that branch +
+  admins) feeds the Activity panel on the vendor order page
+  (`components/orders/OrderActivity.tsx`) and "checked in by" on each item.
+  Check-in photos and condition notes are optional.
+- **Tag search:** Vendor/Admin → Tags has "Find a tag" (type or scan a code,
+  or just the number) to mark missing/damaged/found or reprint one tag
+  (`searchTags` in `src/lib/tagActions.ts`); a batch's list filters by code.
+- **Support photos (`0039`):** customers (new ticket + replies) and support
+  (replies) can attach up to 4 photos (`components/support/PhotoAttach.tsx`,
+  shrunk to ≤1600px client-side) to the private `support-attachments` bucket
+  under `<user id>/…`; paths go in `support_messages.attachments`
+  (`cleanAttachments` checks them; trigger `guard_support_message` forces
+  `author_id = auth.uid()` and own-folder paths). Pages show them via
+  `signSupportPhotos` (1-hour signed links, service key after the viewer's
+  own RLS read of the messages).
 - **Password fields** use `components/ui/PasswordInput.tsx` (Show/Hide).
 - **Responsive dashboards:** admin and vendor shells share `ShellNav` — a fixed
   sidebar on desktop (lg+), a top bar with a Menu button (all links + account)

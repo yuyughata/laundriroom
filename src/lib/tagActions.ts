@@ -43,3 +43,25 @@ export async function setTagStatus(tagId: string, status: "missing" | "damaged" 
   refresh();
   return { ok: true as const };
 }
+
+type FoundTag = {
+  id: string; code: string; status: string; serial: number | null; print_count: number;
+  last_printed_at: string | null; status_note: string | null; current_item_id: string | null; batch_id: string | null;
+};
+
+/**
+ * Find a vendor's tags by code: a full code ("FPL-0042"), part of one, or
+ * just the number ("42"). Exact and same-number matches come first.
+ */
+export async function searchTags(vendorId: string, query: string): Promise<{ tags: FoundTag[] } | { error: string }> {
+  const q = query.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  if (!q) return { tags: [] };
+  const supabase = createClient();
+  const { data, error } = await supabase.from("tags")
+    .select("id, code, status, serial, print_count, last_printed_at, status_note, current_item_id, batch_id")
+    .eq("vendor_id", vendorId).ilike("code", `%${q}%`).order("code").limit(25);
+  if (error) return { error: error.message };
+  const num = /^\d+$/.test(q) ? Number(q) : null;
+  const rank = (t: FoundTag) => (t.code === q ? 0 : num !== null && t.serial === num ? 1 : 2);
+  return { tags: ((data ?? []) as FoundTag[]).sort((a, b) => rank(a) - rank(b)) };
+}

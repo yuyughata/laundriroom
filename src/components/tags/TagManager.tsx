@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { createContext, useContext, useEffect, useMemo, useState, useTransition } from "react";
-import { generateTagBatch, setTagStatus } from "@/lib/tagActions";
+import { generateTagBatch, searchTags, setTagStatus } from "@/lib/tagActions";
+import { QrScanner } from "@/components/ui/QrScanner";
 import type { BatchRow, TagOverview } from "@/lib/tagData";
 import type { Tag } from "@/lib/database.types";
 import { DEFAULT_TAG_SIZE_MM, TAG_SIZES_MM, tagSizeFrom, tagSizeLabel, tagsPerPage, type TagSizeMm } from "@/lib/tagSizes";
@@ -86,10 +87,12 @@ function TagManagerInner({ vendorId, vendorName, overview, canGenerate, batch, b
             <div key={k} className="card p-4">
               <p className="text-xs text-slate">{k}</p>
               <p className="mt-1 font-display text-2xl text-ink">{n}</p>
-              {(k === "Missing" || k === "Damaged") && n > 0 && <span className={`${chip} mt-1`}>Reprint from the batch below</span>}
+              {(k === "Missing" || k === "Damaged") && n > 0 && <span className={`${chip} mt-1`}>Find it below to reprint</span>}
             </div>
           ))}
       </div>
+
+      <TagSearch vendorId={vendorId} />
 
       {canGenerate && <Generator vendorId={vendorId} vendorName={vendorName} overview={overview} basePath={basePath} />}
 
@@ -217,7 +220,11 @@ function BatchDetail({ batch, tags, basePath }: { batch: BatchRow; tags: TagRow[
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const pdf = usePdf();
-  const shown = useMemo(() => rows.filter((r) => filter === "all" || r.status === filter), [rows, filter]);
+  const [codeQ, setCodeQ] = useState("");
+  const shown = useMemo(() => {
+    const q = codeQ.trim().toUpperCase();
+    return rows.filter((r) => (filter === "all" || r.status === filter) && (!q || r.code.includes(q)));
+  }, [rows, filter, codeQ]);
   const back = basePath;
 
   const mark = (id: string, status: "missing" | "damaged" | "found") => start(async () => {
@@ -252,7 +259,9 @@ function BatchDetail({ batch, tags, basePath }: { batch: BatchRow; tags: TagRow[
       </div>
 
       <SizePicker />
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <input className="field w-full sm:w-64" placeholder="Filter by code, e.g. 0042" value={codeQ}
+          aria-label="Filter tags by code" onChange={(e) => setCodeQ(e.target.value)} />
         {(["all", "missing", "damaged", "in_use", "free"] as const).map((f) => (
           <button key={f} onClick={() => setFilter(f)} className={filter === f ? "chip-ink" : "chip-muted"}>
             {f === "all" ? `All (${rows.length})` : `${STATUS[f].label} (${rows.filter((r) => r.status === f).length})`}
@@ -307,5 +316,93 @@ function BatchDetail({ batch, tags, basePath }: { batch: BatchRow; tags: TagRow[
       </div>
       <p className="text-xs text-slate">Reprinting a missing or damaged tag prints the same code again and puts it back into use.</p>
     </div>
+  );
+}
+
+type FoundTag = Extract<Awaited<ReturnType<typeof searchTags>>, { tags: unknown }>["tags"][number];
+
+/** Type or scan a tag's code to find it and mark it missing / damaged, or reprint it. */
+function TagSearch({ vendorId }: { vendorId: string }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<FoundTag[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const pdf = usePdf();
+
+  const find = async (text: string) => {
+    if (!text.trim()) { setResults(null); return; }
+    setSearching(true); setErr(null);
+    const r = await searchTags(vendorId, text);
+    setSearching(false);
+    if ("error" in r) setErr(r.error); else setResults(r.tags);
+  };
+  // Search as they type (short pause), and straight away on scan / Enter.
+  useEffect(() => {
+    const t = setTimeout(() => { void find(q); }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+
+  const mark = (id: string, status: "missing" | "damaged" | "found") => start(async () => {
+    setErr(null);
+    const r = await setTagStatus(id, status);
+    if ("error" in r) { setErr(r.error ?? "Couldn't update the tag."); return; }
+    setResults((rs) => rs?.map((x) => x.id !== id ? x : {
+      ...x, status: status === "found" ? (x.current_item_id ? "in_use" : "free") : status,
+      status_note: status === "found" ? "Found" : null,
+    }) ?? null);
+  });
+
+  return (
+    <section className="card p-5">
+      <h2 className="font-display text-lg text-ink">Find a tag</h2>
+      <p className="mt-1 text-xs text-slate">Type or scan a tag’s code to mark it missing or damaged, or reprint it — no scrolling through batches.</p>
+      <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); void find(q); }}>
+        <input className="field min-w-0 flex-1 font-mono uppercase" placeholder="e.g. FPL-0042 or 42" value={q}
+          aria-label="Tag code" inputMode="text" autoComplete="off"
+          onChange={(e) => setQ(e.target.value.toUpperCase())} />
+        <QrScanner label="Scan" onResult={(t) => { setQ(t.toUpperCase()); void find(t); }} />
+        <button className="btn-primary px-4 py-2 text-sm" type="submit">Find</button>
+      </form>
+      {err && <p className="mt-2 text-sm text-danger">{err}</p>}
+      {searching && <p className="mt-3 text-xs text-slate">Searching…</p>}
+      {!searching && results && results.length === 0 && (
+        <p className="mt-3 text-sm text-slate">No tag matches “{q}”.</p>
+      )}
+      {!searching && results && results.length > 0 && (
+        <div className="table-scroll mt-3 rounded-card border border-ink/10 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-ink/5 text-left text-xs text-slate">
+              <tr><th className="px-4 py-2.5">Code</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">Printed</th><th className="px-4 py-2.5">Mark / reprint</th></tr>
+            </thead>
+            <tbody className="divide-y divide-ink/5">
+              {results.map((r) => (
+                <tr key={r.id}>
+                  <td className="px-4 py-2.5 font-mono text-xs text-ink">{r.code}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={STATUS[r.status]?.chip ?? "chip-muted"}>{STATUS[r.status]?.label ?? r.status}</span>
+                    {r.status_note && <span className="ml-2 text-xs text-slate">{r.status_note}</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-slate">{r.print_count ? `${r.print_count}× · ${d(r.last_printed_at)}` : "Not printed here"}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {(r.status === "free" || r.status === "in_use") && (<>
+                        <button className="btn-ghost px-2.5 py-1 text-xs" disabled={pending} onClick={() => mark(r.id, "missing")}>Missing</button>
+                        <button className="btn-ghost px-2.5 py-1 text-xs" disabled={pending} onClick={() => mark(r.id, "damaged")}>Damaged</button>
+                      </>)}
+                      {(r.status === "missing" || r.status === "damaged") && (<>
+                        <a href={pdf(`ids=${r.id}&reprint=1`)} target="_blank" rel="noopener noreferrer" className="btn-primary px-2.5 py-1 text-xs">Reprint</a>
+                        {r.status === "missing" && <button className="btn-ghost px-2.5 py-1 text-xs" disabled={pending} onClick={() => mark(r.id, "found")}>Found it</button>}
+                      </>)}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
