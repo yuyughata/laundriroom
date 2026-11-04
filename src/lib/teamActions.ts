@@ -89,8 +89,10 @@ export async function inviteStaff(vendorId: string, fd: FormData): Promise<Resul
       : `${existing.full_name || email} has been added. They sign in with their usual email and password.`;
   } else {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    // vendor_name / role_label let the invite email name the laundry and role.
+    const { data: v } = await service.from("vendors").select("name").eq("id", vendorId).maybeSingle();
     const { data, error } = await service.auth.admin.inviteUserByEmail(email, {
-      data: { full_name, phone },
+      data: { full_name, phone, vendor_name: v?.name ?? null, role_label: role === "vendor_manager" ? "Manager" : "Attendant" },
       redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
     });
     if (error || !data?.user) {

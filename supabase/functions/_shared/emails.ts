@@ -521,10 +521,15 @@ export const AUTH_EMAIL_TEMPLATES: Record<string, { label: string; subject: stri
       button: { label: "Confirm new email", url: "{{ .ConfirmationURL }}", tone: "champagne" },
       note: "Didn't ask for this? Ignore this email and change your password.",
     }),
+    // Staff invites (Vendor → Team) carry vendor_name and role_label in the
+    // user's metadata, so the email names the laundry; other invites (e.g. a
+    // walk-in customer added at the counter) get the general wording.
     invite: auth("Invite user", "You've been invited to laundriroom", {
-      preheader: "Your laundriroom account is ready",
-      heading: "You've been invited",
-      paragraphs: [`You've been invited to join laundriroom as <strong>{{ .Email }}</strong>. Accept to set your password and get started.`],
+      preheader: "{{ if .Data.vendor_name }}Join {{ .Data.vendor_name }} on laundriroom{{ else }}Your laundriroom account is ready{{ end }}",
+      heading: "{{ if .Data.vendor_name }}Join the {{ .Data.vendor_name }} team{{ else }}You've been invited{{ end }}",
+      paragraphs: [
+        `{{ if .Data.vendor_name }}<strong>{{ .Data.vendor_name }}</strong> has added you to their team on laundriroom{{ if .Data.role_label }} as <strong>{{ .Data.role_label }}</strong>{{ end }}. Accept to set your own password, then sign in with <strong>{{ .Email }}</strong> to open the vendor dashboard.<br><br>Only you will know your password, and every order step you take is recorded under your name. Not expecting this? Ignore this email — nothing happens until you accept.{{ else }}You've been invited to join laundriroom as <strong>{{ .Email }}</strong>. Accept to set your password and get started.{{ end }}`,
+      ],
       button: { label: "Accept invitation", url: "{{ .ConfirmationURL }}", tone: "champagne" },
     }),
     reauthentication: auth("Verification code", "Your laundriroom verification code", {
@@ -541,6 +546,14 @@ export const AUTH_EMAIL_TEMPLATES: Record<string, { label: string; subject: stri
 
 /** Fill Supabase's Go placeholders with sample values (for previews). */
 export function sampleAuthEmail(html: string): string {
+  // Resolve Go {{ if .Data.x }}…{{ else }}…{{ end }} blocks as for a staff
+  // invite (innermost first), then fill the remaining placeholders.
+  const data: Record<string, string> = { vendor_name: "Fold &amp; Press, Lekki", role_label: "Attendant" };
+  const block = /\{\{ if \.Data\.(\w+) \}\}((?:(?!\{\{ if )[\s\S])*?)(?:\{\{ else \}\}((?:(?!\{\{ if )[\s\S])*?))?\{\{ end \}\}/;
+  for (let i = 0; i < 20 && block.test(html); i++) {
+    html = html.replace(block, (_m, key: string, yes: string, no?: string) => (data[key] ? yes : no ?? ""));
+  }
+  html = html.replace(/\{\{ \.Data\.(\w+) \}\}/g, (_m, key: string) => data[key] ?? "");
   return html
     .replace(/\{\{ \.ConfirmationURL \}\}/g, "#")
     .replace(/\{\{ \.NewEmail \}\}/g, "ada.new@example.com")
