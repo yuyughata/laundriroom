@@ -243,7 +243,8 @@ promote an admin → deploy edge functions → wire Paystack).
   promo row, a QR for `/customer/order?promo=CODE` (plus `&vendor=<slug>` for
   a laundry's own code); Vendor → Promos shows their `/v/<slug>` page QR and
   one per promo (`components/promo/QrCard.tsx`: copy link, print-ready PNG
-  with the code under the QR; links built by `src/lib/promoLinks.ts`). These
+  with the code under the QR, or an A4 PDF made in the browser with pdf-lib —
+  logo, 12 cm QR, code, link; links built by `src/lib/promoLinks.ts`). These
   QRs and the My page QR carry the laundriroom mark in the middle
   (`src/lib/qrWithLogo.ts`: error correction H, logo badge ~22% wide; checked
   to decode with zxing down to 120px). Tag QRs stay plain (tiny prints). The

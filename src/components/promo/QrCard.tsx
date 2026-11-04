@@ -54,6 +54,60 @@ export function QrCard({ title, url, code, note, fileName, compact = false }: {
     a.click();
   }
 
+  /** An A4 page to print: logo, a 12 cm QR (with the logo), the code and the link. */
+  async function downloadPdf() {
+    if (!qr) return;
+    const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+    const doc = await PDFDocument.create();
+    doc.setTitle(code ? `laundriroom promo ${code}` : `laundriroom — ${title}`);
+    doc.setAuthor("laundriroom");
+    const page = doc.addPage([595.28, 841.89]); // A4
+    const W = page.getWidth(), H = page.getHeight();
+    const ink = rgb(0x0f / 255, 0x1b / 255, 0x2d / 255), slate = rgb(0x5b / 255, 0x66 / 255, 0x78 / 255);
+    const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+    const reg = await doc.embedFont(StandardFonts.Helvetica);
+    const mono = await doc.embedFont(StandardFonts.CourierBold);
+    const centre = (text: string, font: typeof reg, size: number, y: number, color = ink) =>
+      page.drawText(text, { x: (W - font.widthOfTextAtSize(text, size)) / 2, y, size, font, color });
+
+    // brand: mark + wordmark, centred
+    try {
+      const mark = await doc.embedPng(await (await fetch("/brand/mark-dark.png")).arrayBuffer());
+      const mh = 26, mw = mh * (mark.width / mark.height), word = "laundriroom", ws = 24;
+      const total = mw + 10 + bold.widthOfTextAtSize(word, ws);
+      const x0 = (W - total) / 2, y0 = H - 92;
+      page.drawImage(mark, { x: x0, y: y0, width: mw, height: mh });
+      page.drawText(word, { x: x0 + mw + 10, y: y0 + 5, size: ws, font: bold, color: ink });
+    } catch {
+      centre("laundriroom", bold, 24, H - 87);
+    }
+
+    // the QR, 12 cm square
+    const img = await doc.embedPng(await (await fetch(qr)).arrayBuffer());
+    const size = 340;
+    const qy = H - 140 - size;
+    page.drawImage(img, { x: (W - size) / 2, y: qy, width: size, height: size });
+
+    let y = qy - 56;
+    if (code) { centre(code, mono, 46, y); y -= 40; }
+    centre(code ? "Scan to order on laundriroom" : "Scan to open laundriroom", reg, 18, y, slate);
+    y -= 26;
+    if (code) { centre("or enter the code when you order", reg, 12, y, slate); y -= 20; }
+
+    // the link, small, wrapped if long
+    const words = url.length > 70 ? [url.slice(0, 70), url.slice(70)] : [url];
+    let ly = 70 + (words.length - 1) * 13;
+    for (const line of words) { centre(line, reg, 10, ly, slate); ly -= 13; }
+
+    const bytes = await doc.save();
+    const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${fileName}.pdf`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  }
+
   return (
     <div className={`card flex ${compact ? "flex-col items-center gap-3 sm:flex-row sm:items-start" : "flex-col items-center gap-3 sm:flex-row"} p-4`}>
       {qr ? (
@@ -71,6 +125,7 @@ export function QrCard({ title, url, code, note, fileName, compact = false }: {
         <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
           <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={copy}>{copied ? "Copied" : "Copy link"}</button>
           <button type="button" className="btn-primary px-3 py-1.5 text-xs" disabled={!qr} onClick={download}>Download QR (PNG)</button>
+          <button type="button" className="btn-primary px-3 py-1.5 text-xs" disabled={!qr} onClick={downloadPdf}>Download PDF</button>
         </div>
       </div>
     </div>
