@@ -47,6 +47,12 @@ export function OrderWorkspace({
   // (null on orders placed before that change).
   const markup = order.commission_markup ?? null;
   const addPrice = priceFor(typeId, service);
+  // What laundriroom adds on top of the vendor's price (express replaces the commission).
+  const addedOnTop = [
+    markup ? `laundriroom’s ${Math.round(Number(markup) * 1000) / 10}% commission` : null,
+    order.express_fee > 0 ? "the express charge" : null,
+    order.premium_fee > 0 ? "the premium charge" : null,
+  ].filter(Boolean) as string[];
 
   const canCheckIn = ["awaiting_dropoff", "pickup_requested", "checked_in", "processing"].includes(order.status);
   const nextStageIndex = 0; // processing stages are free-press in this build
@@ -354,8 +360,7 @@ export function OrderWorkspace({
                 <p className="mt-1 text-xs text-slate">
                   Your prices{order.extras_total > 0 ? ", extras" : ""} and delivery, in full
                   {order.discount_vendor_funded && order.discount > 0 ? ", less your share of the promo" : ""}.
-                  laundriroom&apos;s {Math.round(Number(markup) * 1000) / 10}% commission
-                  {order.express_fee > 0 || order.premium_fee > 0 ? " and the express/premium charges are" : " is"} added on top for the customer.
+                  {addedOnTop.length > 0 && <> {addedOnTop.join(" and ")} {addedOnTop.length > 1 ? "are" : "is"} added on top for the customer.</>}
                 </p>
               </>
             )}

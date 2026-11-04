@@ -21,9 +21,9 @@ export function PlatformRatesEditor({
     <div className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-3">
         <Field label="Commission" unit="%" value={c} onChange={touch(setC)}
-          suffix="Added on top of the vendor's item prices for the customer. The vendor is paid their own price in full. Not added to delivery or extras." />
+          suffix="Added on top of the vendor's item prices on normal-turnaround orders. The vendor is paid their own price in full. Not added to delivery or extras." />
         <Field label="Express markup" unit="%" value={ex} onChange={touch(setEx)}
-          suffix="% of the vendor's price (items + extras), added to express orders. Kept by the platform." />
+          suffix="% of the vendor's price (items + extras). Replaces the commission on express orders. Kept by the platform." />
         <Field label="Premium markup" unit="%" value={pr} onChange={touch(setPr)}
           suffix="% of the vendor's price (items + extras), added to premium orders. Kept by the platform." />
       </div>
@@ -47,15 +47,21 @@ export function PlatformRatesEditor({
 /** Worked example: what the customer pays for a ₦200 item at these rates. */
 function Example({ c, ex, pr }: { c: number; ex: number; pr: number }) {
   const base = 200;
-  const cust = customerPrice(base, c / 100);
-  const exAmt = Math.round(base * ex) / 100;
+  const normal = customerPrice(base, c / 100);   // commission on normal turnaround
+  const express = base + Math.round(base * ex) / 100; // express replaces the commission
   const prAmt = Math.round(base * pr) / 100;
   return (
-    <p className="rounded-card bg-ink/5 px-4 py-3 text-xs text-slate">
-      Example — a {money(base)} item: the customer pays <span className="font-medium text-ink">{money(cust)}</span>
-      {" "}({money(cust)} standard · {money(cust + exAmt)} express · {money(cust + prAmt)} premium ·{" "}
-      {money(cust + exAmt + prAmt)} both). The vendor receives {money(base)} every time.
-    </p>
+    <div className="space-y-1 rounded-card bg-ink/5 px-4 py-3 text-xs text-slate">
+      <p>
+        Example — a {money(base)} item. Normal: <span className="font-medium text-ink">{money(normal)}</span> standard ·{" "}
+        <span className="font-medium text-ink">{money(normal + prAmt)}</span> premium. Express:{" "}
+        <span className="font-medium text-ink">{money(express)}</span> standard ·{" "}
+        <span className="font-medium text-ink">{money(express + prAmt)}</span> premium. The vendor receives {money(base)} every time.
+      </p>
+      {ex < c && (
+        <p className="text-warn">Express is lower than the commission, so express orders cost customers less than normal ones.</p>
+      )}
+    </div>
   );
 }
 

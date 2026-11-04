@@ -30,8 +30,8 @@ export default async function AdminFees() {
       <h1 className="font-display text-2xl text-ink">Fees & charges</h1>
       <p className="mt-1 max-w-3xl text-sm text-slate">
         One set of rates applies to every vendor. The commission is added on top of each vendor&apos;s item prices, so
-        the customer pays the vendor&apos;s price plus commission and the vendor is paid their own price in full. The
-        platform earns the commission plus any express or premium markup. Premium extras are set under{" "}
+        the customer pays the vendor&apos;s price plus commission and the vendor is paid their own price in full. On an
+        express order the express charge replaces the commission. Premium is added on top either way. Premium extras are set under{" "}
         <span className="font-medium text-ink">Services &amp; extras</span>.
       </p>
 

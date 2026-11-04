@@ -48,7 +48,11 @@ promote an admin → deploy edge functions → wire Paystack).
 - **Money is NGN**, formatted via `src/lib/format.ts`. **Commission is the only
   revenue model** — since `0041` it is **added on top of the vendor's item
   prices** for the customer (₦200 shirt at 30% → customer pays ₦260, vendor
-  receives ₦200), not deducted from the payout. Not added to delivery, premium
+  receives ₦200), not deducted from the payout. **Express replaces the
+  commission** (`0042`): the commission is charged on the normal turnaround;
+  an express order adds the express % instead (₦200, 30% / 20% express /
+  12.5% premium → normal 260, normal+premium 285, express 240,
+  express+premium 265). Not added to delivery, premium
   extras (admin-priced) or the penalty.
   Subscription/combined plans are retired (migration `0015`): any such plans are
   deactivated and their vendors moved to the default commission plan, and the
@@ -61,8 +65,10 @@ promote an admin → deploy edge functions → wire Paystack).
   with admin percentages in `platform_settings`). Order total =
   items + extras + delivery + express markup + premium markup + any reschedule
   penalty, all recomputed by DB triggers.
-- **Who earns what (`0041`):** the order snapshots the global rate in
-  `orders.commission_markup` on insert (trigger; can't be changed after).
+- **Who earns what (`0041`/`0042`):** `orders.commission_markup` is the rate
+  added to item prices — the global commission on a normal order, 0 on an
+  express order — set on insert by trigger and only changed by a turnaround
+  change (`orders_reprice_on_turnaround` then re-prices the items).
   `order_items.price_at_checkin` stays the **vendor's** price;
   `order_items.customer_price` = price × (1 + rate), rounded to the whole naira
   (`src/lib/pricing.ts` mirrors it). `orders.items_total` is the customer's
@@ -151,8 +157,8 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0041 are applied to the hosted project
-  (0033–0038 on 2026-11-03, 0039–0041 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
+- **Live database:** migrations 0001–0042 are applied to the hosted project
+  (0033–0038 on 2026-11-03, 0039–0042 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`
   statements, so live changes went in drop-free (`create or replace trigger`,
