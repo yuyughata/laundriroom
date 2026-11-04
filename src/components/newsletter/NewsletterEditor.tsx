@@ -8,8 +8,9 @@ import { renderNewsletter } from "@/lib/newsletter";
 import {
   saveNewsletter, sendTestNewsletter, sendNewsletter, countAudience, searchPeople, deleteNewsletter,
   type NewsletterInput, type PersonHit,
-} from "@/app/admin/newsletters/actions";
+} from "@/app/admin/emails/actions";
 import type { NewsletterAudience, NewsletterGroup } from "@/lib/database.types";
+import { EMAIL_KINDS, type EmailKind } from "@/lib/emailKinds";
 
 const GROUPS: { key: NewsletterGroup; label: string; hint: string }[] = [
   { key: "customers", label: "Customers", hint: "Everyone who orders laundry" },
@@ -28,6 +29,7 @@ export type EditorStart = NewsletterInput & { id: string | null; last_test_at: s
 export function NewsletterEditor({ start, people: startPeople }: { start: EditorStart; people: PersonHit[] }) {
   const router = useRouter();
   const [id, setId] = useState<string | null>(start.id);
+  const [kind, setKind] = useState<EmailKind>(start.kind ?? "newsletter");
   const [subject, setSubject] = useState(start.subject);
   const [preheader, setPreheader] = useState(start.preheader);
   const [header, setHeader] = useState<string | null>(start.header_image_url);
@@ -48,7 +50,7 @@ export function NewsletterEditor({ start, people: startPeople }: { start: Editor
 
   const audience: NewsletterAudience = useMemo(() => ({ groups, user_ids: people.map((p) => p.id) }), [groups, people]);
   const input = (): NewsletterInput => ({
-    subject, preheader, header_image_url: header, footer_image_url: footer, body_html: body,
+    kind, subject, preheader, header_image_url: header, footer_image_url: footer, body_html: body,
     cta_label: ctaLabel, cta_url: ctaUrl, audience,
   });
   const touch = <T,>(set: (v: T) => void) => (v: T) => { set(v); setDirty(true); };
@@ -99,6 +101,19 @@ export function NewsletterEditor({ start, people: startPeople }: { start: Editor
       <div className="space-y-5">
         <div className="card space-y-3 p-4">
           <div>
+            <p className="label" id="nl-kind">Type of email</p>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="nl-kind">
+              {EMAIL_KINDS.map((k) => (
+                <button key={k.key} type="button" role="radio" aria-checked={kind === k.key} title={k.hint}
+                  onClick={() => { setKind(k.key); setDirty(true); }}
+                  className={`rounded-lg border px-3 py-2 text-left text-sm ${kind === k.key ? "border-ink bg-ink text-ivory" : "border-ink/15 text-ink hover:bg-ink/5"}`}>
+                  {k.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-slate">{EMAIL_KINDS.find((k) => k.key === kind)?.hint}</p>
+          </div>
+          <div>
             <label className="label" htmlFor="nl-subject">Subject</label>
             <input id="nl-subject" className="field" maxLength={200} value={subject} placeholder="What's new at laundriroom"
               onChange={(e) => touch(setSubject)(e.target.value)} />
@@ -115,7 +130,7 @@ export function NewsletterEditor({ start, people: startPeople }: { start: Editor
 
         <div>
           <p className="label">Message</p>
-          <RichTextEditor value={body} onChange={touch(setBody)} placeholder="Write your newsletter…" />
+          <RichTextEditor value={body} onChange={touch(setBody)} placeholder="Write your email…" />
         </div>
 
         <div className="card grid gap-3 p-4 sm:grid-cols-2">
@@ -176,7 +191,7 @@ export function NewsletterEditor({ start, people: startPeople }: { start: Editor
             <button className="ml-auto text-sm text-danger underline" disabled={pending} onClick={() => start_(async () => {
               if (!window.confirm("Delete this draft?")) return;
               const r = await deleteNewsletter(id);
-              if ("error" in r) setMsg({ tone: "err", text: r.error ?? "Couldn’t delete." }); else { setDirty(false); router.push("/admin/newsletters"); }
+              if ("error" in r) setMsg({ tone: "err", text: r.error ?? "Couldn’t delete." }); else { setDirty(false); router.push("/admin/emails"); }
             })}>Delete draft</button>
           )}
         </div>
@@ -185,7 +200,7 @@ export function NewsletterEditor({ start, people: startPeople }: { start: Editor
         {confirming && id && (
           <div className="card border-ink p-4" role="alertdialog" aria-label="Confirm send">
             <p className="font-medium text-ink">Send “{subject}” to {count} {count === 1 ? "person" : "people"}?</p>
-            <p className="mt-1 text-sm text-slate">It goes out straight away and can&apos;t be unsent. Sent newsletters are kept as a record and can&apos;t be edited (you can duplicate one).</p>
+            <p className="mt-1 text-sm text-slate">It goes out straight away and can&apos;t be unsent. Sent emails are kept as a record and can&apos;t be edited (you can duplicate one).</p>
             <div className="mt-3 flex gap-2">
               <button className="btn-primary" disabled={pending} onClick={() => start_(async () => {
                 const r = await sendNewsletter(id);

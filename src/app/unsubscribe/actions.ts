@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Turn newsletters off for the person whose link this is. */
+/** Turn email broadcasts off for the person whose link this is. */
 export async function unsubscribe(token: string): Promise<{ name: string } | { error: string }> {
   if (!UUID.test(token)) return { error: "This unsubscribe link isn't complete. Use the link from the email." };
   const supabase = createClient();

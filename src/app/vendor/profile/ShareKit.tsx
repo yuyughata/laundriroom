@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
+import { qrWithLogo } from "@/lib/qrWithLogo";
 
 /**
  * Everything a vendor needs to hand their profile link to customers: copy,
@@ -16,9 +16,7 @@ export function ShareKit({ url, vendorName }: { url: string; vendorName: string 
 
   useEffect(() => {
     setCanShare(typeof navigator !== "undefined" && !!navigator.share);
-    QRCode.toDataURL(url, { width: 640, margin: 2, color: { dark: "#0F1B2D", light: "#FFFFFF" } })
-      .then(setQr)
-      .catch(() => setQr(null));
+    qrWithLogo(url, 640).then(setQr).catch(() => setQr(null));
   }, [url]);
 
   async function copy() {

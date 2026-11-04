@@ -5,7 +5,7 @@ import { UnsubscribeButton } from "./UnsubscribeButton";
 export const metadata = { title: "Unsubscribe — laundriroom", robots: { index: false } };
 
 /**
- * Newsletter unsubscribe (link in every newsletter). Asks for a click rather
+ * Unsubscribe from email broadcasts (link in every one). Asks for a click rather
  * than unsubscribing on page load, so email link-scanners can't do it by
  * accident. Email apps' one-click button uses POST /api/unsubscribe instead.
  */
@@ -22,7 +22,7 @@ export default function UnsubscribePage({ searchParams }: { searchParams: { t?: 
             <div>
               <h1 className="font-display text-3xl text-ink">Unsubscribe</h1>
               <p className="mt-3 text-slate">
-                Use the unsubscribe link at the bottom of a laundriroom newsletter, or turn newsletters off in your{" "}
+                Use the unsubscribe link at the bottom of a laundriroom email, or turn these emails off in your{" "}
                 <Link href="/customer/account" className="text-ink underline">account</Link>.
               </p>
             </div>

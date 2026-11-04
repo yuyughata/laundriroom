@@ -55,6 +55,8 @@ export type Newsletter = {
   header_image_url: string | null; footer_image_url: string | null;
   body_html: string; cta_label: string | null; cta_url: string | null;
   audience: NewsletterAudience;
+  /** Type of broadcast (0044): newsletter | promotion | announcement | update. */
+  kind: "newsletter" | "promotion" | "announcement" | "update";
   status: "draft" | "sending" | "sent" | "failed";
   recipient_count: number; sent_count: number; failed_count: number;
   last_error: string | null; last_test_at: string | null; sent_at: string | null;

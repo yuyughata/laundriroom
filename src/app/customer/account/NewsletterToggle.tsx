@@ -11,11 +11,11 @@ export function NewsletterToggle({ optedOut }: { optedOut: boolean }) {
   return (
     <div className="card flex items-center justify-between gap-4 p-4">
       <div>
-        <p className="font-medium text-ink">News and offers by email</p>
-        <p className="text-sm text-slate">Occasional newsletters and promo codes. Emails about your orders always come.</p>
+        <p className="font-medium text-ink">Emails from laundriroom</p>
+        <p className="text-sm text-slate">News, offers and announcements. Emails about your own orders always come.</p>
         {err && <p className="mt-1 text-sm text-danger">{err}</p>}
       </div>
-      <button type="button" role="switch" aria-checked={on} aria-label="News and offers by email" disabled={pending}
+      <button type="button" role="switch" aria-checked={on} aria-label="Emails from laundriroom" disabled={pending}
         onClick={() => start(async () => {
           setErr(null);
           const next = !on;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
+import { qrWithLogo } from "@/lib/qrWithLogo";
 
 const INK = "#0F1B2D";
 
@@ -16,8 +16,7 @@ export function QrCard({ title, url, code, note, fileName, compact = false }: {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    QRCode.toDataURL(url, { width: 720, margin: 2, errorCorrectionLevel: "M", color: { dark: INK, light: "#FFFFFF" } })
-      .then(setQr).catch(() => setQr(null));
+    qrWithLogo(url, 720).then(setQr).catch(() => setQr(null));
   }, [url]);
 
   async function copy() {

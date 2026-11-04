@@ -11,7 +11,7 @@ export function NewsletterRowActions({ id, draft }: { id: string; draft: boolean
     <div className="flex justify-end gap-3 text-xs">
       <button className="text-ink underline" disabled={pending} onClick={() => start(async () => {
         const r = await duplicateNewsletter(id);
-        if ("id" in r && r.id) router.push(`/admin/newsletters/${r.id}`); else window.alert(("error" in r && r.error) || "Couldn’t duplicate.");
+        if ("id" in r && r.id) router.push(`/admin/emails/${r.id}`); else window.alert(("error" in r && r.error) || "Couldn’t duplicate.");
       })}>Duplicate</button>
       {draft && (
         <button className="text-danger underline" disabled={pending} onClick={() => start(async () => {
@@ -24,14 +24,14 @@ export function NewsletterRowActions({ id, draft }: { id: string; draft: boolean
   );
 }
 
-/** Creates the draft first, then opens it — the editor always works on a saved newsletter. */
+/** Creates the draft first, then opens it — the editor always works on a saved email. */
 export function NewNewsletterButton() {
   const router = useRouter();
   const [pending, start] = useTransition();
   return (
     <button className="btn-primary text-sm" disabled={pending} onClick={() => start(async () => {
       const r = await createNewsletterDraft();
-      if ("id" in r && r.id) router.push(`/admin/newsletters/${r.id}`); else window.alert(("error" in r && r.error) || "Couldn’t start a newsletter.");
-    })}>{pending ? "Starting…" : "New newsletter"}</button>
+      if ("id" in r && r.id) router.push(`/admin/emails/${r.id}`); else window.alert(("error" in r && r.error) || "Couldn’t start an email.");
+    })}>{pending ? "Starting…" : "New email"}</button>
   );
 }

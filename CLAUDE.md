@@ -157,8 +157,8 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0043 are applied to the hosted project
-  (0033–0038 on 2026-11-03, 0039–0043 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
+- **Live database:** migrations 0001–0044 are applied to the hosted project
+  (0033–0038 on 2026-11-03, 0039–0044 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`
   statements, so live changes went in drop-free (`create or replace trigger`,
@@ -210,10 +210,13 @@ promote an admin → deploy edge functions → wire Paystack).
   sideways with edge shadows and keeps a readable min-width below lg. Page
   heading rows use `flex flex-wrap … gap-3` so badges/buttons wrap on phones.
 
-- **Newsletters (`0043`):** Admin → Newsletters (platform admins only; support
-  agents see a notice). "New newsletter" creates the draft first (reusing the
-  last header/footer images), then opens the editor
-  (`components/newsletter/NewsletterEditor.tsx`): subject, preview text,
+- **Emails (`0043`/`0044`):** Admin → Emails (`/admin/emails`; the old
+  `/admin/newsletters` links redirect) — email broadcasts, each with a kind
+  (`newsletters.kind`: newsletter, promotion, announcement or service update;
+  `src/lib/emailKinds.ts`). The tables keep the `newsletters` names. Platform
+  admins only; support agents see a notice. "New email" creates the draft
+  first (reusing the last header/footer images), then opens the editor
+  (`components/newsletter/NewsletterEditor.tsx`): type, subject, preview text,
   header image, rich-text body (`RichTextEditor.tsx`: contentEditable +
   toolbar — heading/subheading, bold/italic/underline/strike, lists, quote,
   link, alignment, divider; paste is cleaned client-side), button text + link
@@ -232,15 +235,18 @@ promote an admin → deploy edge functions → wire Paystack).
   via the Resend batch API in the background, each email with its own
   unsubscribe link (`/unsubscribe?t=<profiles.unsubscribe_token>`, asks for a
   click) and one-click `List-Unsubscribe` (POST `/api/unsubscribe`). A sent
-  newsletter is locked (`guard_newsletter`) and shows a delivery report;
-  Duplicate makes a new draft. Customers also toggle "News and offers by
-  email" on their account page. Needs Resend connected (Admin → Integrations)
+  email is locked (`guard_newsletter`, kind included) and shows a delivery
+  report; Duplicate makes a new draft. Opt-out covers every kind. Customers
+  also toggle "Emails from laundriroom" on their account page. Needs Resend connected (Admin → Integrations)
   + `RESEND_API_KEY`, and `SITE_URL` (secret) or `NEXT_PUBLIC_SITE_URL`.
 - **Promo QR codes:** Admin → Promos shows a QR for the website and, per
   promo row, a QR for `/customer/order?promo=CODE` (plus `&vendor=<slug>` for
   a laundry's own code); Vendor → Promos shows their `/v/<slug>` page QR and
   one per promo (`components/promo/QrCard.tsx`: copy link, print-ready PNG
-  with the code under the QR; links built by `src/lib/promoLinks.ts`). The
+  with the code under the QR; links built by `src/lib/promoLinks.ts`). These
+  QRs and the My page QR carry the laundriroom mark in the middle
+  (`src/lib/qrWithLogo.ts`: error correction H, logo badge ~22% wide; checked
+  to decode with zxing down to 120px). Tag QRs stay plain (tiny prints). The
   order form shows a banner for `?promo=` and `createOrder` applies it with
   `redeem_promo` right after the order is created; the order page says
   whether it applied (`promo_applied` / `promo_error`). Signed-out scans go
