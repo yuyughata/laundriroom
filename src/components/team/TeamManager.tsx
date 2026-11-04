@@ -136,7 +136,7 @@ function MemberRow({ vendorId, m, branches, multi, canManage, forAdmin }: {
       </td>
       <td className="px-4 py-3">
         {locked || m.role === "rider" ? <span className="text-ink">{ROLE_LABEL[m.role] ?? m.role}</span> : (
-          <select className="field py-1.5 text-sm" aria-label={`Role for ${m.name}`} value={m.role} disabled={pending}
+          <select className="field min-w-[9.5rem] py-1.5 text-sm" aria-label={`Role for ${m.name}`} value={m.role} disabled={pending}
             onChange={(e) => run(() => updateStaff(vendorId, m.membershipId, { role: e.target.value }))}>
             <option value="attendant">Attendant</option>
             <option value="vendor_manager">Manager</option>
