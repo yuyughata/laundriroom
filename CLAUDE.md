@@ -267,11 +267,11 @@ promote an admin → deploy edge functions → wire Paystack).
   rider, branch managers their branch's); `guard_rider_contact` keeps
   `vendor_id`/`created_by` fixed. On a delivery order the rider box is
   `components/riders/RiderPicker.tsx`: search/pick, or "+ New rider" with
-  "Save to rider list" → `assign_order_rider()` (branch staff/admin; reuses an
+  "Save to Dispatch list" → `assign_order_rider()` (branch staff/admin; reuses an
   existing number and un-archives it; a new contact gets the adder's branch;
   empty name+phone clears). The order keeps its own copy (`rider_name`,
   `rider_phone`, plus `rider_contact_id`), so editing/archiving a contact never
-  changes past orders. Vendor → Riders (`app/vendor/riders`,
+  changes past orders. Vendor → Dispatch (`app/vendor/dispatch`; the old `/vendor/riders` link redirects;
   `components/riders/RiderManager.tsx`) lists them with order counts.
   Pickups don't use the picker yet.
 - **Training decks:** `docs/presentations/` holds the team training deck and

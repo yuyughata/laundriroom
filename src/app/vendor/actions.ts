@@ -94,7 +94,7 @@ export async function assignRider(order_id: string, rider: {
   });
   if (error) return { error: error.message.replace(/^.*?:\s*(?=[A-Z])/, "") };
   revalidatePath(`/vendor/orders/${order_id}`);
-  revalidatePath("/vendor/riders");
+  revalidatePath("/vendor/dispatch");
   return { ok: true };
 }
 

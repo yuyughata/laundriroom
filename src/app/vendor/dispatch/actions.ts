@@ -14,7 +14,7 @@ function check(r: RiderInput) {
   return null;
 }
 const friendly = (m: string) => /rider_contacts_vendor_phone_key|duplicate key/.test(m)
-  ? "That phone number is already on your rider list." : m;
+  ? "That phone number is already on your Dispatch list." : m;
 
 /** Add a rider to the list (any staff). Branch-only staff add riders for their branch. */
 export async function addRider(r: RiderInput) {
@@ -27,7 +27,7 @@ export async function addRider(r: RiderInput) {
     company: r.kind === "dispatch" ? (r.company || null) : null, notes: r.notes || null,
   } as never);
   if (error) return { error: friendly(error.message) };
-  revalidatePath("/vendor/riders");
+  revalidatePath("/vendor/dispatch");
   return { ok: true };
 }
 
@@ -44,7 +44,7 @@ export async function updateRider(id: string, r: RiderInput) {
   const { data, error } = await supabase.from("rider_contacts").update(patch as never).eq("id", id).select("id");
   if (error) return { error: friendly(error.message) };
   if (!data?.length) return { error: "Only a manager can edit riders." };
-  revalidatePath("/vendor/riders");
+  revalidatePath("/vendor/dispatch");
   return { ok: true };
 }
 
@@ -55,6 +55,6 @@ export async function setRiderActive(id: string, active: boolean) {
   const { data, error } = await supabase.from("rider_contacts").update({ active } as never).eq("id", id).select("id");
   if (error) return { error: error.message };
   if (!data?.length) return { error: "Only a manager can archive riders." };
-  revalidatePath("/vendor/riders");
+  revalidatePath("/vendor/dispatch");
   return { ok: true };
 }

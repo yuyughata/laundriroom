@@ -15,7 +15,7 @@ screen's route.
 | [laundriroom-ui-whats-new.pdf](laundriroom-ui-whats-new.pdf) | Only the screens changed in this round, marked NEW or UPDATED | 10 |
 
 **What changed in this round:** demo data moved to Jos; the rider list
-(Vendor → Riders, and the rider picker on a delivery order — migration
+(Vendor → Riders — since renamed Dispatch — and the rider picker on a delivery order — migration
 `0045`); Admin → Emails (broadcast editor, sending, delivery report —
 `0043`/`0044`) and the customer's "Emails from laundriroom" switch; QR codes
 with the laundriroom mark, with PNG and PDF downloads, on Admin → Promos,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { addRider, updateRider, setRiderActive, type RiderInput } from "@/app/vendor/riders/actions";
+import { addRider, updateRider, setRiderActive, type RiderInput } from "@/app/vendor/dispatch/actions";
 import { dateShort } from "@/lib/format";
 import { telHref, whatsappHref } from "@/lib/phone";
 import type { RiderContact } from "@/lib/database.types";

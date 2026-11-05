@@ -122,7 +122,7 @@ export function RiderPicker({ orderId, orderCode, handoverCode, contacts, curren
               )}
               {known && <p className="text-xs text-warn">{known.name} already has this number — they&apos;ll be used.</p>}
               <label className="flex items-center gap-2 text-xs text-ink">
-                <input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} /> Save to rider list
+                <input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} /> Save to Dispatch list
               </label>
               <div className="flex gap-2">
                 <button type="button" className="btn-primary flex-1 justify-center text-xs" disabled={pending}
