@@ -1,28 +1,50 @@
 "use client";
 
-import { useState } from "react";
-import { createOrder } from "../actions";
+import { useEffect, useState } from "react";
+import { createOrder, quoteDeliveryFee } from "../actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { money } from "@/lib/format";
 import { Stars } from "@/components/ui/Stars";
 import type { ServiceExtra } from "@/lib/database.types";
 
+export type OrderBranch = {
+  /** "" on a database without branches yet (the vendor's own location). */
+  id: string; name: string; area: string | null; city: string | null; address_line: string | null;
+  openNow: boolean; hours: string;
+};
+
 export type OrderVendor = {
   id: string; slug: string; name: string; area: string | null; city: string | null;
   delivery: string; openNow: boolean; hours: string;
   rating: number; reviewCount: number;
+  branches: OrderBranch[];
 };
 
+export type SavedAddress = { id: string; label: string; text: string };
+
 export function OrderForm({
-  vendors, deliveryFee, deliveryFeeLabel, extras, linkedVendorId,
+  vendors, deliveryFee, deliveryFeeLabel, pricedByDistance, extras, linkedVendorId, linkedBranchId, addresses, promoCode,
 }: {
   vendors: OrderVendor[]; deliveryFee: number; deliveryFeeLabel: string;
+  /** Admin turned on Google Maps distance pricing for deliveries. */
+  pricedByDistance: boolean;
   extras: ServiceExtra[];
   /** Opened from this vendor's profile link: order from them, list collapsed. */
   linkedVendorId?: string;
+  /** …and a particular branch of theirs. */
+  linkedBranchId?: string;
+  addresses: SavedAddress[];
+  /** From a promo QR / link: applied when the order is placed. */
+  promoCode?: string;
 }) {
   const firstOpen = vendors.find((v) => v.openNow) ?? vendors[0];
   const [vendorId, setVendorId] = useState(linkedVendorId ?? firstOpen?.id ?? "");
+  const pickBranch = (v?: OrderVendor) => (v?.branches.find((b) => b.openNow) ?? v?.branches[0])?.id ?? "";
+  const [branchId, setBranchId] = useState(linkedBranchId ?? pickBranch(vendors.find((v) => v.id === (linkedVendorId ?? firstOpen?.id))));
+  const [addressId, setAddressId] = useState(addresses[0]?.id ?? "new");
+  const [addr, setAddr] = useState({ line1: "", area: "", city: "Jos" });
+  const [quote, setQuote] = useState<{ fee: number; km: number | null; note?: string } | null>(null);
+  const [quoting, setQuoting] = useState(false);
   const [showAll, setShowAll] = useState(!linkedVendorId);
   const viaLink = !!linkedVendorId && vendorId === linkedVendorId;
   const shown = showAll ? vendors : vendors.filter((v) => v.id === linkedVendorId);
@@ -35,12 +57,39 @@ export function OrderForm({
   const [error, setError] = useState<string | null>(null);
 
   const vendor = vendors.find((v) => v.id === vendorId);
+  const branch = vendor?.branches.find((b) => b.id === branchId) ?? vendor?.branches[0];
   const canDispatch = vendor && (vendor.delivery === "both" || vendor.delivery === "dispatch_partner");
+  const needsAddress = entry === "pickup" || ret === "delivery";
+
+  function chooseVendor(v: OrderVendor) {
+    setVendorId(v.id);
+    setBranchId(pickBranch(v));
+  }
+
+  // Distance pricing: re-quote when the branch or the address changes.
+  const addrKey = addressId === "new" ? `${addr.line1}|${addr.area}|${addr.city}` : addressId;
+  useEffect(() => {
+    if (!pricedByDistance || ret !== "delivery" || !vendor) { setQuote(null); return; }
+    if (addressId === "new" && addr.line1.trim().length < 4) { setQuote(null); return; }
+    let live = true;
+    setQuoting(true);
+    const t = setTimeout(async () => {
+      const r = await quoteDeliveryFee({
+        vendorId: vendor.id, branchId: branch?.id || undefined,
+        ...(addressId === "new" ? { line1: addr.line1, area: addr.area, city: addr.city } : { addressId }),
+      });
+      if (!live) return;
+      setQuoting(false);
+      setQuote("error" in r ? null : { fee: r.fee, km: r.km, note: r.note });
+    }, 600);
+    return () => { live = false; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pricedByDistance, ret, vendor?.id, branch?.id, addrKey]);
 
   const extrasTotal = tier === "premium"
     ? extras.filter((e) => chosenExtras.includes(e.id)).reduce((s, e) => s + Number(e.price), 0)
     : 0;
-  const vendorOpen = vendor?.openNow ?? false;
+  const vendorOpen = branch?.openNow ?? false;
 
   function toggleExtra(id: string) {
     setChosenExtras((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
@@ -58,7 +107,14 @@ export function OrderForm({
 
   return (
     <form action={onSubmit} className="mt-6 space-y-6">
+      {promoCode && (
+        <div className="rounded-card border border-champagne/50 bg-champagne/10 px-4 py-3 text-sm text-ink">
+          Promo code <span className="font-mono font-semibold tracking-wider">{promoCode}</span> will be applied when you place this order.
+          <input type="hidden" name="promo" value={promoCode} />
+        </div>
+      )}
       <input type="hidden" name="vendor_id" value={vendorId} />
+      {branch?.id && <input type="hidden" name="branch_id" value={branch.id} />}
       {viaLink && <input type="hidden" name="via_vendor_link" value="1" />}
       {tier === "premium" && chosenExtras.map((id) => <input key={id} type="hidden" name="extras" value={id} />)}
 
@@ -66,13 +122,15 @@ export function OrderForm({
         <p className="label">{showAll ? "Choose a laundry" : "Your laundry"}</p>
         <div className="space-y-2">
           {shown.map((v) => (
-            <button type="button" key={v.id} onClick={() => setVendorId(v.id)}
+            <button type="button" key={v.id} onClick={() => chooseVendor(v)}
               className={`card flex w-full items-center justify-between p-4 text-left ${
                 vendorId === v.id ? "ring-2 ring-ink" : ""} ${v.openNow ? "" : "opacity-70"}`}>
               <div>
                 <p className="font-medium text-ink">{v.name}</p>
                 <p className="text-xs text-slate">
-                  {[v.area, v.city].filter(Boolean).join(", ")} · {v.hours}
+                  {v.branches.length > 1
+                    ? `${v.branches.length} branches · ${[...new Set(v.branches.map((b) => b.area).filter(Boolean))].slice(0, 3).join(", ")}`
+                    : `${[v.area, v.city].filter(Boolean).join(", ")} · ${v.hours}`}
                 </p>
                 <div className="mt-1">
                   {v.reviewCount > 0
@@ -90,6 +148,28 @@ export function OrderForm({
           </button>
         )}
       </section>
+
+      {/* Branch, when the laundry has more than one */}
+      {vendor && vendor.branches.length > 1 && (
+        <section>
+          <p className="label">Which branch?</p>
+          <div className="space-y-2">
+            {vendor.branches.map((b) => (
+              <button type="button" key={b.id} onClick={() => setBranchId(b.id)}
+                className={`card flex w-full items-center justify-between gap-3 p-3 text-left ${
+                  branch?.id === b.id ? "ring-2 ring-ink" : ""} ${b.openNow ? "" : "opacity-70"}`}>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-ink">{b.name}</p>
+                  <p className="truncate text-xs text-slate">
+                    {[b.address_line, b.area].filter(Boolean).join(", ") || b.city} · {b.hours}
+                  </p>
+                </div>
+                <span className={b.openNow ? "chip-ok" : "chip-muted"}>{b.openNow ? "Open" : "Closed"}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Service tier */}
       <section>
@@ -173,6 +253,40 @@ export function OrderForm({
             : [["own_rider", "Vendor rider"]]} />
       )}
 
+      {needsAddress && (
+        <section>
+          <p className="label">{entry === "pickup" && ret === "delivery" ? "Pickup & delivery address"
+            : entry === "pickup" ? "Pickup address" : "Delivery address"}</p>
+          <input type="hidden" name="address_id" value={addressId} />
+          {addresses.length > 0 && (
+            <div className="mb-2 space-y-2">
+              {addresses.map((a) => (
+                <button type="button" key={a.id} onClick={() => setAddressId(a.id)}
+                  className={`card w-full p-3 text-left ${addressId === a.id ? "ring-2 ring-ink" : ""}`}>
+                  <p className="text-sm font-medium text-ink">{a.label}</p>
+                  <p className="text-xs text-slate">{a.text}</p>
+                </button>
+              ))}
+              <button type="button" onClick={() => setAddressId("new")}
+                className={`card w-full p-3 text-left text-sm ${addressId === "new" ? "ring-2 ring-ink" : "text-slate"}`}>
+                + A different address
+              </button>
+            </div>
+          )}
+          {addressId === "new" && (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <input name="address_line1" className="field sm:col-span-3" required placeholder="House number and street"
+                value={addr.line1} onChange={(e) => setAddr({ ...addr, line1: e.target.value })} aria-label="Street address" />
+              <input name="address_area" className="field sm:col-span-2" placeholder="Area (e.g. Rayfield)"
+                value={addr.area} onChange={(e) => setAddr({ ...addr, area: e.target.value })} aria-label="Area" />
+              <input name="address_city" className="field" placeholder="City"
+                value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} aria-label="City" />
+            </div>
+          )}
+          {addressId === "new" && <p className="mt-1 text-xs text-slate">We&apos;ll save it for next time.</p>}
+        </section>
+      )}
+
       <Choice label="When would you like to pay?" name="payment_timing" value={pay}
         onChange={(v) => setPay(v as typeof pay)}
         options={[["online", "Pay online once priced"], ["on_delivery", "Pay on delivery"]]} />
@@ -186,7 +300,14 @@ export function OrderForm({
       <div className="card p-4">
         <p className="text-sm font-medium text-ink">Estimate</p>
         <div className="mt-2 space-y-1 text-sm">
-          {ret === "delivery" && <Line label="Delivery" value={deliveryFeeLabel} />}
+          {ret === "delivery" && (
+            <Line label={quote?.km != null ? `Delivery · ${quote.km} km` : "Delivery"}
+              value={!pricedByDistance ? deliveryFeeLabel
+                : quoting ? "Working it out…"
+                : quote ? money(quote.fee)
+                : "Priced by distance"} />
+          )}
+          {ret === "delivery" && pricedByDistance && quote?.note && <p className="text-xs text-slate">{quote.note}</p>}
           {extrasTotal > 0 && <Line label="Premium extras" value={money(extrasTotal)} />}
         </div>
         <p className="mt-2 text-xs text-slate">
@@ -197,8 +318,9 @@ export function OrderForm({
 
       {!vendorOpen && vendor && (
         <p className="text-sm text-warn">
-          {vendor.name} is closed right now (hours {vendor.hours}). Choose an open
-          laundry, or come back during opening hours to drop off or book a pickup.
+          {vendor.name}{vendor.branches.length > 1 && branch ? ` (${branch.name})` : ""} is closed right now
+          (hours {branch?.hours ?? vendor.hours}). Choose an open {vendor.branches.length > 1 ? "branch or " : ""}laundry,
+          or come back during opening hours to drop off or book a pickup.
         </p>
       )}
       {error && <p className="text-sm text-danger">{error}</p>}

@@ -15,10 +15,13 @@ export default async function AdminVendors() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  const [{ data: vendors }, { data: ratings }] = await Promise.all([
+  const [{ data: vendors }, { data: ratings }, { data: branchRows }] = await Promise.all([
     supabase.from("vendors").select("*").order("created_at", { ascending: false }),
     supabase.from("vendor_ratings").select("*"),
+    supabase.from("branches").select("vendor_id").eq("active", true),
   ]);
+  const branchCount = new Map<string, number>();
+  for (const b of (branchRows ?? []) as { vendor_id: string }[]) branchCount.set(b.vendor_id, (branchCount.get(b.vendor_id) ?? 0) + 1);
 
   const vs = (vendors ?? []) as Vendor[];
   const ratingMap = new Map(((ratings ?? []) as VendorRating[]).map((r) => [r.vendor_id, r]));
@@ -50,7 +53,10 @@ export default async function AdminVendors() {
             {vs.map((v) => (
               <tr key={v.id}>
                 <td className="px-4 py-3">
-                  <p className="font-medium text-ink">{v.name}</p>
+                  <a href={`/admin/vendors/${v.id}`} className="font-medium text-ink underline decoration-ink/20 hover:decoration-ink">{v.name}</a>
+                  <p className="text-xs text-slate">
+                    {(branchCount.get(v.id) ?? 1)} branch{(branchCount.get(v.id) ?? 1) === 1 ? "" : "es"}
+                  </p>
                   {v.slug && v.status !== "rejected" && v.status !== "suspended" && (
                     <a href={`/v/${v.slug}`} target="_blank" rel="noopener noreferrer"
                       className="text-xs text-slate underline hover:text-ink">/v/{v.slug}</a>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createTicket } from "../actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { SUPPORT_CATEGORIES } from "@/lib/support";
+import { PhotoAttach, uploadSupportPhotos } from "@/components/support/PhotoAttach";
 
 type OrderOpt = { id: string; code: string };
 
@@ -11,12 +12,16 @@ export function TicketForm({ orders }: { orders: OrderOpt[] }) {
   const [category, setCategory] = useState(SUPPORT_CATEGORIES[0].category);
   const [subcategory, setSubcategory] = useState(SUPPORT_CATEGORIES[0].subcategories[0]);
   const [error, setError] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
 
   const subs = SUPPORT_CATEGORIES.find((c) => c.category === category)?.subcategories ?? ["Other"];
   const needsOther = category === "Other" || subcategory === "Other";
 
   async function onSubmit(formData: FormData) {
     setError(null);
+    const up = await uploadSupportPhotos(photos);
+    if ("error" in up) { setError(up.error); return; }
+    formData.set("attachments", JSON.stringify(up.paths));
     const res = await createTicket(formData);
     if (res?.error) setError(res.error);
   }
@@ -71,6 +76,8 @@ export function TicketForm({ orders }: { orders: OrderOpt[] }) {
       <div>
         <label className="label">Describe the issue</label>
         <textarea name="message" rows={5} className="field" placeholder="What happened? Include any details that help us resolve it." />
+        <p className="mt-2 text-xs text-slate">Photos help us see the problem — a stain, damage, a missing item. Up to 4.</p>
+        <PhotoAttach files={photos} onChange={setPhotos} />
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}

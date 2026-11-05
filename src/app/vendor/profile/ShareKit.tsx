@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
+import { qrWithLogo } from "@/lib/qrWithLogo";
+import { downloadQrPdf } from "@/lib/qrPdf";
 
 /**
  * Everything a vendor needs to hand their profile link to customers: copy,
@@ -12,13 +13,12 @@ export function ShareKit({ url, vendorName }: { url: string; vendorName: string 
   const [qr, setQr] = useState<string | null>(null);
   const [canShare, setCanShare] = useState(false);
 
+  const fileSlug = vendorName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const message = `Order your laundry from ${vendorName} on laundriroom — book a pickup or drop-off, track every item and pay in the app: ${url}`;
 
   useEffect(() => {
     setCanShare(typeof navigator !== "undefined" && !!navigator.share);
-    QRCode.toDataURL(url, { width: 640, margin: 2, color: { dark: "#0F1B2D", light: "#FFFFFF" } })
-      .then(setQr)
-      .catch(() => setQr(null));
+    qrWithLogo(url, 640).then(setQr).catch(() => setQr(null));
   }, [url]);
 
   async function copy() {
@@ -77,8 +77,16 @@ export function ShareKit({ url, vendorName }: { url: string; vendorName: string 
         )}
         <p className="mt-2 max-w-[11rem] text-xs text-slate">Customers scan it with their phone camera to open your page.</p>
         {qr && (
-          <a href={qr} download={`laundriroom-${vendorName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-qr.png`}
-            className="btn-ghost mt-3 px-4 py-2 text-sm">Download QR</a>
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            <a href={qr} download={`laundriroom-${fileSlug}-qr.png`}
+              className="btn-ghost px-4 py-2 text-sm">Download QR</a>
+            <button type="button" className="btn-ghost px-4 py-2 text-sm"
+              onClick={() => downloadQrPdf({
+                qrDataUrl: qr, url, fileName: `laundriroom-${fileSlug}-qr`, docTitle: `${vendorName} on laundriroom`,
+                big: vendorName, caption: "Scan to order on laundriroom",
+                note: "Book a pickup or drop-off, track every item, pay in the app",
+              })}>Download PDF</button>
+          </div>
         )}
       </div>
     </div>

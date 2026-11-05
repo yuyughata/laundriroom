@@ -25,8 +25,8 @@ export default async function VendorProfileLink() {
   const completed = orders.filter((o) => o.status === "closed").length;
 
   return (
-    <VendorShell active="/vendor/profile" vendorName={ctx.vendorName}
-      staffName={ctx.profile.full_name} staffRole={ctx.isManager ? "Manager" : "Attendant"}>
+    <VendorShell active="/vendor/profile" vendorName={ctx.vendorName} isManager={ctx.isManager}
+      staffName={ctx.profile.full_name} staffRole={ctx.roleLabel} branchName={ctx.branchName}>
       <h1 className="font-display text-2xl text-ink">My page</h1>
       <p className="mt-1 max-w-2xl text-sm text-slate">
         Your own laundriroom page — your name, location, verified badge, prices, ratings and reviews — with an
@@ -70,7 +70,7 @@ export default async function VendorProfileLink() {
                   <Link href="/vendor/verification" className="text-ink underline">Verification</Link>.
                 </li>
               )}
-              <li>Keep your prices up to date — they show on your page.</li>
+              <li>Keep your prices up to date. Your page shows what customers pay — your price with laundriroom&apos;s commission added; you&apos;re paid your own price in full.</li>
               <li>Ask happy customers to rate their order in the app; ratings and reviews appear on your page.</li>
             </ul>
             <p className="mt-3 text-xs text-slate">

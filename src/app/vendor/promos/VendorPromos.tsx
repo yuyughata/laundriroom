@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { createVendorPromo, toggleVendorPromo } from "../actions";
 import { money, dateShort } from "@/lib/format";
+import { QrCard } from "@/components/promo/QrCard";
 import type { PromoCode } from "@/lib/database.types";
 
 export function NewVendorPromo({ vendorId, canManage }: { vendorId: string; canManage: boolean }) {
@@ -42,12 +43,14 @@ export function NewVendorPromo({ vendorId, canManage }: { vendorId: string; canM
   );
 }
 
-export function VendorPromoRow({ promo, canManage }: { promo: PromoCode; canManage: boolean }) {
+export function VendorPromoRow({ promo, canManage, qrUrl }: { promo: PromoCode; canManage: boolean; qrUrl: string }) {
   const [pending, start] = useTransition();
+  const [showQr, setShowQr] = useState(false);
   const discount = promo.discount_type === "percent"
     ? `${promo.value}%${promo.max_discount ? ` (max ${money(promo.max_discount)})` : ""}`
     : money(promo.value);
   return (
+    <>
     <tr className={promo.active ? "" : "opacity-60"}>
       <td className="px-4 py-3 font-medium text-ink">{promo.code}</td>
       <td className="px-4 py-3 text-slate">{discount}</td>
@@ -61,6 +64,21 @@ export function VendorPromoRow({ promo, canManage }: { promo: PromoCode; canMana
           </button>
         ) : <span className={promo.active ? "chip-ok" : "chip-muted"}>{promo.active ? "Active" : "Off"}</span>}
       </td>
+      <td className="px-4 py-3 text-right">
+        <button type="button" className="btn-ghost px-3 py-1 text-xs" aria-expanded={showQr} onClick={() => setShowQr((v) => !v)}>
+          {showQr ? "Hide QR" : "QR code"}
+        </button>
+      </td>
     </tr>
+    {showQr && (
+      <tr className="bg-ivory/60">
+        <td colSpan={6} className="px-4 py-3">
+          <QrCard compact title={`Promo ${promo.code}`} code={promo.code} url={qrUrl}
+            fileName={`promo-${promo.code.toLowerCase()}-qr`}
+            note={promo.active ? "Opens your order form with this code ready to apply. New customers sign up first, then come straight back." : "This code is switched off — scans won’t give a discount until it’s active."} />
+        </td>
+      </tr>
+    )}
+    </>
   );
 }

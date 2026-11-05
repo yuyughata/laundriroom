@@ -11,6 +11,9 @@
 //   order_id  → order events; recipients from the rule ('customer', 'admin')
 //   user_id   → account events, sent to that account holder
 //   ticket_id → support events; ticket details are read from the database
+//   vendor_action_id → review-quality steps (inquiry / warning / suspension),
+//               sent to the vendor's managers; the message is read from the DB
+// review_low (order_id) also reads the order's review (rating + comment).
 // Recipient 'admin' = every active platform_admin and support_agent;
 // 'vendor' = the order's vendor's active managers and attendants;
 // 'customer' = the order's or the ticket's customer. skip_recipients drops
@@ -44,7 +47,7 @@ Deno.serve(async (req: Request) => {
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  const { event, order_id = null, user_id = null, ticket_id = null, context = {}, skip_recipients = [] } =
+  const { event, order_id = null, user_id = null, ticket_id = null, vendor_action_id = null, context = {}, skip_recipients = [] } =
     await req.json().catch(() => ({}));
   if (!event) return json({ error: "event required" }, 400);
 
@@ -63,9 +66,19 @@ Deno.serve(async (req: Request) => {
   // quote the customer's latest message.
   if (ticket_id) Object.assign(base, await ticketVars(db, ticket_id, SITE, event === "ticket_reply"));
   if (order_id) Object.assign(base, await orderVars(db, order_id, SITE));
+  if (order_id && event === "review_low") Object.assign(base, await reviewVars(db, order_id, SITE));
+  let actionVendor: string | null = null;
+  if (vendor_action_id) {
+    const av = await vendorActionVars(db, vendor_action_id, SITE);
+    if (!av) return json({ skipped: true, reason: "action not found" });
+    actionVendor = av.vendor_id;
+    Object.assign(base, av.vars);
+  }
 
   const recipients: Recipient[] = user_id
     ? await resolveUser(db, user_id)
+    : actionVendor
+    ? await resolveVendorStaff(db, actionVendor, {}, null, true)
     : await resolveRecipients(
         db, order_id, ticket_id,
         (rule.recipients ?? []).filter((r: string) => !(Array.isArray(skip_recipients) && skip_recipients.includes(r))),
@@ -134,13 +147,27 @@ async function resolveAdmins(db: any, extra: Record<string, string> = {}): Promi
   }));
 }
 
-/** The vendor's active managers and attendants (riders have no login). */
-async function resolveVendorStaff(db: any, vendorId: string, extra: Record<string, string> = {}): Promise<Recipient[]> {
-  const { data } = await db.from("vendor_memberships")
-    .select("role, profile:profile_id(email, phone, full_name, status)")
+/**
+ * The vendor's active managers and attendants (riders have no login). For a
+ * branch order: that branch's staff plus business-wide staff (branch_id null).
+ */
+async function resolveVendorStaff(
+  db: any, vendorId: string, extra: Record<string, string> = {}, branchId: string | null = null, managersOnly = false,
+): Promise<Recipient[]> {
+  let { data, error } = await db.from("vendor_memberships")
+    .select("role, branch_id, profile:profile_id(email, phone, full_name, status)")
     .eq("vendor_id", vendorId).in("role", ["vendor_manager", "attendant"]);
+  if (error) {
+    // Database without branches yet (migration 0033): everyone at the vendor.
+    ({ data } = await db.from("vendor_memberships")
+      .select("role, profile:profile_id(email, phone, full_name, status)")
+      .eq("vendor_id", vendorId).in("role", ["vendor_manager", "attendant"]));
+  }
   return (data ?? [])
     .filter((m: any) => m.profile && m.profile.status === "active")
+    .filter((m: any) => !branchId || !m.branch_id || m.branch_id === branchId)
+    // Managers only (review-quality steps): business-wide managers where branches exist.
+    .filter((m: any) => !managersOnly || (m.role === "vendor_manager" && !m.branch_id))
     .map((m: any) => ({
       email: m.profile.email ?? null, phone: m.profile.phone ?? null,
       vars: { recipient_name: firstName(m.profile.full_name), ...extra },
@@ -152,11 +179,14 @@ async function resolveRecipients(
 ): Promise<Recipient[]> {
   const out: Recipient[] = [];
   if (roles.includes("admin")) {
-    out.push(...await resolveAdmins(db, orderId ? { order_url: `${site}/admin/orders` } : {}));
+    out.push(...await resolveAdmins(db, orderId ? { order_url: `${site}/admin/orders`, quality_url: `${site}/admin/quality` } : {}));
   }
   if (orderId && roles.includes("vendor")) {
     const { data: o } = await db.from("orders").select("vendor_id").eq("id", orderId).maybeSingle();
-    if (o?.vendor_id) out.push(...await resolveVendorStaff(db, o.vendor_id, { order_url: `${site}/vendor/orders/${orderId}` }));
+    const { data: ob } = await db.from("orders").select("branch_id").eq("id", orderId).maybeSingle(); // null before 0033
+    if (o?.vendor_id) {
+      out.push(...await resolveVendorStaff(db, o.vendor_id, { order_url: `${site}/vendor/orders/${orderId}` }, ob?.branch_id ?? null));
+    }
   }
   if (ticketId && roles.includes("customer")) {
     const { data: t } = await db.from("support_tickets")
@@ -201,6 +231,14 @@ async function orderVars(db: any, orderId: string, site: string): Promise<Record
     if (a) address = [a.line1, a.area, a.city].filter(Boolean).join(", ");
   }
   const { data: extras } = await db.from("order_extras").select("name").eq("order_id", orderId);
+  // Branch (migration 0033): named when the business has more than one.
+  let branchLine = "";
+  const { data: ob } = await db.from("orders").select("branch:branch_id(name, address_line, area, vendor_id)").eq("id", orderId).maybeSingle();
+  if (ob?.branch) {
+    const { count } = await db.from("branches").select("id", { count: "exact", head: true })
+      .eq("vendor_id", ob.branch.vendor_id).eq("active", true);
+    if ((count ?? 0) > 1) branchLine = [ob.branch.name, ob.branch.address_line || ob.branch.area].filter(Boolean).join(" · ");
+  }
   const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
   return {
     order_code: o.code,
@@ -217,7 +255,40 @@ async function orderVars(db: any, orderId: string, site: string): Promise<Record
     address_line: address,
     notes: o.notes ?? "",
     placed_by_line: placedBy,
+    branch_line: branchLine,
     track_url: `${site}/customer/orders/${o.id}`,
+  };
+}
+
+/** The order's review, for review_low. */
+async function reviewVars(db: any, orderId: string, site: string): Promise<Record<string, string>> {
+  const { data: r } = await db.from("reviews").select("rating, comment").eq("order_id", orderId).maybeSingle();
+  if (!r) return {};
+  const comment = String(r.comment ?? "").replace(/\s+/g, " ").trim();
+  return {
+    rating: String(r.rating),
+    review_comment: comment ? (comment.length > 280 ? comment.slice(0, 277) + "…" : comment) : "(no comment)",
+    reviews_url: `${site}/vendor/reviews`,
+  };
+}
+
+/** A review-quality step (inquiry / warning / suspension) and its vendor. */
+async function vendorActionVars(db: any, actionId: string, site: string) {
+  const { data: a } = await db.from("vendor_quality_actions")
+    .select("vendor_id, stage, message, vendor:vendor_id(name)").eq("id", actionId).maybeSingle();
+  if (!a) return null;
+  const { data: rv } = await db.from("reviews").select("rating, created_at")
+    .eq("vendor_id", a.vendor_id).lte("rating", 2).gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString());
+  return {
+    vendor_id: a.vendor_id as string,
+    vars: {
+      vendor_name: a.vendor?.name ?? "",
+      action_stage: a.stage,
+      action_message: String(a.message ?? "").trim(),
+      bad_reviews_30: String((rv ?? []).length),
+      reviews_url: `${site}/vendor/reviews`,
+      support_url: `${site}/vendor/reviews`,
+    } as Record<string, string>,
   };
 }
 

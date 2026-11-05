@@ -15,12 +15,18 @@ export default async function PayoutDetail({ params }: { params: { id: string } 
   if (!payout) notFound();
   const p = payout as Payout;
 
-  const [{ data: vendor }, { data: orders }] = await Promise.all([
+  const [{ data: vendor }, { data: orders }, { data: money_ }] = await Promise.all([
     supabase.from("vendors").select("name, area, city").eq("id", p.vendor_id).maybeSingle(),
     p.order_ids.length
       ? supabase.from("order_summaries").select("*").in("id", p.order_ids)
       : Promise.resolve({ data: [] }),
+    p.order_ids.length
+      ? supabase.from("orders").select("commission_total").in("id", p.order_ids)
+      : Promise.resolve({ data: [] }),
   ]);
+  // Commission added to the customer's price (0041) — not deducted from this payout.
+  const addedCommission = ((money_ ?? []) as { commission_total: number | null }[])
+    .reduce((s, o) => s + Number(o.commission_total ?? 0), 0);
   const v = vendor as Pick<Vendor, "name" | "area" | "city"> | null;
   const os = (orders ?? []) as OrderSummary[];
   const vendorGross = os.reduce((s, o) => s + Number(o.total), 0);
@@ -40,7 +46,9 @@ export default async function PayoutDetail({ params }: { params: { id: string } 
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <Stat label="Gross" value={money(p.gross)} />
-        <Stat label="Commission" value={`−${money(p.fee)}`} />
+        {Number(p.fee) > 0
+          ? <Stat label="Commission (deducted)" value={`−${money(p.fee)}`} />
+          : <Stat label="Commission (paid by customer)" value={money(addedCommission)} />}
         <Stat label="Net payable" value={money(p.net)} strong />
       </div>
 
@@ -52,6 +60,7 @@ export default async function PayoutDetail({ params }: { params: { id: string } 
               <tr>
                 <th className="px-4 py-2">Order</th><th className="px-4 py-2">Customer</th>
                 <th className="px-4 py-2">Closed</th><th className="px-4 py-2 text-right">Order total</th>
+                <th className="px-4 py-2 text-right">Vendor receives</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink/5">
@@ -61,17 +70,18 @@ export default async function PayoutDetail({ params }: { params: { id: string } 
                   <td className="px-4 py-2 text-slate">{o.customer_name}</td>
                   <td className="px-4 py-2 text-slate">{dateShort(o.closed_at)}</td>
                   <td className="px-4 py-2 text-right">{money(o.total)}</td>
+                  <td className="px-4 py-2 text-right">{money(o.vendor_earnings ?? 0)}</td>
                 </tr>
               ))}
               <tr className="bg-ink/5">
-                <td className="px-4 py-2 font-medium text-ink" colSpan={3}>Vendor-entitled gross (items + extras + delivery)</td>
+                <td className="px-4 py-2 font-medium text-ink" colSpan={4}>Vendor-entitled gross (vendor prices + extras + delivery)</td>
                 <td className="px-4 py-2 text-right font-medium text-ink">{money(p.gross)}</td>
               </tr>
             </tbody>
           </table>
         </div>
         <p className="mt-2 text-xs text-slate">
-          Order totals may exceed the vendor gross — platform markups (express/premium) and any penalty are kept by the platform and excluded from the payout. Shown order total sum: {money(vendorGross)}.
+          Order totals exceed the vendor gross: the commission added to the vendor&apos;s prices, express/premium markups and any penalty are kept by the platform and excluded from the payout. Shown order total sum: {money(vendorGross)}.
         </p>
       </section>
     </AdminShell>

@@ -3,9 +3,10 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { submitApplication } from "./actions";
-import { NON_CIRCUMVENTION_TITLE, NON_CIRCUMVENTION_CLAUSE } from "@/lib/legal";
+import { PARTNER_AGREEMENT_TITLE, PARTNER_AGREEMENT_ACCEPT, type AgreementClause } from "@/lib/legal";
+import { AgreementText } from "@/components/ui/AgreementText";
 
-export function ApplyForm() {
+export function ApplyForm({ agreement }: { agreement: AgreementClause[] }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -55,11 +56,11 @@ export function ApplyForm() {
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className="label">Area</label>
-          <input name="area" className="field" placeholder="Lekki Phase 1" />
+          <input name="area" className="field" placeholder="Rayfield" />
         </div>
         <div>
           <label className="label">City</label>
-          <input name="city" className="field" placeholder="Lagos" />
+          <input name="city" className="field" placeholder="Jos" />
         </div>
       </div>
       <div>
@@ -75,13 +76,11 @@ export function ApplyForm() {
         <textarea name="message" className="field min-h-[80px]" placeholder="Opening hours, services, volume…" />
       </div>
       <div className="rounded-card border border-ink/10 bg-ivory p-4">
-        <p className="text-sm font-medium text-ink">{NON_CIRCUMVENTION_TITLE}</p>
-        <div className="mt-2 space-y-2 text-xs leading-relaxed text-slate">
-          {NON_CIRCUMVENTION_CLAUSE.map((p, i) => <p key={i}>{p}</p>)}
-        </div>
+        <p className="text-sm font-medium text-ink">{PARTNER_AGREEMENT_TITLE}</p>
+        <AgreementText clauses={agreement} className="mt-2" />
         <label className="mt-3 flex items-start gap-2 text-sm text-ink">
           <input type="checkbox" name="agree" required className="mt-1" />
-          <span>I have read and agree to the laundriroom Vendor Agreement, including the non-circumvention clause above.</span>
+          <span>{PARTNER_AGREEMENT_ACCEPT}</span>
         </label>
       </div>
       {err && <p className="text-sm text-danger">{err}</p>}

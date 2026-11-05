@@ -10,7 +10,7 @@ CLI — both routes are below.
 
 1. Go to <https://supabase.com> → **New project**. Pick a name (e.g. `fresco`),
    a strong database password, and a region close to your users
-   (e.g. `West EU (London)` for Lagos traffic is a reasonable start).
+   (e.g. `West EU (London)` for Nigerian traffic is a reasonable start).
 2. When it's ready, open **Project Settings → API** and copy:
    - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
    - **anon public** key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -24,7 +24,7 @@ cp .env.example .env.local
 
 Fill in the three values above, plus `NEXT_PUBLIC_SITE_URL` (your app URL —
 in production your public domain, because vendors share profile links built
-from it, e.g. `https://laundriroom.app/v/fold-and-press-lekki`).
+from it, e.g. `https://laundriroom.app/v/fold-and-press-rayfield`).
 Then confirm:
 
 ```bash
@@ -110,6 +110,20 @@ the manager/attendant to the demo vendor from `seed.sql`.
 The migrations create three private buckets: `item-photos`, `vendor-docs`,
 `invoices`, with access policies. Nothing more to do unless you want public
 buckets.
+
+## 6b. Google Maps (optional — distance-based delivery fees)
+
+1. In Google Cloud, create an API key and enable the **Geocoding API** and the
+   **Routes API** (billing must be on). Restrict the key to those two
+   APIs; it's used only by the app server.
+2. Add `GOOGLE_MAPS_API_KEY` to the app's environment and redeploy.
+3. Admin → Fees & charges → Delivery pricing → **By distance**: set the amount
+   per km, a base fare and a minimum fee. Branch and customer addresses are
+   placed on the map when saved; re-save older branches (Vendor → Branches →
+   Edit → Save) so they get coordinates.
+
+Without the key, or whenever a distance can't be found, deliveries use the
+flat fee.
 
 ## 7. Payments (Paystack)
 
@@ -197,8 +211,12 @@ npm run db:types     # supabase gen types typescript --local > src/lib/database.
 
 ## Automated vendor payouts (Paystack Transfers)
 
-A payout row is created 24h after an order is `closed` and paid, with its `net`
-(gross − commission) ready to send. To pay vendors automatically:
+A payout is created the moment an order is `closed` and paid (reconciled), with
+its `net` (gross − commission), and the database immediately asks
+`process-payouts` to transfer it. Pay-on-delivery orders are paid in the app too
+(the customer taps Pay now at the door), so the money is always in your Paystack
+balance first. An admin can add a hold window (Admin → Fees & charges → Vendor
+payouts; default 0 = pay immediately). To pay vendors automatically:
 
 **1. Activate Transfers on Paystack.** Complete business verification, then
 enable Transfers in the dashboard. Collections and transfers share one balance —
@@ -222,7 +240,8 @@ at the `paystack-webhook` URL. It already handles `charge.success`; it now also
 settles `transfer.success` / `transfer.failed` / `transfer.reversed` onto the
 payout (success → `sent`; failed/reversed → back to `due` with a reason).
 
-**5. Schedule `process-payouts` hourly.** Migration `0019_payout_schedule.sql`
+**5. Connect the database to `process-payouts`** (used both for the instant
+payout on reconciliation, `0032`, and the hourly retry sweep). Migration `0019_payout_schedule.sql`
 enables `pg_cron` + `pg_net` and creates the `process-payouts-hourly` job. The
 job reads the URL and secret from Supabase Vault, so nothing secret is stored in
 the job itself, and it does nothing until both Vault entries exist. Once per
@@ -240,12 +259,15 @@ runs with `select * from cron.job_run_details order by start_time desc;` and
 the function's replies with
 `select status_code, content from net._http_response order by created desc;`.
 
-Each run transfers every `due` payout whose `due_at` has passed: it creates the
+Each payout is sent straight after reconciliation; the hourly run then retries
+every `due` payout whose `due_at` has passed. Each attempt creates the
 Paystack recipient from the vendor's saved bank account on first use, checks the
 balance, initiates the transfer (reference = payout id, so no double-pay), and
 moves the payout to `processing`. The webhook then settles it. Payouts with no
-vendor bank account, or when the balance is short, stay `due` with a
-`failure_reason` and retry next run. Vendors set their bank account under
+vendor bank account, or when the balance is short, go back to `due` with a
+`failure_reason` and retry next hour. **Admin → Payouts → Release** sends a due
+or held payout through Paystack immediately (platform admins only); **Hold**
+stops a disputed one. Vendors set their bank account under
 **Vendor → Ledger → Payout account**; admins see unpayable payouts flagged on
 **Admin → Payouts**.
 

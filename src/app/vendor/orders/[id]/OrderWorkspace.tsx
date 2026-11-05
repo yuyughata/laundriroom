@@ -1,21 +1,31 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { checkInItem, pressStage, confirmHandover, markOutForDelivery, rescheduleDelivery, confirmPickup, logDispatch, assignRider } from "../../actions";
+import { checkInItem, pressStage, confirmHandover, markOutForDelivery, rescheduleDelivery, confirmPickup, logDispatch } from "../../actions";
+import { RiderPicker } from "@/components/riders/RiderPicker";
 import { createClient as createBrowser } from "@/lib/supabase/client";
 import { QrScanner } from "@/components/ui/QrScanner";
+import { customerPrice } from "@/lib/pricing";
 import { money, SERVICE_LABEL, STATUS_LABEL, PROCESSING_STAGES, STAGE_LABEL, TIER_LABEL } from "@/lib/format";
 import type {
-  Order, OrderItem, ItemType, PriceListRow, ServiceType, StageKind, OrderExtra,
+  Order, OrderItem, ItemType, PriceListRow, ServiceType, StageKind, OrderExtra, RiderContact,
 } from "@/lib/database.types";
 
 const SERVICES: ServiceType[] = ["wash_and_fold", "dry_clean", "press_only"];
 
 export function OrderWorkspace({
-  order, items, itemTypes, prices, paid, customerName, extras,
+  order, items, itemTypes, prices, paid, customerName, extras, branchName, checkedInBy = {}, showEarnings = false, riders = [],
 }: {
   order: Order; items: OrderItem[]; itemTypes: ItemType[];
   prices: PriceListRow[]; paid: boolean; customerName: string; extras: OrderExtra[];
+  /** Shown for business-wide staff of a multi-branch business. */
+  branchName?: string | null;
+  /** Item sub-code → name of the staff member who checked it in. */
+  checkedInBy?: Record<string, string>;
+  /** Show what the vendor receives (business-wide managers only). */
+  showEarnings?: boolean;
+  /** The laundry's saved riders this staff member can use (0045). */
+  riders?: RiderContact[];
 }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -31,11 +41,19 @@ export function OrderWorkspace({
   const [code, setCode] = useState("");
   const [pickupPin, setPickupPin] = useState("");
   const [dispatchRef, setDispatchRef] = useState(order.dispatch_reference ?? "");
-  const [riderName, setRiderName] = useState(order.rider_name ?? "");
-  const [riderPhone, setRiderPhone] = useState(order.rider_phone ?? "");
 
   const priceFor = (t: string, s: ServiceType) =>
     prices.find((p) => p.item_type_id === t && p.service === s)?.price ?? 0;
+  // laundriroom's commission is added on top of the vendor's price for the customer
+  // (null on orders placed before that change).
+  const markup = order.commission_markup ?? null;
+  const addPrice = priceFor(typeId, service);
+  // What laundriroom adds on top of the vendor's price (express replaces the commission).
+  const addedOnTop = [
+    markup ? `laundriroom’s ${Math.round(Number(markup) * 1000) / 10}% commission` : null,
+    order.express_fee > 0 ? "the express charge" : null,
+    order.premium_fee > 0 ? "the premium charge" : null,
+  ].filter(Boolean) as string[];
 
   const canCheckIn = ["awaiting_dropoff", "pickup_requested", "checked_in", "processing"].includes(order.status);
   const nextStageIndex = 0; // processing stages are free-press in this build
@@ -58,6 +76,7 @@ export function OrderWorkspace({
             {customerName} · {order.entry_mode === "pickup" ? "Pickup" : "Drop-off"} ·{" "}
             {isDelivery ? "Deliver back" : "Collect"} ·{" "}
             {order.payment_timing === "on_delivery" ? "Pay on delivery" : "Pay online"}
+            {branchName ? ` · ${branchName} branch` : ""}
           </p>
         </div>
         <span className="chip-ink">{STATUS_LABEL[order.status]}</span>
@@ -107,12 +126,18 @@ export function OrderWorkspace({
                     <p className="text-sm font-medium text-ink">{it.sub_code} · {t?.name ?? "Item"}</p>
                     <p className="text-xs text-slate">
                       {SERVICE_LABEL[it.service]}{it.tag_code ? ` · tag ${it.tag_code}` : " · no tag"}
+                      {checkedInBy[it.sub_code] ? ` · checked in by ${checkedInBy[it.sub_code]}` : ""}
                     </p>
                     {it.customer_comment && <p className="text-xs text-slate">“{it.customer_comment}”</p>}
                     {it.condition_notes && <p className="text-xs text-warn">Condition: {it.condition_notes}</p>}
                     {it.photos?.length > 0 && <p className="text-xs text-slate">📷 {it.photos.length} photo{it.photos.length === 1 ? "" : "s"}</p>}
                   </div>
-                  <p className="text-sm text-ink">{money(it.price_at_checkin)}</p>
+                  <div className="text-right">
+                    <p className="text-sm text-ink">{money(it.price_at_checkin)}</p>
+                    {markup != null && it.customer_price != null && Number(it.customer_price) !== Number(it.price_at_checkin) && (
+                      <p className="text-xs text-slate">customer pays {money(it.customer_price)}</p>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -137,10 +162,10 @@ export function OrderWorkspace({
                 </div>
                 <input className="field" placeholder="Customer note (optional)" value={comment}
                   onChange={(e) => setComment(e.target.value)} />
-                <input className="field sm:col-span-2" placeholder="Condition notes — stains, damage, wear (evidence)"
+                <input className="field sm:col-span-2" placeholder="Condition notes — stains, damage, wear (optional)"
                   value={condNotes} onChange={(e) => setCondNotes(e.target.value)} />
                 <div className="sm:col-span-2">
-                  <label className="label">Photos (evidence)</label>
+                  <label className="label">Photos <span className="font-normal text-slate">(optional — useful as evidence of existing damage)</span></label>
                   <input type="file" accept="image/*" multiple className="text-sm"
                     onChange={(e) => setPhotoFiles(Array.from(e.target.files ?? []))} />
                   {photoFiles.length > 0 && <span className="ml-2 text-xs text-slate">{photoFiles.length} selected</span>}
@@ -168,7 +193,7 @@ export function OrderWorkspace({
                   if (!(r && "error" in r)) { setTag(""); setComment(""); setCondNotes(""); setPhotoFiles([]); }
                   return r;
                 })}>
-                {uploading ? "Uploading…" : `Add item · ${money(priceFor(typeId, service))}`}
+                {uploading ? "Uploading…" : `Add item · ${money(addPrice)}${markup ? ` (customer pays ${money(customerPrice(addPrice, markup))})` : ""}`}
               </button>
             </div>
           )}
@@ -195,34 +220,9 @@ export function OrderWorkspace({
               <p className="label">{isDelivery ? "Delivery" : "Collection"}</p>
 
               {isDelivery && (
-                <div className="mb-3 rounded-card border border-ink/10 p-3">
-                  <p className="text-xs font-medium text-ink">Assign a rider</p>
-                  <p className="mt-1 text-xs text-slate">
-                    Your own rider or a dispatch driver. Give them the code below —
-                    they bring it to the customer at handover.
-                  </p>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    <input className="field" placeholder="Rider name" value={riderName}
-                      onChange={(e) => setRiderName(e.target.value)} />
-                    <input className="field" placeholder="Rider phone" value={riderPhone}
-                      onChange={(e) => setRiderPhone(e.target.value)} />
-                  </div>
-                  <button className="btn-ghost mt-2 w-full justify-center text-xs" disabled={pending}
-                    onClick={() => run(() => assignRider(order.id, riderName, riderPhone))}>
-                    {order.rider_name ? "Update rider" : "Assign rider"}
-                  </button>
-                  {order.rider_name && (
-                    <div className="mt-2 rounded-card bg-ink/5 p-2 text-xs text-ink">
-                      <p className="font-medium">{order.rider_name}{order.rider_phone ? ` · ${order.rider_phone}` : ""}</p>
-                      <p className="mt-1 text-slate">
-                        Order code <span className="font-mono text-ink">{order.code}</span>
-                        {order.payment_timing === "online" && order.handover_code
-                          ? <> · handover code <span className="font-mono text-ink">{order.handover_code}</span></>
-                          : null}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <RiderPicker orderId={order.id} orderCode={order.code} contacts={riders}
+                  handoverCode={order.payment_timing === "online" ? order.handover_code : null}
+                  current={{ name: order.rider_name, phone: order.rider_phone, contactId: order.rider_contact_id ?? null }} />
               )}
 
               {isDelivery && order.delivered_by === "dispatch_partner" && (
@@ -317,16 +317,29 @@ export function OrderWorkspace({
           )}
 
           <div className="card p-4">
+            {markup != null && <p className="label">What the customer pays</p>}
             <Row label="Items" value={money(order.items_total)} />
             {order.extras_total > 0 && <Row label="Premium extras" value={money(order.extras_total)} />}
             {order.premium_fee > 0 && <Row label="Premium service" value={money(order.premium_fee)} />}
             {order.express_fee > 0 && <Row label="Express" value={money(order.express_fee)} />}
             <Row label="Delivery" value={order.delivery_fee > 0 ? money(order.delivery_fee) : "Free"} />
             {order.reschedule_penalty > 0 && <Row label="Re-delivery penalty" value={money(order.reschedule_penalty)} />}
+            {order.discount > 0 && <Row label={`Promo ${order.promo_code ?? ""}`} value={`− ${money(order.discount)}`} />}
             {order.bulk_discount > 0 && <Row label="Bulk discount" value={`− ${money(order.bulk_discount)}`} />}
             <div className="my-2 border-t border-ink/10" />
             <Row label="Total" value={money(order.total)} strong />
             <Row label="Payment" value={paid ? "Paid" : order.payment_timing === "on_delivery" ? "On delivery" : "Online — pending"} />
+            {showEarnings && markup != null && (
+              <>
+                <div className="my-2 border-t border-ink/10" />
+                <Row label="You receive" value={money(order.vendor_earnings ?? 0)} strong />
+                <p className="mt-1 text-xs text-slate">
+                  Your prices{order.extras_total > 0 ? ", extras" : ""} and delivery, in full
+                  {order.discount_vendor_funded && order.discount > 0 ? ", less your share of the promo" : ""}.
+                  {addedOnTop.length > 0 && <> {addedOnTop.join(" and ")} {addedOnTop.length > 1 ? "are" : "is"} added on top for the customer.</>}
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>

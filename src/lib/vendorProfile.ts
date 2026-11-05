@@ -19,6 +19,11 @@ export type VendorProfile = {
   is_open: boolean;
   member_since: string;
   completed_orders: number;
+  /** Active branches, main first (migration 0033; absent on older databases). */
+  branches?: {
+    id: string; name: string; is_main: boolean; address_line: string | null; area: string | null;
+    city: string | null; phone: string | null; opens_at: string | null; closes_at: string | null; is_open: boolean;
+  }[];
   rating: { avg: number; count: number; dist: Record<"1" | "2" | "3" | "4" | "5", number> };
   reviews: { rating: number; comment: string | null; created_at: string; reviewer: string }[];
   prices: { item: string; service: ServiceType; price: number }[];
@@ -42,6 +47,6 @@ export function vendorProfileUrl(slug: string): string {
 }
 
 /** Where the profile's Order button goes: the order form with this vendor chosen. */
-export function vendorOrderPath(slug: string): string {
-  return `/customer/order?vendor=${encodeURIComponent(slug)}`;
+export function vendorOrderPath(slug: string, branchId?: string): string {
+  return `/customer/order?vendor=${encodeURIComponent(slug)}${branchId ? `&branch=${encodeURIComponent(branchId)}` : ""}`;
 }

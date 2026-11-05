@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { replyTicket, setTicketStatus, assignToMe } from "../actions";
+import { PhotoAttach, uploadSupportPhotos } from "@/components/support/PhotoAttach";
 import type { TicketStatus } from "@/lib/database.types";
 
 const STATUSES: TicketStatus[] = ["open", "in_progress", "resolved", "closed"];
@@ -36,6 +37,7 @@ export function TicketControls({ ticketId, status }: { ticketId: string; status:
 
 export function SupportReplyBox({ ticketId }: { ticketId: string }) {
   const [body, setBody] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
@@ -43,14 +45,17 @@ export function SupportReplyBox({ ticketId }: { ticketId: string }) {
     <div className="mt-4">
       <textarea className="field" rows={3} placeholder="Reply to the customer…" value={body}
         onChange={(e) => setBody(e.target.value)} />
+      <PhotoAttach files={photos} onChange={setPhotos} />
       {err && <p className="mt-1 text-sm text-danger">{err}</p>}
-      <button className="btn-primary mt-2" disabled={pending || !body.trim()}
+      <button className="btn-primary mt-2" disabled={pending || (!body.trim() && !photos.length)}
         onClick={() => start(async () => {
           setErr(null);
-          const r = await replyTicket(ticketId, body);
-          if (r?.error) setErr(r.error); else setBody("");
+          const up = await uploadSupportPhotos(photos);
+          if ("error" in up) { setErr(up.error); return; }
+          const r = await replyTicket(ticketId, body, up.paths);
+          if ("error" in r) setErr(r.error ?? "Couldn’t send."); else { setBody(""); setPhotos([]); }
         })}>
-        Send reply
+        {pending ? "Sending…" : "Send reply"}
       </button>
     </div>
   );

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type { VendorStatus, NotifChannel, IntegrationProvider } from "@/lib/database.types";
 
@@ -42,6 +43,27 @@ export async function setGlobalDeliveryFee(amount: number) {
   return { ok: true };
 }
 
+/**
+ * How delivery fees are worked out: the flat fee, or by Google Maps driving
+ * distance (base fare + per-km rate, never below the minimum). Distance
+ * pricing falls back to the flat fee whenever the distance can't be found.
+ */
+export async function setDeliveryPricing(input: { mode: "flat" | "distance"; perKm: number; base: number; min: number }) {
+  await requireRole(["platform_admin"]);
+  const nums = [input.perKm, input.base, input.min];
+  if (!["flat", "distance"].includes(input.mode)) return { error: "Choose flat or distance pricing." };
+  if (!nums.every((n) => Number.isFinite(n) && n >= 0 && n <= 1_000_000)) return { error: "Amounts must be zero or more." };
+  if (input.mode === "distance" && input.perKm <= 0) return { error: "Set the amount per kilometre." };
+  const supabase = createClient();
+  const { error } = await supabase.from("platform_settings").update({
+    delivery_pricing: input.mode, delivery_per_km: input.perKm, delivery_base_fare: input.base,
+    delivery_min_fee: input.min, updated_at: new Date().toISOString(),
+  } as never).eq("id", true);
+  if (error) return { error: /column/.test(error.message) ? "Distance pricing needs database migration 0035." : error.message };
+  revalidatePath("/admin/fees");
+  return { ok: true };
+}
+
 /** Choose the online payment provider (Paystack or Flutterwave). */
 export async function setPaymentProvider(provider: "paystack" | "flutterwave") {
   const supabase = createClient();
@@ -54,16 +76,55 @@ export async function setPaymentProvider(provider: "paystack" | "flutterwave") {
   return { ok: true };
 }
 
-export async function releasePayout(payoutId: string) {
+/**
+ * Release a payout: send the vendor's money now through Paystack (a due or
+ * held payout, ignoring any hold window). Platform admins only — support
+ * agents can't move money. The process-payouts edge function makes the
+ * transfer; the Paystack webhook then marks it sent. Without a Paystack key,
+ * local development (or ALLOW_SIMULATED_PAYMENTS=true) marks it sent as a
+ * simulation, like payments do.
+ */
+export async function releasePayout(payoutId: string): Promise<{ ok?: true; message?: string; error?: string }> {
+  await requireRole(["platform_admin"]);
   const supabase = createClient();
-  // In production this calls the bank/Paystack transfer; here it marks it sent.
-  const { error } = await supabase
-    .from("payouts")
-    .update({ status: "sent", sent_at: new Date().toISOString(), reference: `po_${Date.now()}` } as never)
-    .eq("id", payoutId);
-  if (error) return { error: error.message };
+  const { data: p } = await supabase.from("payouts").select("id, status").eq("id", payoutId).maybeSingle();
+  if (!p) return { error: "Payout not found." };
+  const status = (p as { status: string }).status;
+  if (status !== "due" && status !== "held") return { error: `This payout is already ${status}.` };
+
+  if (!process.env.PAYSTACK_SECRET_KEY) {
+    const simulate = process.env.NODE_ENV !== "production" || process.env.ALLOW_SIMULATED_PAYMENTS === "true";
+    if (!simulate) return { error: "Paystack isn't set up: add PAYSTACK_SECRET_KEY to the app and the payout function." };
+    const { error } = await supabase.from("payouts")
+      .update({ status: "sent", sent_at: new Date().toISOString(), reference: `sim_${Date.now()}`, failure_reason: null } as never)
+      .eq("id", payoutId);
+    if (error) return { error: error.message };
+    revalidatePath("/admin/payouts");
+    return { ok: true, message: "Simulated payout (no Paystack key on this server)." };
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { error: "Payouts aren't configured on this server (SUPABASE_SERVICE_ROLE_KEY missing)." };
+
+  const res = await fetch(`${url}/functions/v1/process-payouts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+    body: JSON.stringify({ payout_id: payoutId, release: true }),
+    signal: AbortSignal.timeout(30000),
+  }).catch(() => null);
+  const body = res ? await res.json().catch(() => null) : null;
   revalidatePath("/admin/payouts");
-  return { ok: true };
+  revalidatePath(`/admin/payouts/${payoutId}`);
+
+  if (!res) return { error: "Couldn't reach the payout service. Please try again." };
+  if (!res.ok) return { error: body?.error || body?.message || `Payout service error (${res.status}).` };
+  const r = body?.results?.[0];
+  if (r?.status === "processing") {
+    return { ok: true, message: "Transfer sent to Paystack. It shows as sent once Paystack confirms it." };
+  }
+  if (r?.status === "sent") return { ok: true, message: "Payout settled." };
+  return { error: r?.reason ? `Not sent: ${r.reason}` : "The payout wasn't sent. Check the reason on the payout." };
 }
 
 export async function holdPayout(payoutId: string) {
@@ -143,6 +204,22 @@ export async function setPlatformRates(commissionPct: number, expressPct: number
   if (e2) return { error: e2.message };
   revalidatePath("/admin/fees");
   revalidatePath("/admin/vendors");
+  return { ok: true };
+}
+
+/**
+ * How long to hold a vendor payout after the order is completed and paid.
+ * 0 (the default) pays the vendor immediately.
+ */
+export async function setPayoutDelay(hours: number) {
+  await requireRole(["platform_admin"]);
+  if (!Number.isInteger(hours) || hours < 0 || hours > 720) return { error: "Enter a whole number of hours from 0 to 720." };
+  const supabase = createClient();
+  const { error } = await supabase.from("platform_settings")
+    .update({ payout_delay_hours: hours, updated_at: new Date().toISOString() } as never).eq("id", true);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/fees");
+  revalidatePath("/admin/payouts");
   return { ok: true };
 }
 

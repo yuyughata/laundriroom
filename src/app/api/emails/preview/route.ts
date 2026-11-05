@@ -4,9 +4,15 @@ import { EMAIL_TEMPLATES, EMAIL_EVENTS, AUTH_EMAIL_TEMPLATES, sampleAuthEmail, t
 export const dynamic = "force-dynamic";
 
 const SAMPLE: EmailContext = {
+  rating: 2,
+  review_comment: "My white shirt came back with a stain and two buttons missing.",
+  action_message: "We've seen several low ratings mentioning damaged items. What happened, and what are you changing?",
+  bad_reviews_30: 3,
+  quality_url: "#",
+  reviews_url: "#",
   order_code: "ORD-261101-0042",
   customer_name: "Barry",
-  vendor_name: "Fold & Press, Lekki",
+  vendor_name: "Fold & Press, Rayfield",
   item_count: 5,
   total: "₦14,200",
   track_url: "#",
@@ -39,14 +45,14 @@ const SAMPLE: EmailContext = {
   customer_ticket_url: "#",
   recipient_name: "Chidi",
   entry_line: "Pickup from customer",
-  address_line: "Flat 4, 21 Fola Osibo Rd, Lekki Phase 1, Lagos",
+  address_line: "House 21, Lamingo Road, Lamingo, Jos",
   return_mode_line: "Deliver back to customer",
   service_line: "Premium · Express",
   extras_line: "Stain treatment, Fabric softener & scent",
   payment_line: "Pay online",
   notes: "Gate code 4412. Please handle the agbada with care.",
   order_url: "#",
-  placed_by_line: "Fold & Press, Lekki staff · Halima Bello",
+  placed_by_line: "Fold & Press, Rayfield staff · Halima Bello",
 };
 
 const LABEL: Record<string, string> = {
@@ -80,7 +86,10 @@ export async function GET(req: Request) {
   }
 
   if (event && EMAIL_TEMPLATES[event]) {
-    const { html } = EMAIL_TEMPLATES[event](SAMPLE);
+    // ?to=vendor previews the copy a vendor's staff get (e.g. review_low,
+    // which has an admin version and a vendor version).
+    const ctx = new URL(req.url).searchParams.get("to") === "vendor" ? { ...SAMPLE, admin_name: undefined } : SAMPLE;
+    const { html } = EMAIL_TEMPLATES[event](ctx);
     return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
   }
 

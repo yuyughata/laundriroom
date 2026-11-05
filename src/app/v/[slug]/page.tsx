@@ -62,7 +62,13 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
   const isCustomer = viewer?.role === "customer";
   const isStaff = !!viewer && !isCustomer;
   const taking = v.status === "verified";
-  const openNow = isVendorOpenNow(v);
+  // Branches (shop locations). Older databases: the vendor is its own single location.
+  const branches = (v.branches?.length ? v.branches : [{
+    id: "", name: v.area ?? v.name, is_main: true, address_line: v.address_line, area: v.area, city: v.city,
+    phone: null, opens_at: v.opens_at, closes_at: v.closes_at, is_open: v.is_open,
+  }]).map((b) => ({ ...b, openNow: isVendorOpenNow(b), hours: hoursLabel(b.opens_at, b.closes_at) }));
+  const multi = branches.length > 1;
+  const openNow = branches.some((b) => b.openNow);
   const hours = hoursLabel(v.opens_at, v.closes_at);
   const orderPath = vendorOrderPath(v.slug);
   const next = encodeURIComponent(orderPath);
@@ -133,7 +139,9 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
             )}
             {taking && (
               <span className={`chip ${openNow ? "bg-teal/20 text-teal" : "bg-ivory/10 text-ivory/70"}`}>
-                {openNow ? "Open now" : "Closed now"} · {hours}
+                {multi
+                  ? `${branches.filter((b) => b.openNow).length} of ${branches.length} branches open now`
+                  : `${openNow ? "Open now" : "Closed now"} · ${hours}`}
               </span>
             )}
             {!taking && <span className="chip bg-champagne/20 text-champagne">Coming soon</span>}
@@ -141,7 +149,17 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
 
           <h1 className="mt-3 font-display text-3xl leading-tight sm:text-4xl">{v.name}</h1>
 
-          {(v.address_line || place(v)) && (
+          {multi ? (
+            <p className="mt-2 flex items-start gap-2 text-sm text-ivory/70">
+              <svg className="mt-0.5 shrink-0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 21s-7-6.1-7-11.5A7 7 0 0119 9.5C19 14.9 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" />
+              </svg>
+              <a href="#branches" className="hover:text-ivory">
+                {branches.length} branches · {[...new Set(branches.map((b) => b.area || b.city).filter(Boolean))].join(", ")}
+              </a>
+            </p>
+          ) : (v.address_line || place(v)) && (
             <p className="mt-2 flex items-start gap-2 text-sm text-ivory/70">
               <svg className="mt-0.5 shrink-0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -168,12 +186,42 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
       </section>
 
       <div className="mx-auto max-w-3xl space-y-5 px-4 pt-6 sm:px-6">
+        {/* Branches */}
+        {multi && (
+          <section id="branches" className="card scroll-mt-4 p-5">
+            <h2 className="font-display text-lg text-ink">Branches</h2>
+            <p className="mt-1 text-xs text-slate">Same prices at every branch. Drop off, collect or book a pickup at the one nearest you.</p>
+            <ul className="mt-3 divide-y divide-ink/5">
+              {branches.map((b) => (
+                <li key={b.id || b.name} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink">
+                      {b.name}{b.is_main && <span className="ml-2 text-xs font-normal text-slate">Main branch</span>}
+                    </p>
+                    <p className="text-xs text-slate">{[b.address_line, b.area, b.city].filter(Boolean).join(", ")}</p>
+                    <p className="mt-0.5 text-xs">
+                      <span className={b.openNow ? "text-teal" : "text-slate"}>{b.openNow ? "Open now" : "Closed now"}</span>
+                      <span className="text-slate"> · {b.hours}{b.phone ? ` · ${b.phone}` : ""}</span>
+                    </p>
+                  </div>
+                  {taking && !isStaff && b.id && (
+                    <Link href={isCustomer ? vendorOrderPath(v.slug, b.id) : `/signup?next=${encodeURIComponent(vendorOrderPath(v.slug, b.id))}`}
+                      className="btn-ghost shrink-0 px-4 py-2 text-xs">Order from {b.name}</Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* At a glance */}
         <section className="card p-5">
           <h2 className="font-display text-lg text-ink">How it works here</h2>
           <ul className="mt-3 divide-y divide-ink/5 text-sm">
             {[
-              ["Hours", `${hours} daily (Lagos time). Drop-off and pickup follow these hours.`],
+              ["Hours", multi
+                ? "Each branch keeps its own hours (see Branches above). Drop-off and pickup follow them."
+                : `${hours} daily (Nigerian time). Drop-off and pickup follow these hours.`],
               ["Getting it in", "Drop off at the shop, or book a pickup."],
               ["Getting it back", `Collect from the shop, or have it delivered. ${DELIVERY_LINE[v.delivery]}.`],
               ["Service", "Standard or Premium (with extras like stain treatment), normal or Express turnaround."],

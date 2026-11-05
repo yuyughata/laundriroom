@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { notifyTicket } from "@/lib/notify";
 import type { TicketStatus } from "@/lib/database.types";
+import { cleanAttachments } from "@/lib/supportPhotos";
 
 async function requireSupport() {
   const supabase = createClient();
@@ -16,13 +17,16 @@ async function requireSupport() {
   return { ok: true as const, supabase, userId: user.id };
 }
 
-export async function replyTicket(ticketId: string, body: string) {
+export async function replyTicket(ticketId: string, body: string, photos: string[] = []) {
   const g = await requireSupport();
   if (!g.ok) return { error: g.error };
-  if (!body.trim()) return { error: "Message is empty." };
+  const attachments = cleanAttachments(photos, g.userId);
+  if (!Array.isArray(attachments)) return attachments;
+  if (!body.trim() && !attachments.length) return { error: "Message is empty." };
 
   const { error } = await g.supabase.from("support_messages").insert({
-    ticket_id: ticketId, author_id: g.userId, from_support: true, body: body.trim(),
+    ticket_id: ticketId, author_id: g.userId, from_support: true, body: body.trim() || "Photo attached",
+    ...(attachments.length ? { attachments } : {}),
   } as never);
   if (error) return { error: error.message };
 

@@ -6,6 +6,7 @@ import { PayNowButton } from "@/components/ui/PayNowButton";
 import {
   money, dateTime, SERVICE_LABEL, STATUS_LABEL, statusChip, STAGE_LABEL, TIER_LABEL,
 } from "@/lib/format";
+import { itemCustomerPrice } from "@/lib/pricing";
 import { Stars } from "@/components/ui/Stars";
 import { PromoInput } from "@/components/ui/PromoInput";
 import { ReviewCard } from "./ReviewCard";
@@ -26,7 +27,7 @@ const ORDER_RANK: Record<string, number> = {
 
 export default async function TrackOrder({
   params, searchParams,
-}: { params: { id: string }; searchParams: { paid?: string } }) {
+}: { params: { id: string }; searchParams: { paid?: string; promo_applied?: string; promo_error?: string } }) {
   const supabase = createClient();
 
   const { data: order } = await supabase.from("orders").select("*").eq("id", params.id).maybeSingle();
@@ -74,6 +75,16 @@ export default async function TrackOrder({
         {o.turnaround === "express" && <span className="chip-warn">Express</span>}
       </div>
 
+      {searchParams.promo_applied && (
+        <div className="mt-4 rounded-card border border-teal/30 bg-teal/10 p-4 text-sm text-teal">
+          Promo code {String(searchParams.promo_applied).slice(0, 40)} is applied — the discount shows once your items are priced.
+        </div>
+      )}
+      {searchParams.promo_error && (
+        <div className="mt-4 rounded-card border border-warn/30 bg-warn/10 p-4 text-sm text-warn">
+          Your order is placed, but the promo code couldn&apos;t be used ({String(searchParams.promo_error).slice(0, 160)}). You can try another code below.
+        </div>
+      )}
       {searchParams.paid && (
         <div className="mt-4 rounded-card border border-teal/30 bg-teal/10 p-4 text-sm text-teal">
           Payment received. Your order is settled.
@@ -176,7 +187,7 @@ export default async function TrackOrder({
               <div key={it.id} className="card p-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-ink">{it.sub_code}</p>
-                  <p className="text-sm text-ink">{money(it.price_at_checkin)}</p>
+                  <p className="text-sm text-ink">{money(itemCustomerPrice(it))}</p>
                 </div>
                 <p className="text-xs text-slate">
                   {SERVICE_LABEL[it.service]}{it.tag_code ? ` · tag ${it.tag_code}` : ""}

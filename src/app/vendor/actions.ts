@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getVendorContext } from "@/lib/vendor";
 import { notifyOrder } from "@/lib/notify";
+import { loadPricing, quoteDelivery } from "@/lib/deliveryPricing";
+import { geocode, addressText, mapsConfigured } from "@/lib/maps";
 import type {
   ServiceType, StageKind, EntryMode, ReturnMode, DeliveredBy, PaymentTiming, ServiceTier, Turnaround,
 } from "@/lib/database.types";
@@ -75,13 +77,24 @@ export async function markOutForDelivery(order_id: string) {
 }
 
 /** Assign a rider to an order (own rider or a dispatch driver). They're given the code. */
-export async function assignRider(order_id: string, name: string, phone: string) {
+/**
+ * Put a rider on an order: a saved one (contactId), or a name + phone typed
+ * on the spot — saved to the rider list when `save` (the DB reuses a contact
+ * with the same number). Empty name + phone clears the rider. 0045.
+ */
+export async function assignRider(order_id: string, rider: {
+  contactId?: string | null; name?: string; phone?: string; kind?: "own" | "dispatch"; company?: string; save?: boolean;
+}) {
   const supabase = createClient();
-  const { error } = await supabase.from("orders")
-    .update({ rider_name: name.trim() || null, rider_phone: phone.trim() || null } as never)
-    .eq("id", order_id);
-  if (error) return { error: error.message };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.rpc as any)("assign_order_rider", {
+    p_order: order_id, p_contact: rider.contactId ?? null,
+    p_name: rider.name ?? "", p_phone: rider.phone ?? "",
+    p_kind: rider.kind ?? "own", p_company: rider.company ?? null, p_save: rider.save ?? true,
+  });
+  if (error) return { error: error.message.replace(/^.*?:\s*(?=[A-Z])/, "") };
   revalidatePath(`/vendor/orders/${order_id}`);
+  revalidatePath("/vendor/dispatch");
   return { ok: true };
 }
 
@@ -212,7 +225,7 @@ export async function saveVendorPayoutAccount(formData: FormData) {
   return { ok: true };
 }
 
-/** Vendor manager acknowledges the Vendor Agreement (non-circumvention). */
+/** Vendor manager accepts the current Partner Agreement. */
 export async function acceptVendorTerms(vendor_id: string) {
   const supabase = createClient();
   const { error } = await supabase.from("vendors")
@@ -379,12 +392,44 @@ export async function createVendorOrder(_prev: unknown, formData: FormData) {
   const notes = String(formData.get("notes") || "").trim() || null;
   const extraIds = formData.getAll("extras").map(String).filter(Boolean);
 
+  // Branch: the one picked (business-wide staff), else the staff member's own (set by the DB).
+  const branchChoice = String(formData.get("branch_id") || "");
+  const branch = branchChoice ? ctx.branches.find((b) => b.id === branchChoice && b.active) : undefined;
+  if (branchChoice && !branch) return { error: "Choose one of your branches." };
+  const branchId = branch?.id ?? ctx.branchId ?? ctx.branches.find((b) => b.is_main)?.id ?? null;
+
+  // The customer's address, for a pickup or a delivery — saved to their account.
+  let addressId: string | null = null;
+  let address: { line1: string; area: string | null; city: string | null; lat: number | null; lng: number | null } | null = null;
+  if (entry_mode === "pickup" || return_mode === "delivery") {
+    const line1 = String(formData.get("address_line1") || "").trim();
+    const area = String(formData.get("address_area") || "").trim() || null;
+    const city = String(formData.get("address_city") || "").trim() || null;
+    if (!line1) return { error: "Enter the customer's address for the pickup or delivery." };
+    const at = mapsConfigured() ? await geocode(addressText({ line1, area, city })) : null;
+    address = { line1, area, city, lat: at?.lat ?? null, lng: at?.lng ?? null };
+    // Staff can't write customers' addresses under RLS; the service client does, for this customer only.
+    const service = createServiceClient();
+    if (service) {
+      const { data: saved } = await service.from("customer_addresses")
+        .insert({ customer_id, label: "Address", ...address }).select("id").single();
+      addressId = saved?.id ?? null;
+    }
+  }
+
+  // Delivery fee: flat, or by Google Maps distance from the branch.
   let delivery_fee = 0;
+  let distanceKm: number | null = null;
   if (return_mode === "delivery") {
-    const { data: rule } = await supabase
-      .from("delivery_fee_rules").select("flat_amount")
-      .eq("scope", "global").eq("active", true).limit(1).maybeSingle();
-    delivery_fee = Number(rule?.flat_amount ?? 0);
+    let from = null;
+    if (branchId) {
+      const { data: b } = await supabase.from("branches")
+        .select("lat, lng, address_line, area, city").eq("id", branchId).maybeSingle();
+      from = b ?? null;
+    }
+    const q = await quoteDelivery(await loadPricing(supabase), from, address);
+    delivery_fee = q.fee;
+    distanceKm = q.km;
   }
 
   const { data, error } = await supabase
@@ -392,6 +437,9 @@ export async function createVendorOrder(_prev: unknown, formData: FormData) {
     .insert({
       customer_id,
       vendor_id: ctx.vendorId,
+      ...(branchId ? { branch_id: branchId } : {}),
+      ...(addressId ? { pickup_address_id: addressId } : {}),
+      ...(distanceKm != null ? { delivery_distance_km: distanceKm } : {}),
       entry_mode,
       return_mode,
       delivered_by: return_mode === "delivery" ? (delivered_by ?? "own_rider") : null,
@@ -424,4 +472,14 @@ export async function createVendorOrder(_prev: unknown, formData: FormData) {
 
   revalidatePath("/vendor/queue");
   redirect(`/vendor/orders/${orderId}`);
+}
+
+/** The main manager replies to laundriroom's inquiry or warning about reviews. */
+export async function respondQualityAction(actionId: string, response: string) {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("respond_quality_action" as never, { p_action: actionId, p_response: response } as never);
+  if (error) return { error: error.message };
+  revalidatePath("/vendor/reviews");
+  revalidatePath("/admin/quality");
+  return { ok: true };
 }

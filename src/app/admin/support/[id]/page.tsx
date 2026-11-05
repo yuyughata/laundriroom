@@ -4,6 +4,8 @@ import { AdminShell } from "@/components/shells/AdminShell";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { dateTime } from "@/lib/format";
+import { signSupportPhotos } from "@/lib/supportPhotos";
+import { MessagePhotos } from "@/components/support/MessagePhotos";
 import { TICKET_STATUS_LABEL, ticketChip } from "@/lib/support";
 import { TicketControls, SupportReplyBox } from "./TicketControls";
 import type { SupportTicket, SupportMessage, Order, Profile } from "@/lib/database.types";
@@ -22,6 +24,7 @@ export default async function AdminTicket({ params }: { params: { id: string } }
     t.order_id ? supabase.from("orders").select("code").eq("id", t.order_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const msgs = (messages ?? []) as SupportMessage[];
+  const photoUrls = await signSupportPhotos(msgs);
   const cust = customer as Pick<Profile, "full_name" | "email" | "phone"> | null;
   const orderCode = (order as Pick<Order, "code"> | null)?.code;
 
@@ -47,6 +50,7 @@ export default async function AdminTicket({ params }: { params: { id: string } }
                   {m.from_support ? "Support" : cust?.full_name ?? "Customer"} · {dateTime(m.created_at)}
                 </p>
                 <p className={`mt-1 text-sm ${m.from_support ? "text-ivory" : "text-ink"}`}>{m.body}</p>
+            <MessagePhotos paths={m.attachments} urls={photoUrls} />
               </div>
             ))}
           </div>

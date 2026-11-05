@@ -361,6 +361,79 @@ export const EMAIL_TEMPLATES: Record<string, (ctx: EmailContext) => { subject: s
     note: "Reply in the app so the whole conversation stays in one place.",
   }),
 
+  // ── Bad review (to the vendor's staff, and admins) ──────────────────────
+  review_low: (ctx) => ctx.admin_name
+    ? build(`${c(ctx, "rating")}★ review for ${c(ctx, "vendor_name")} — ${c(ctx, "order_code")}`, {
+        preheader: `${c(ctx, "vendor_name")} received a ${c(ctx, "rating")}-star review`,
+        heading: "Low rating flagged",
+        accent: WARN,
+        paragraphs: [
+          `Hi ${c(ctx, "admin_name", "there")}, <strong>${c(ctx, "customer_name", "A customer")}</strong> gave <strong>${c(ctx, "vendor_name")}</strong> ${c(ctx, "rating")}★ for order <strong>${c(ctx, "order_code")}</strong>.`,
+          `“${c(ctx, "review_comment")}”`,
+          `The vendor has been asked to contact the customer and resolve it. Vendors with rising bad reviews show on the Vendor quality page.`,
+        ],
+        rows: [
+          { label: "Vendor", value: String(ctx.vendor_name ?? "—") },
+          ...(ctx.branch_line ? [{ label: "Branch", value: String(ctx.branch_line) }] : []),
+          { label: "Customer", value: [ctx.customer_name, ctx.customer_phone].filter(Boolean).join(" · ") || "—" },
+        ],
+        button: { label: "Open Vendor quality", url: String(ctx.quality_url ?? "#"), tone: "ink" },
+      })
+    : build(`A customer rated order ${c(ctx, "order_code")} ${c(ctx, "rating")}★ — please follow up`, {
+        preheader: "Please look into this review and reach out to the customer",
+        heading: "A customer wasn't happy",
+        accent: WARN,
+        paragraphs: [
+          `Hi ${c(ctx, "recipient_name", "there")}, <strong>${c(ctx, "customer_name", "A customer")}</strong> rated order <strong>${c(ctx, "order_code")}</strong> ${c(ctx, "rating")} out of 5.`,
+          `“${c(ctx, "review_comment")}”`,
+          `Please look into what happened, reach out to the customer to talk it through, and resolve it promptly. Quick, caring follow-up usually turns an unhappy customer around — and repeated low ratings are reviewed by laundriroom.`,
+        ],
+        rows: [
+          { label: "Order", value: String(ctx.order_code ?? "—") },
+          ...(ctx.branch_line ? [{ label: "Branch", value: String(ctx.branch_line) }] : []),
+          { label: "Customer", value: [ctx.customer_name, ctx.customer_phone].filter(Boolean).join(" · ") || "—" },
+        ],
+        button: { label: "Open the order", url: String(ctx.order_url ?? ctx.reviews_url ?? "#"), tone: "ink" },
+        note: "Tip: call or WhatsApp the customer first, then note what you did when you reply in the app.",
+      }),
+
+  // ── Review-quality steps (to the vendor's managers) ─────────────────────
+  vendor_inquiry: (ctx) => build(`Your recent reviews on laundriroom`, {
+    preheader: "We'd like to understand what's behind some recent reviews",
+    heading: "Can you help us understand?",
+    accent: WARN,
+    paragraphs: [
+      `Hi ${c(ctx, "recipient_name", "there")}, ${c(ctx, "vendor_name")} has had ${c(ctx, "bad_reviews_30", "some")} low rating(s) in the last 30 days, and we'd like to understand what's happening.`,
+      ctx.action_message ? `“${c(ctx, "action_message")}”` : "",
+      `Please reply from your dashboard with what went wrong and what you're doing about it.`,
+    ].filter(Boolean),
+    button: { label: "Reply in your dashboard", url: String(ctx.reviews_url ?? "#"), tone: "ink" },
+  }),
+
+  vendor_warning: (ctx) => build(`Warning: customer reviews at ${c(ctx, "vendor_name")}`, {
+    preheader: "Low ratings are continuing — action is needed",
+    heading: "This is a formal warning",
+    accent: WARN,
+    paragraphs: [
+      `Hi ${c(ctx, "recipient_name", "there")}, low ratings at ${c(ctx, "vendor_name")} are continuing (${c(ctx, "bad_reviews_30", "several")} in the last 30 days).`,
+      ctx.action_message ? `“${c(ctx, "action_message")}”` : "",
+      `If customer reviews don't improve, your laundry may be suspended from laundriroom. Please reply from your dashboard with the steps you're taking.`,
+    ].filter(Boolean),
+    button: { label: "Respond now", url: String(ctx.reviews_url ?? "#"), tone: "ink" },
+  }),
+
+  vendor_suspended: (ctx) => build(`${c(ctx, "vendor_name")} has been suspended from laundriroom`, {
+    preheader: "Your laundry can't take new orders on laundriroom",
+    heading: "Your laundry is suspended",
+    accent: WARN,
+    paragraphs: [
+      `Hi ${c(ctx, "recipient_name", "there")}, after repeated low customer ratings, ${c(ctx, "vendor_name")} has been suspended from laundriroom and can't take new orders.`,
+      ctx.action_message ? `“${c(ctx, "action_message")}”` : "",
+      `Orders already in progress should still be completed. Contact laundriroom support to discuss the next steps.`,
+    ].filter(Boolean),
+    button: { label: "Open your dashboard", url: String(ctx.support_url ?? "#"), tone: "ink" },
+  }),
+
   // ── New order alert (to admins & the vendor's staff) ────────────────────
   order_placed: (ctx) => build(`New order ${c(ctx, "order_code")} — ${c(ctx, "vendor_name")}`, {
     preheader: `${c(ctx, "customer_name", "A customer")} placed an order`,
@@ -374,6 +447,7 @@ export const EMAIL_TEMPLATES: Record<string, (ctx: EmailContext) => { subject: s
       { label: "Order", value: String(ctx.order_code ?? "—") },
       { label: "Customer", value: [ctx.customer_name, ctx.customer_phone].filter(Boolean).join(" · ") || "—" },
       ...(ctx.placed_by_line ? [{ label: "Entered by", value: String(ctx.placed_by_line) }] : []),
+      ...(ctx.branch_line ? [{ label: "Branch", value: String(ctx.branch_line) }] : []),
       { label: "Getting it in", value: String(ctx.entry_line ?? "—") },
       ...(ctx.address_line ? [{ label: "Pickup address", value: String(ctx.address_line) }] : []),
       { label: "Getting it back", value: String(ctx.return_mode_line ?? "—") },
@@ -447,10 +521,15 @@ export const AUTH_EMAIL_TEMPLATES: Record<string, { label: string; subject: stri
       button: { label: "Confirm new email", url: "{{ .ConfirmationURL }}", tone: "champagne" },
       note: "Didn't ask for this? Ignore this email and change your password.",
     }),
+    // Staff invites (Vendor → Team) carry vendor_name and role_label in the
+    // user's metadata, so the email names the laundry; other invites (e.g. a
+    // walk-in customer added at the counter) get the general wording.
     invite: auth("Invite user", "You've been invited to laundriroom", {
-      preheader: "Your laundriroom account is ready",
-      heading: "You've been invited",
-      paragraphs: [`You've been invited to join laundriroom as <strong>{{ .Email }}</strong>. Accept to set your password and get started.`],
+      preheader: "{{ if .Data.vendor_name }}Join {{ .Data.vendor_name }} on laundriroom{{ else }}Your laundriroom account is ready{{ end }}",
+      heading: "{{ if .Data.vendor_name }}Join the {{ .Data.vendor_name }} team{{ else }}You've been invited{{ end }}",
+      paragraphs: [
+        `{{ if .Data.vendor_name }}<strong>{{ .Data.vendor_name }}</strong> has added you to their team on laundriroom{{ if .Data.role_label }} as <strong>{{ .Data.role_label }}</strong>{{ end }}. Accept to set your own password, then sign in with <strong>{{ .Email }}</strong> to open the vendor dashboard.<br><br>Only you will know your password, and every order step you take is recorded under your name. Not expecting this? Ignore this email — nothing happens until you accept.{{ else }}You've been invited to join laundriroom as <strong>{{ .Email }}</strong>. Accept to set your password and get started.{{ end }}`,
+      ],
       button: { label: "Accept invitation", url: "{{ .ConfirmationURL }}", tone: "champagne" },
     }),
     reauthentication: auth("Verification code", "Your laundriroom verification code", {
@@ -467,6 +546,14 @@ export const AUTH_EMAIL_TEMPLATES: Record<string, { label: string; subject: stri
 
 /** Fill Supabase's Go placeholders with sample values (for previews). */
 export function sampleAuthEmail(html: string): string {
+  // Resolve Go {{ if .Data.x }}…{{ else }}…{{ end }} blocks as for a staff
+  // invite (innermost first), then fill the remaining placeholders.
+  const data: Record<string, string> = { vendor_name: "Fold &amp; Press, Rayfield", role_label: "Attendant" };
+  const block = /\{\{ if \.Data\.(\w+) \}\}((?:(?!\{\{ if )[\s\S])*?)(?:\{\{ else \}\}((?:(?!\{\{ if )[\s\S])*?))?\{\{ end \}\}/;
+  for (let i = 0; i < 20 && block.test(html); i++) {
+    html = html.replace(block, (_m, key: string, yes: string, no?: string) => (data[key] ? yes : no ?? ""));
+  }
+  html = html.replace(/\{\{ \.Data\.(\w+) \}\}/g, (_m, key: string) => data[key] ?? "");
   return html
     .replace(/\{\{ \.ConfirmationURL \}\}/g, "#")
     .replace(/\{\{ \.NewEmail \}\}/g, "ada.new@example.com")

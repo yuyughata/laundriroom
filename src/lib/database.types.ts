@@ -27,7 +27,7 @@ export type InvoiceStatus = "draft" | "issued" | "paid" | "void";
 export type PaymentMethod = "paystack" | "flutterwave" | "manual";
 export type PaymentStatus = "pending" | "succeeded" | "failed" | "refunded";
 export type PayoutStatus = "held" | "due" | "processing" | "sent" | "failed";
-export type TagStatus = "free" | "in_use" | "retired";
+export type TagStatus = "free" | "in_use" | "retired" | "missing" | "damaged";
 export type RequestStatus = "pending" | "approved" | "rejected";
 export type NotifChannel = "email" | "whatsapp" | "sms";
 export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
@@ -43,7 +43,36 @@ export type Profile = {
   role: UserRole; status: "active" | "suspended" | "invited";
   email_verified: boolean; verify_reminders_sent: number;
   referral_code: string | null; referred_by: string | null;
+  /** Doesn't want newsletters (0043). */
+  newsletter_opt_out?: boolean;
   created_at: string; updated_at: string;
+}
+
+/** A laundry's saved rider (0045). No login — a contact. */
+export type RiderContact = {
+  id: string; vendor_id: string; branch_id: string | null;
+  name: string; phone: string; phone_key: string;
+  kind: "own" | "dispatch"; company: string | null; notes: string | null;
+  active: boolean; created_by: string | null; created_at: string; updated_at: string; last_used_at: string | null;
+}
+
+export type NewsletterGroup = "customers" | "vendor_managers" | "vendor_staff" | "team" | "everyone";
+export type NewsletterAudience = { groups: NewsletterGroup[]; user_ids: string[] };
+export type Newsletter = {
+  id: string; subject: string; preheader: string | null;
+  header_image_url: string | null; footer_image_url: string | null;
+  body_html: string; cta_label: string | null; cta_url: string | null;
+  audience: NewsletterAudience;
+  /** Type of broadcast (0044): newsletter | promotion | announcement | update. */
+  kind: "newsletter" | "promotion" | "announcement" | "update";
+  status: "draft" | "sending" | "sent" | "failed";
+  recipient_count: number; sent_count: number; failed_count: number;
+  last_error: string | null; last_test_at: string | null; sent_at: string | null;
+  created_by: string | null; created_at: string; updated_at: string;
+}
+export type NewsletterRecipient = {
+  newsletter_id: string; email: string; profile_id: string | null;
+  status: "queued" | "sent" | "failed"; error: string | null; sent_at: string | null;
 }
 export type ClaimType = "damage" | "loss";
 export type ClaimStatus = "open" | "investigating" | "approved" | "rejected" | "resolved";
@@ -95,13 +124,24 @@ export type Order = {
   delivery_fee: number; express_fee: number; premium_fee: number;
   reschedule_penalty: number; delivery_attempts: number;
   items_total: number; extras_total: number; bulk_discount: number; total: number;
-  handover_code: string | null; pickup_code: string | null; picked_up_at: string | null;
+  /** Commission added on top of the vendor's item prices (snapshot when placed). Null = older order: commission was deducted from the payout. */
+  commission_markup?: number | null;
+  /** The vendor's own item prices; items_total is what the customer pays. */
+  vendor_items_total?: number; commission_total?: number;
+  /** What the vendor receives for this order. */
+  vendor_earnings?: number;
+  handover_code: string | null; pickup_code: string | null; picked_up_at: string | null; picked_up_by?: string | null;
   dispatch_reference: string | null; rider_name: string | null; rider_phone: string | null;
+  /** The saved rider used (0045); rider_name/phone are this order's own copy. */
+  rider_contact_id?: string | null;
   created_by: string | null;
   /** Placed from the vendor's public profile link. */
   via_vendor_link: boolean;
+  /** The branch (shop location) handling the order. */
+  branch_id: string;
   promo_code: string | null; discount: number;
   discount_type: "percent" | "fixed" | null; discount_value: number | null; discount_max: number | null;
+  discount_vendor_funded?: boolean;
   pickup_address_id: string | null; notes: string | null;
   created_at: string; checked_in_at: string | null; ready_at: string | null;
   completed_at: string | null; closed_at: string | null;
@@ -109,8 +149,8 @@ export type Order = {
 }
 export type OrderItem = {
   id: string; order_id: string; sub_code: string; item_type_id: string;
-  service: ServiceType; price_at_checkin: number; customer_comment: string | null;
-  condition_notes: string | null;
+  service: ServiceType; price_at_checkin: number; customer_price?: number | null; customer_comment: string | null;
+  condition_notes: string | null; checked_in_by?: string | null;
   tag_code: string | null; status: OrderItemStatus; photos: string[]; created_at: string;
 }
 export type StageEvent = {
@@ -136,6 +176,14 @@ export type VendorPayoutAccount = {
 export type Tag = {
   id: string; code: string; batch: string | null; status: TagStatus;
   vendor_id: string | null; current_item_id: string | null; created_at: string;
+  /** Printable batches (migration 0036). */
+  batch_id: string | null; serial: number | null; print_count: number; last_printed_at: string | null;
+  status_note: string | null; status_changed_at: string | null;
+}
+/** A generated batch of printable tags (migration 0036). */
+export type TagBatch = {
+  id: string; vendor_id: string; prefix: string; first_serial: number; last_serial: number; quantity: number;
+  created_by: string | null; created_at: string; print_count: number; last_printed_at: string | null;
 }
 export type ItemTypeRequest = {
   id: string; vendor_id: string; requested_by: string; item_name: string;
@@ -186,6 +234,21 @@ export type DeliveryFeeRule = {
 }
 export type VendorMembership = {
   id: string; vendor_id: string; profile_id: string; role: UserRole; created_at: string;
+  /** NULL = business-wide (all branches); set = this branch only. */
+  branch_id: string | null;
+}
+/** A customer's saved address (pickup / delivery). lat/lng are set when Google Maps places it. */
+export type CustomerAddress = {
+  id: string; customer_id: string; label: string; line1: string; area: string | null; city: string | null;
+  lat: number | null; lng: number | null; is_default: boolean; created_at: string;
+}
+/** A vendor's shop location (migration 0033). Orders and branch staff belong to one. */
+export type Branch = {
+  id: string; vendor_id: string; name: string; is_main: boolean; active: boolean;
+  phone: string | null; address_line: string | null; area: string | null; city: string | null;
+  lat: number | null; lng: number | null; service_radius_km: number;
+  opens_at: string; closes_at: string; is_open: boolean;
+  created_at: string; updated_at: string;
 }
 export type NotificationTemplate = {
   id: string; event: string; channel: NotifChannel;
@@ -198,6 +261,8 @@ export type OrderSummary = {
   delivery_fee: number; created_at: string; ready_at: string | null; closed_at: string | null;
   vendor_id: string; vendor_name: string; customer_id: string; customer_name: string;
   item_count: number; is_paid: boolean;
+  branch_id?: string; branch_name?: string | null;
+  vendor_earnings?: number;
 }
 
 export type SupportTicket = {
@@ -209,6 +274,8 @@ export type SupportTicket = {
 export type SupportMessage = {
   id: string; ticket_id: string; author_id: string | null;
   from_support: boolean; body: string; created_at: string;
+  /** Storage paths in the support-attachments bucket (0039). */
+  attachments?: string[];
 };
 export type Review = {
   id: string; order_id: string; customer_id: string; vendor_id: string;
@@ -251,6 +318,8 @@ export type Database = {
       integration_settings: Table<IntegrationSetting>;
       delivery_fee_rules: Table<DeliveryFeeRule>;
       vendor_memberships: Table<VendorMembership>;
+      branches: Table<Branch>;
+      customer_addresses: Table<CustomerAddress>;
       service_extras: Table<ServiceExtra>;
       order_extras: Table<OrderExtra>;
       platform_settings: Table<PlatformSettings>;
@@ -264,6 +333,9 @@ export type Database = {
       vendor_applications: Table<VendorApplication>;
       vendor_documents: Table<VendorDocument>;
       vendor_payout_accounts: Table<VendorPayoutAccount>;
+      newsletters: Table<Newsletter>;
+      rider_contacts: Table<RiderContact>;
+      newsletter_recipients: Table<NewsletterRecipient>;
     };
     Views: {
       order_summaries: { Row: OrderSummary; Relationships: [] };

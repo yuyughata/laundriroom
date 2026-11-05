@@ -9,11 +9,13 @@ export default async function AdminPayouts() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  const [{ data: payouts }, { data: vendors }, { data: accounts }] = await Promise.all([
+  const [{ data: payouts }, { data: vendors }, { data: accounts }, { data: settings }] = await Promise.all([
     supabase.from("payouts").select("*").order("due_at", { ascending: true }),
     supabase.from("vendors").select("id, name"),
     supabase.from("vendor_payout_accounts").select("vendor_id"),
+    supabase.from("platform_settings").select("payout_delay_hours").eq("id", true).maybeSingle(),
   ]);
+  const delay = Number((settings as { payout_delay_hours?: number } | null)?.payout_delay_hours ?? 0);
 
   const po = (payouts ?? []) as Payout[];
   const vmap = new Map((vendors as Pick<Vendor, "id" | "name">[] ?? []).map((v) => [v.id, v.name]));
@@ -32,7 +34,11 @@ export default async function AdminPayouts() {
         </div>
       </div>
       <p className="mt-1 text-sm text-slate">
-        Each payout falls due 24 hours after an order is completed and paid, net of commission or plan fee. Hold any that are disputed.
+        {delay === 0
+          ? "Vendors are paid automatically through Paystack as soon as an order is completed and paid — their own prices and delivery in full (commission is added to the customer's price)."
+          : `Payouts are held for ${delay} hour${delay === 1 ? "" : "s"} after an order is completed and paid, then sent automatically through Paystack — the vendor's own prices and delivery in full (commission is added to the customer's price).`}{" "}
+        Anything that can&apos;t be sent is retried every hour. <strong className="text-ink">Hold</strong> a disputed payout;{" "}
+        <strong className="text-ink">Release</strong> sends a due or held payout immediately.
       </p>
 
       <div className="mt-6 table-scroll rounded-card border border-ink/10 bg-white">
@@ -55,7 +61,7 @@ export default async function AdminPayouts() {
                 </td>
                 <td className="px-4 py-3 text-slate">{dateTime(p.due_at)}</td>
                 <td className="px-4 py-3">{money(p.gross)}</td>
-                <td className="px-4 py-3 text-slate">−{money(p.fee)}</td>
+                <td className="px-4 py-3 text-slate">{Number(p.fee) > 0 ? `−${money(p.fee)}` : "—"}</td>
                 <td className="px-4 py-3 font-medium text-ink">{money(p.net)}</td>
                 <td className="px-4 py-3">
                   <span className={p.status === "sent" ? "chip-ok" : p.status === "processing" ? "chip-ink" : p.status === "held" ? "chip-warn" : "chip-muted"}>{p.status}</span>
@@ -64,7 +70,7 @@ export default async function AdminPayouts() {
                     <p className="mt-1 text-xs text-warn">No payout account — can&apos;t auto-pay</p>
                   )}
                 </td>
-                <td className="px-4 py-3"><PayoutActions id={p.id} status={p.status} /></td>
+                <td className="px-4 py-3"><PayoutActions id={p.id} status={p.status} amount={money(p.net)} vendor={vmap.get(p.vendor_id) ?? "this vendor"} /></td>
               </tr>
             ))}
             {po.length === 0 && (
