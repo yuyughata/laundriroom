@@ -115,7 +115,7 @@ promote an admin → deploy edge functions → wire Paystack).
   new-order alerts go to that branch's staff + business-wide staff.
 - **Delivery pricing (`0035`):** Admin → Fees & charges → Delivery pricing:
   flat fee, or by distance (`GOOGLE_MAPS_API_KEY`, server-side only,
-  `src/lib/maps.ts`): base + per-km × driving km (Distance Matrix) from the
+  `src/lib/maps.ts`): base + per-km × driving km (Routes API computeRoutes) from the
   branch to the customer's address, at least the minimum, rounded up to ₦50
   (`src/lib/deliveryPricing.ts`). Any failure (no key, address not found) falls
   back to the flat fee. The server prices the order at creation

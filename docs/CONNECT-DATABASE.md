@@ -114,7 +114,7 @@ buckets.
 ## 6b. Google Maps (optional — distance-based delivery fees)
 
 1. In Google Cloud, create an API key and enable the **Geocoding API** and the
-   **Distance Matrix API** (billing must be on). Restrict the key to those two
+   **Routes API** (billing must be on). Restrict the key to those two
    APIs; it's used only by the app server.
 2. Add `GOOGLE_MAPS_API_KEY` to the app's environment and redeploy.
 3. Admin → Fees & charges → Delivery pricing → **By distance**: set the amount

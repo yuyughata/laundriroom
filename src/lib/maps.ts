@@ -7,12 +7,15 @@
  * delivery. Everything returns null when the key isn't set or Google can't
  * answer, and callers fall back to the flat delivery fee.
  *
- * Env: GOOGLE_MAPS_API_KEY (Geocoding API + Distance Matrix API enabled).
+ * Env: GOOGLE_MAPS_API_KEY with the Geocoding API and the Routes API enabled.
+ * (Distance Matrix is legacy and can't be enabled on new Google Cloud
+ * projects, so distances come from Routes API computeRoutes.)
  */
 
 const KEY = () => process.env.GOOGLE_MAPS_API_KEY || "";
 // Override only for tests/staging stubs; production always talks to Google.
 const BASE = () => (process.env.GOOGLE_MAPS_API_BASE || "https://maps.googleapis.com").replace(/\/$/, "");
+const ROUTES_BASE = () => (process.env.GOOGLE_MAPS_API_BASE || "https://routes.googleapis.com").replace(/\/$/, "");
 export const mapsConfigured = () => !!KEY();
 
 export type LatLng = { lat: number; lng: number };
@@ -34,18 +37,23 @@ export async function geocode(address: string): Promise<LatLng | null> {
   }
 }
 
-/** Driving distance in km between two points (Distance Matrix). */
+/** Driving distance in km between two points (Routes API, driving, no traffic). */
 export async function drivingDistanceKm(from: LatLng, to: LatLng): Promise<number | null> {
   const key = KEY();
   if (!key) return null;
+  const point = (p: LatLng) => ({ location: { latLng: { latitude: p.lat, longitude: p.lng } } });
   try {
-    const url = `${BASE()}/maps/api/distancematrix/json?origins=${from.lat},${from.lng}` +
-      `&destinations=${to.lat},${to.lng}&mode=driving&units=metric&region=ng&key=${key}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000), cache: "no-store" });
+    const res = await fetch(`${ROUTES_BASE()}/directions/v2:computeRoutes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": "routes.distanceMeters" },
+      body: JSON.stringify({ origin: point(from), destination: point(to), travelMode: "DRIVE", regionCode: "ng", units: "METRIC" }),
+      signal: AbortSignal.timeout(8000), cache: "no-store",
+    });
+    if (!res.ok) return null;
     const body = await res.json();
-    const el = body?.rows?.[0]?.elements?.[0];
-    if (body?.status !== "OK" || el?.status !== "OK" || typeof el?.distance?.value !== "number") return null;
-    return Math.round((el.distance.value / 1000) * 10) / 10; // metres → km, 1 dp
+    const m = body?.routes?.[0]?.distanceMeters;
+    if (typeof m !== "number") return null;
+    return Math.round((m / 1000) * 10) / 10; // metres → km, 1 dp
   } catch {
     return null;
   }

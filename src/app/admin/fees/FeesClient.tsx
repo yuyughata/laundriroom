@@ -204,7 +204,7 @@ export function DeliveryPricingEditor({
           {!mapsReady && (
             <p className="rounded-card bg-warn/10 px-3 py-2 text-xs text-warn">
               Google Maps isn&apos;t connected: add <span className="font-mono">GOOGLE_MAPS_API_KEY</span> to the app&apos;s
-              environment (Geocoding + Distance Matrix APIs enabled). Until then every delivery uses the flat fee.
+              environment (Geocoding API + Routes API enabled). Until then every delivery uses the flat fee.
             </p>
           )}
           <div className="grid gap-5 sm:grid-cols-3">
