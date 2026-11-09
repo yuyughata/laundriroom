@@ -404,9 +404,9 @@ const landingMarkup = `<header>
 <div class="body">
 <div class="ico"><svg fill="none" height="22" stroke="#0F1B2D" stroke-width="2.1" viewbox="0 0 24 24" width="22"><path d="M12 21s-7-5.5-7-11a7 7 0 0114 0c0 5.5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></div>
 <h3>Accessibility</h3>
-<p>A nearby station, open hours that suit a working day, and payment that works for you.</p>
+<p>Get your laundry picked up and delivered from any part of the city — even if you can't find a laundriroom station near you.</p>
 <div class="plist">
-<div class="li"><svg fill="none" height="16" stroke="#5FB3A8" stroke-width="2.4" viewbox="0 0 24 24" width="16"><path d="M20 6L9 17l-5-5"></path></svg>Nearest verified laundry to you</div>
+<div class="li"><svg fill="none" height="16" stroke="#5FB3A8" stroke-width="2.4" viewbox="0 0 24 24" width="16"><path d="M20 6L9 17l-5-5"></path></svg>Pickup &amp; delivery across the whole city</div>
 <div class="li"><svg fill="none" height="16" stroke="#5FB3A8" stroke-width="2.4" viewbox="0 0 24 24" width="16"><path d="M20 6L9 17l-5-5"></path></svg>Open 7am–6pm, drop any time</div>
 <div class="li"><svg fill="none" height="16" stroke="#5FB3A8" stroke-width="2.4" viewbox="0 0 24 24" width="16"><path d="M20 6L9 17l-5-5"></path></svg>Pay online or on delivery</div>
 </div>
