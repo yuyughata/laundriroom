@@ -131,6 +131,15 @@ promote an admin → deploy edge functions → wire Paystack).
   stays a % of `delivery_fee` only. Pickup/delivery orders take an address
   (`customer_addresses`, geocoded on save; `orders.pickup_address_id` is the
   customer's address for both legs).
+  **Who keeps the delivery fee (`0048`):** the customer always pays it, but who
+  keeps it follows `orders.delivered_by` — `own_rider` (or unset) → the vendor
+  keeps it; `dispatch_partner` → the platform keeps it and settles the dispatch
+  company out of band. Pickup is always the vendor's own rider, so the pickup
+  fee always goes to the vendor. `delivered_by` follows the vendor's rider
+  choice: `assign_order_rider` sets it from the assigned rider's kind on a
+  delivery order and re-prices (`recompute_order`), so the delivery fee is in
+  `vendor_earnings`/the payout only for own-rider deliveries; the vendor order
+  page says so in "You receive".
 - **Partner Agreement (`0034`):** the terms vendors accept (`/apply`, Vendor →
   Verification) are `agreement_clauses`, edited at Admin → Partner agreement
   (add, edit, reorder, hide, delete). Any change bumps
@@ -169,7 +178,7 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0047 are applied to the hosted project
+- **Live database:** migrations 0001–0048 are applied to the hosted project
   (0033–0038 on 2026-11-03, 0039–0045 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`
@@ -305,7 +314,10 @@ promote an admin → deploy edge functions → wire Paystack).
   (`drivingDistancesKm` in `src/lib/maps.ts`); without a key it stays
   straight-line. Laundries sort nearest first with "km away", and the
   nearest open laundry + branch is pre-selected (not when opened from a
-  laundry's own link).
+  laundry's own link). The "Find the nearest laundry" box shows only
+  when Google Maps is connected **and** the admin has turned on distance
+  pricing (`mapsConfigured() && pricing.mode === "distance"`, passed as
+  `nearestEnabled`); otherwise it's hidden.
 - **Provider keys + function auth (`0046`):** Admin → Integrations stores the
   Resend / WhatsApp / SMS key in Supabase Vault (`set_integration_secret`,
   platform admins; read by edge functions with `integration_secret`, service

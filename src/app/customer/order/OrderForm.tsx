@@ -23,11 +23,13 @@ export type OrderVendor = {
 export type SavedAddress = { id: string; label: string; text: string };
 
 export function OrderForm({
-  vendors, deliveryFee, deliveryFeeLabel, pricedByDistance, extras, linkedVendorId, linkedBranchId, addresses, promoCode,
+  vendors, deliveryFee, deliveryFeeLabel, pricedByDistance, nearestEnabled = false, extras, linkedVendorId, linkedBranchId, addresses, promoCode,
 }: {
   vendors: OrderVendor[]; deliveryFee: number; deliveryFeeLabel: string;
   /** Admin turned on Google Maps distance pricing for deliveries. */
   pricedByDistance: boolean;
+  /** Google Maps is connected and distance pricing is on → show "find the nearest laundry". */
+  nearestEnabled?: boolean;
   extras: ServiceExtra[];
   /** Opened from this vendor's profile link: order from them, list collapsed. */
   linkedVendorId?: string;
@@ -172,7 +174,7 @@ export function OrderForm({
 
       <section>
         <p className="label">{showAll ? "Choose a laundry" : "Your laundry"}</p>
-        {showAll && vendors.length > 1 && (
+        {showAll && vendors.length > 1 && nearestEnabled && (
           <div className="mb-3 rounded-card border border-ink/10 bg-white p-3">
             <p className="text-xs font-medium text-ink">Find the nearest laundry</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">

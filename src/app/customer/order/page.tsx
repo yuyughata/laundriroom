@@ -6,6 +6,7 @@ import { isVendorOpenNow, hoursLabel } from "@/lib/hours";
 import { OrderForm, type OrderVendor } from "./OrderForm";
 import type { Vendor, ServiceExtra, Branch, CustomerAddress } from "@/lib/database.types";
 import { loadPricing } from "@/lib/deliveryPricing";
+import { mapsConfigured } from "@/lib/maps";
 
 export default async function NewOrderPage({ searchParams }: { searchParams: { vendor?: string; branch?: string; promo?: string } }) {
   const supabase = createClient();
@@ -82,6 +83,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: { v
         deliveryFee={pricing.flat}
         deliveryFeeLabel={money(pricing.flat)}
         pricedByDistance={pricing.mode === "distance"}
+        nearestEnabled={mapsConfigured() && pricing.mode === "distance"}
         extras={(extras ?? []) as ServiceExtra[]}
         linkedVendorId={linked?.id}
         linkedBranchId={linked && linked.branches.some((b) => b.id === searchParams?.branch) ? searchParams.branch : undefined}

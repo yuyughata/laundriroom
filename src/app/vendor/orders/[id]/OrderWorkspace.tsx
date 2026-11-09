@@ -347,8 +347,12 @@ export function OrderWorkspace({
                 <div className="my-2 border-t border-ink/10" />
                 <Row label="You receive" value={money(order.vendor_earnings ?? 0)} strong />
                 <p className="mt-1 text-xs text-slate">
-                  Your prices{order.extras_total > 0 ? ", extras" : ""} and delivery, in full
+                  Your prices{order.extras_total > 0 ? ", extras" : ""}{order.pickup_fee > 0 ? ", pickup" : ""}
+                  {order.delivered_by !== "dispatch_partner" && order.delivery_fee > 0 ? " and delivery" : ""}, in full
                   {order.discount_vendor_funded && order.discount > 0 ? ", less your share of the promo" : ""}.
+                  {order.delivered_by === "dispatch_partner" && order.delivery_fee > 0 && (
+                    <> The {money(order.delivery_fee)} delivery fee is collected by laundriroom to pay the dispatch company.</>
+                  )}
                   {addedOnTop.length > 0 && <> {addedOnTop.join(" and ")} {addedOnTop.length > 1 ? "are" : "is"} added on top for the customer.</>}
                 </p>
               </>
