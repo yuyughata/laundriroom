@@ -17,8 +17,9 @@ export default async function Landing() {
             Laundry, handled.
           </h1>
           <p className="mt-6 text-lg text-ivory/70">
-            Book a pickup or drop off at the nearest station. Track every item,
-            pay in the app, and have it brought back pressed and folded.
+            Get your laundry picked up and delivered from any part of the city —
+            even without a laundriroom station nearby. Track every item, pay in
+            the app, and have it brought back pressed and folded.
           </p>
 
           <div className="mt-10 flex flex-wrap gap-3">
@@ -36,7 +37,7 @@ export default async function Landing() {
 
         <div className="mt-28 grid gap-6 sm:grid-cols-3">
           {[
-            ["Book in seconds", "Pickup or drop-off, a time slot, and a nearby laundry."],
+            ["Anywhere in the city", "Picked up and delivered from any part of the city — even without a laundriroom station nearby."],
             ["Track every item", "Each garment gets its own tag and sub-ID you can follow."],
             ["Pay your way", "Online before delivery, or tap Pay now at the door."],
           ].map(([t, d]) => (
