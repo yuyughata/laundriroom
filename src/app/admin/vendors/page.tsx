@@ -13,6 +13,7 @@ const STATUS_CHIP: Record<string, string> = {
 
 export default async function AdminVendors() {
   const profile = await requireProfile();
+  const isAdmin = profile.role === "platform_admin";
   const supabase = createClient();
 
   const [{ data: vendors }, { data: ratings }, { data: branchRows }] = await Promise.all([
@@ -72,7 +73,7 @@ export default async function AdminVendors() {
                 <td className="px-4 py-3"><span className={STATUS_CHIP[v.status]}>{v.status}</span></td>
                 <td className="px-4 py-3 text-slate">{dateShort(v.created_at)}</td>
                 <td className="px-4 py-3">
-                  <VendorActions vendorId={v.id} status={v.status} />
+                  <VendorActions vendorId={v.id} vendorName={v.name} status={v.status} canManage={isAdmin} />
                 </td>
               </tr>
             ))}

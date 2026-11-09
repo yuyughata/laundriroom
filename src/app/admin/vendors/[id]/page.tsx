@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadBranches, loadStaff } from "@/lib/branchData";
 import { mapsConfigured } from "@/lib/maps";
 import { dateShort } from "@/lib/format";
+import { VendorActions } from "../VendorActions";
 import type { Vendor } from "@/lib/database.types";
 
 /** Admin → Vendors → one vendor: its branches and staff, managed on the vendor's behalf. */
@@ -35,6 +36,11 @@ export default async function AdminVendorDetail({ params }: { params: { id: stri
           )}
         </div>
       </div>
+      {isAdmin && (
+        <div className="mt-3">
+          <VendorActions vendorId={v.id} vendorName={v.name} status={v.status} afterDelete="/admin/vendors" />
+        </div>
+      )}
       <p className="mt-1 text-sm text-slate">
         On laundriroom since {dateShort(v.created_at)} · {branches.filter((b) => b.active).length} active branch
         {branches.filter((b) => b.active).length === 1 ? "" : "es"} · {staff.length} staff

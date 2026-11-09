@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createOrder, quoteDeliveryFee } from "../actions";
+import { createOrder, quoteDeliveryFee, nearestBranches } from "../actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { money } from "@/lib/format";
 import { Stars } from "@/components/ui/Stars";
@@ -55,16 +55,66 @@ export function OrderForm({
   const [pay, setPay] = useState<"online" | "on_delivery">("online");
   const [chosenExtras, setChosenExtras] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Nearest laundries (branch id → km), from a saved address or the phone's location.
+  const [near, setNear] = useState<{ km: Record<string, number>; by: "road" | "straight"; from: string } | null>(null);
+  const [nearBusy, setNearBusy] = useState(false);
+  const [nearErr, setNearErr] = useState<string | null>(null);
 
   const vendor = vendors.find((v) => v.id === vendorId);
   const branch = vendor?.branches.find((b) => b.id === branchId) ?? vendor?.branches[0];
   const canDispatch = vendor && (vendor.delivery === "both" || vendor.delivery === "dispatch_partner");
   const needsAddress = entry === "pickup" || ret === "delivery";
 
+  const branchKm = (b: OrderBranch) => (near && b.id && near.km[b.id] != null ? near.km[b.id] : null);
+  const vendorKm = (v: OrderVendor) => {
+    const ks = v.branches.map(branchKm).filter((k): k is number => k != null);
+    return ks.length ? Math.min(...ks) : null;
+  };
+  /** With distances known, the nearest open branch (else the nearest). */
+  const nearestBranch = (v: OrderVendor) => {
+    const ranked = [...v.branches].filter((b) => branchKm(b) != null).sort((a, b) => branchKm(a)! - branchKm(b)!);
+    return (ranked.find((b) => b.openNow) ?? ranked[0])?.id ?? pickBranch(v);
+  };
+
   function chooseVendor(v: OrderVendor) {
     setVendorId(v.id);
-    setBranchId(pickBranch(v));
+    setBranchId(near ? nearestBranch(v) : pickBranch(v));
   }
+
+  async function findNear(input: { addressId?: string; lat?: number; lng?: number }, from: string) {
+    setNearErr(null); setNearBusy(true);
+    const r = await nearestBranches(input);
+    setNearBusy(false);
+    if ("error" in r) { setNearErr(r.error); return; }
+    if (Object.keys(r.km).length === 0) { setNearErr("None of the laundries have a map location yet."); return; }
+    setNear({ ...r, from });
+  }
+  function useMyLocation() {
+    setNearErr(null);
+    if (typeof navigator === "undefined" || !navigator.geolocation) { setNearErr("This browser can't share your location. Choose a saved address instead."); return; }
+    setNearBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => findNear({ lat: pos.coords.latitude, lng: pos.coords.longitude }, "your location"),
+      (e) => {
+        setNearBusy(false);
+        setNearErr(e.code === e.PERMISSION_DENIED
+          ? "Location is blocked for this site. Allow it in your browser settings, or choose a saved address."
+          : "Couldn't get your location. Try again, or choose a saved address.");
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    );
+  }
+  // When distances arrive, select the nearest open laundry (unless the order came from a laundry's link).
+  useEffect(() => {
+    if (!near || linkedVendorId) return;
+    const ranked = [...vendors].filter((v) => vendorKm(v) != null).sort((a, b) => vendorKm(a)! - vendorKm(b)!);
+    const best = ranked.find((v) => v.openNow) ?? ranked[0];
+    if (best) { setVendorId(best.id); setBranchId(nearestBranch(best)); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [near]);
+  const ordered = near
+    ? [...shown].sort((a, b) => (vendorKm(a) ?? Infinity) - (vendorKm(b) ?? Infinity))
+    : shown;
 
   // Distance pricing: re-quote when the branch or the address changes.
   const addrKey = addressId === "new" ? `${addr.line1}|${addr.area}|${addr.city}` : addressId;
@@ -120,8 +170,34 @@ export function OrderForm({
 
       <section>
         <p className="label">{showAll ? "Choose a laundry" : "Your laundry"}</p>
+        {showAll && vendors.length > 1 && (
+          <div className="mb-3 rounded-card border border-ink/10 bg-white p-3">
+            <p className="text-xs font-medium text-ink">Find the nearest laundry</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" className="btn-ghost px-3 py-1.5 text-xs" disabled={nearBusy} onClick={useMyLocation}>
+                {nearBusy ? "Finding…" : "Use my location"}
+              </button>
+              {addresses.length > 0 && (
+                <select className="field max-w-[260px] py-1.5 text-xs" value="" disabled={nearBusy} aria-label="Nearest to a saved address"
+                  onChange={(e) => {
+                    const a = addresses.find((x) => x.id === e.target.value);
+                    if (a) findNear({ addressId: a.id }, a.label || a.text);
+                  }}>
+                  <option value="">Nearest to a saved address…</option>
+                  {addresses.map((a) => <option key={a.id} value={a.id}>{a.label}: {a.text}</option>)}
+                </select>
+              )}
+            </div>
+            {near && (
+              <p className="mt-2 text-xs text-slate">
+                Nearest first from {near.from} · {near.by === "road" ? "distance by road" : "straight-line distance"}
+              </p>
+            )}
+            {nearErr && <p className="mt-2 text-xs text-danger">{nearErr}</p>}
+          </div>
+        )}
         <div className="space-y-2">
-          {shown.map((v) => (
+          {ordered.map((v) => (
             <button type="button" key={v.id} onClick={() => chooseVendor(v)}
               className={`card flex w-full items-center justify-between p-4 text-left ${
                 vendorId === v.id ? "ring-2 ring-ink" : ""} ${v.openNow ? "" : "opacity-70"}`}>
@@ -138,7 +214,10 @@ export function OrderForm({
                     : <span className="text-xs text-slate">No reviews yet</span>}
                 </div>
               </div>
-              <span className={v.openNow ? "chip-ok" : "chip-muted"}>{v.openNow ? "Open" : "Closed"}</span>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <span className={v.openNow ? "chip-ok" : "chip-muted"}>{v.openNow ? "Open" : "Closed"}</span>
+                {vendorKm(v) != null && <span className="text-xs font-medium text-ink">{fmtKm(vendorKm(v)!)}</span>}
+              </div>
             </button>
           ))}
         </div>
@@ -164,7 +243,10 @@ export function OrderForm({
                     {[b.address_line, b.area].filter(Boolean).join(", ") || b.city} · {b.hours}
                   </p>
                 </div>
-                <span className={b.openNow ? "chip-ok" : "chip-muted"}>{b.openNow ? "Open" : "Closed"}</span>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className={b.openNow ? "chip-ok" : "chip-muted"}>{b.openNow ? "Open" : "Closed"}</span>
+                  {branchKm(b) != null && <span className="text-xs font-medium text-ink">{fmtKm(branchKm(b)!)}</span>}
+                </div>
               </button>
             ))}
           </div>
@@ -359,4 +441,9 @@ function Choice({
       </div>
     </section>
   );
+}
+
+/** 0.4 → "400 m", 3.25 → "3.3 km". */
+function fmtKm(km: number) {
+  return km < 1 ? `${Math.max(50, Math.round(km * 20) * 50)} m away` : `${km.toFixed(1)} km away`;
 }

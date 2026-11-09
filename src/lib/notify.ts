@@ -5,6 +5,9 @@
  * Best-effort: a failed or unconfigured notification never blocks the action
  * that triggered it.
  */
+/** The app's public address, so emails link back here and load its logo. */
+const SITE = () => process.env.NEXT_PUBLIC_SITE_URL || "";
+
 export type AccountEvent = "password_changed" | "account_updated" | "account_suspended" | "account_reactivated";
 
 export async function notifyUser(event: AccountEvent, userId: string, context: Record<string, string> = {}) {
@@ -16,7 +19,7 @@ export async function notifyUser(event: AccountEvent, userId: string, context: R
     await fetch(`${url}/functions/v1/send-notification`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
-      body: JSON.stringify({
+      body: JSON.stringify({ site_url: SITE(),
         event,
         user_id: userId,
         context: {
@@ -48,7 +51,7 @@ export async function notifyTicket(event: "ticket_opened" | "ticket_message" | "
     await fetch(`${url}/functions/v1/send-notification`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
-      body: JSON.stringify({ event, ticket_id: ticketId }),
+      body: JSON.stringify({ site_url: SITE(), event, ticket_id: ticketId }),
       signal: AbortSignal.timeout(5000),
     });
   } catch {
@@ -73,7 +76,7 @@ export async function notifyOrder(
     await fetch(`${url}/functions/v1/send-notification`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
-      body: JSON.stringify({ event, order_id: orderId, skip_recipients: opts.skip ?? [] }),
+      body: JSON.stringify({ site_url: SITE(), event, order_id: orderId, skip_recipients: opts.skip ?? [] }),
       signal: AbortSignal.timeout(5000),
     });
   } catch {
@@ -93,7 +96,7 @@ export async function notifyVendorAction(event: "vendor_inquiry" | "vendor_warni
     await fetch(`${url}/functions/v1/send-notification`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
-      body: JSON.stringify({ event, vendor_action_id: actionId }),
+      body: JSON.stringify({ site_url: SITE(), event, vendor_action_id: actionId }),
       signal: AbortSignal.timeout(5000),
     });
   } catch {

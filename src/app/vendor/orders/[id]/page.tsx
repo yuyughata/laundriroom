@@ -15,7 +15,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
   if (!order || (order as Order).vendor_id !== ctx.vendorId) notFound();
   const o = order as Order;
 
-  const [{ data: items }, { data: itemTypes }, { data: prices }, { data: payments }, { data: customer }, { data: extras }, { data: activity }, { data: riders }] =
+  const [{ data: items }, { data: itemTypes }, { data: prices }, { data: payments }, { data: customer }, { data: extras }, { data: activity }, { data: riders }, { data: stageRows }] =
     await Promise.all([
       supabase.from("order_items").select("*").eq("order_id", o.id).order("sub_code"),
       supabase.from("item_types").select("*").or(`is_global.eq.true,vendor_id.eq.${ctx.vendorId}`).eq("active", true).order("name"),
@@ -28,6 +28,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
       // Saved riders this staff member can see (their branch's + business-wide); newest use first.
       supabase.from("rider_contacts").select("*").eq("vendor_id", ctx.vendorId).eq("active", true)
         .order("last_used_at", { ascending: false, nullsFirst: false }).order("name").limit(300),
+      supabase.from("stage_events").select("stage").eq("order_id", o.id),
     ]);
   const rows = (Array.isArray(activity) ? activity : []) as ActivityRow[];
   // Item sub-code → the staff member who checked it in.
@@ -51,6 +52,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
           ? ctx.branches.find((b) => b.id === o.branch_id)?.name ?? null : null}
         checkedInBy={checkedInBy}
         riders={((riders ?? []) as RiderContact[]).filter((r) => !r.branch_id || r.branch_id === o.branch_id)}
+        doneStages={((stageRows ?? []) as { stage: string }[]).map((r) => r.stage)}
       />
       <OrderActivity rows={rows} />
     </VendorShell>

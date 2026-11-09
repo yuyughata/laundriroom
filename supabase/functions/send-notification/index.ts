@@ -7,7 +7,9 @@
 //
 // Call it from server code (or a DB webhook) with JSON
 //   { event, order_id?, user_id?, ticket_id?, context?, skip_recipients? }
-// and `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`; other callers get 401.
+// and `Authorization: Bearer <service key>` (old JWT or new sb_secret_ key —
+// see _shared/auth.ts); other callers get 401. `site_url` (the app's address)
+// builds links and the email icon when the SITE_URL secret isn't set.
 //   order_id  → order events; recipients from the rule ('customer', 'admin')
 //   user_id   → account events, sent to that account holder
 //   ticket_id → support events; ticket details are read from the database
@@ -19,12 +21,15 @@
 // 'customer' = the order's or the ticket's customer. skip_recipients drops
 // groups for this send (e.g. ['vendor'] when the vendor's own staff entered it).
 //
-// Secrets: RESEND_API_KEY (email), WHATSAPP_API_TOKEN (+ phone number ID on
-// Admin → Integrations, or WHATSAPP_PHONE_ID), SITE_URL for links.
+// Keys: entered on Admin → Integrations (kept in Vault, 0046); the function
+// secrets RESEND_API_KEY / WHATSAPP_API_TOKEN still work as a fallback.
+// Phone number ID on Admin → Integrations (or WHATSAPP_PHONE_ID).
 // Deploy:  supabase functions deploy send-notification
 // ============================================================================
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { EMAIL_TEMPLATES, setEmailAssetBase } from "../_shared/emails.ts";
+import { isServiceCaller } from "../_shared/auth.ts";
+import { providerKey } from "../_shared/secrets.ts";
 
 type Channel = "email" | "whatsapp" | "sms";
 type Recipient = { email: string | null; phone: string | null; vars: Record<string, string> };
@@ -36,19 +41,19 @@ const TICKET_STATUS: Record<string, string> = {
 Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const SITE = (Deno.env.get("SITE_URL") ?? "http://localhost:3000").replace(/\/$/, "");
-  setEmailAssetBase(SITE); // email header icon is served by the app
 
-  // Server-to-server only: the caller must present the service-role key.
+  // Server-to-server only: the caller must present the service key.
   // Otherwise anyone holding the public anon key could make us message people.
-  if (req.headers.get("Authorization") !== `Bearer ${SERVICE_KEY}`) {
+  if (!(await isServiceCaller(req))) {
     return json({ error: "unauthorized" }, 401);
   }
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  const { event, order_id = null, user_id = null, ticket_id = null, vendor_action_id = null, context = {}, skip_recipients = [] } =
+  const { event, order_id = null, user_id = null, ticket_id = null, vendor_action_id = null, context = {}, skip_recipients = [], site_url = "" } =
     await req.json().catch(() => ({}));
+  const SITE = (Deno.env.get("SITE_URL") || (/^https?:\/\//.test(String(site_url)) ? String(site_url) : "") || "http://localhost:3000").replace(/\/$/, "");
+  setEmailAssetBase(SITE); // email header icon is served by the app
   if (!event) return json({ error: "event required" }, 400);
 
   const { data: rule } = await db.from("notification_rules").select("*").eq("event", event).maybeSingle();
@@ -59,6 +64,7 @@ Deno.serve(async (req: Request) => {
   // Which providers are connected right now.
   const { data: integrations } = await db.from("integration_settings").select("provider, status, config");
   const connected = new Map<string, any>((integrations ?? []).map((i: any) => [i.provider, i]));
+  for (const i of connected.values()) i.key = await providerKey(db, i.provider);
 
   // Shared variables for the templates, then who gets the message.
   const base: Record<string, string> = {};
@@ -329,8 +335,8 @@ export function toPhoneNumber(raw: string | null): string | null {
 // ─── Channel adapters ───────────────────────────────────────────────────────
 /** Send a designed HTML email (with a plain-text part) via Resend. */
 async function sendEmail(to: string, subject: string, html: string, text: string, integ: any) {
-  const key = Deno.env.get("RESEND_API_KEY");
-  if (!key) throw new Error("RESEND_API_KEY missing");
+  const key = integ.key;
+  if (!key) throw new Error("Resend API key missing: add it on Admin → Integrations");
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -347,8 +353,8 @@ async function sendEmail(to: string, subject: string, html: string, text: string
  * only delivers those within 24 hours of the recipient last messaging you.
  */
 async function sendWhatsApp(to: string, body: string, integ: any) {
-  const token = Deno.env.get("WHATSAPP_API_TOKEN");
-  if (!token) throw new Error("WHATSAPP_API_TOKEN missing");
+  const token = integ.key;
+  if (!token) throw new Error("WhatsApp access token missing: add it on Admin → Integrations");
   const phoneId = integ.config?.phone_id || Deno.env.get("WHATSAPP_PHONE_ID");
   if (!phoneId) throw new Error("WhatsApp phone number ID missing");
   // Template parameters can't contain newlines/tabs or 4+ spaces in a row.
