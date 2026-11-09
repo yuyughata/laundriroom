@@ -6,12 +6,15 @@ import { approveApplication, rejectApplication } from "./actions";
 export function ApplicationActions({ id }: { id: string }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
-  function run(fn: () => Promise<{ error?: string } | void>) {
+  function run(fn: () => Promise<{ error?: string; message?: string } | void>) {
     setErr(null);
+    setNote(null);
     start(async () => {
       const r = await fn();
       if (r && "error" in r && r.error) setErr(r.error);
+      else if (r && "message" in r && r.message) setNote(r.message);
     });
   }
 
@@ -28,6 +31,7 @@ export function ApplicationActions({ id }: { id: string }) {
         </button>
       </div>
       {err && <p className="text-xs text-danger">{err}</p>}
+      {note && <p className="max-w-xs text-right text-xs text-slate">{note}</p>}
     </div>
   );
 }

@@ -296,6 +296,7 @@ export type VendorApplication = {
   delivery: DeliveryMode; message: string | null;
   status: "pending" | "approved" | "rejected";
   agreed_terms: boolean; agreed_at: string | null;
+  applicant_id: string | null;
   vendor_id: string | null; reviewed_by: string | null; created_at: string; updated_at: string;
 };
 export type UserDirectoryRow = {

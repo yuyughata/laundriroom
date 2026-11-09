@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { ApplyForm } from "./ApplyForm";
 import { getPartnerAgreement } from "@/lib/agreement";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Become a partner · laundriroom" };
 
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ApplyPage() {
   const { clauses } = await getPartnerAgreement();
+  const { data: { user } } = await createClient().auth.getUser();
   return (
     <main className="min-h-screen bg-ivory">
       <div className="mx-auto flex min-h-screen max-w-lg flex-col px-6 py-10">
@@ -21,7 +23,7 @@ export default async function ApplyPage() {
             your laundry and we&apos;ll be in touch.
           </p>
           <div className="mt-6">
-            <ApplyForm agreement={clauses} />
+            <ApplyForm agreement={clauses} signedIn={!!user} />
           </div>
         </div>
       </div>
