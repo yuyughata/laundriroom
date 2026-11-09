@@ -130,7 +130,8 @@ begin
   if p_provider not in ('resend', 'whatsapp', 'sms') then raise exception 'unknown provider'; end if;
   select id into sid from vault.secrets where name = nm;
   if p_secret is null or btrim(p_secret) = '' then
-    if sid is not null then delete from vault.secrets where id = sid; end if;
+    -- Disconnect: blank the stored value (an empty key counts as no key).
+    if sid is not null then perform vault.update_secret(sid, ''); end if;
     return;
   end if;
   if sid is null then
@@ -145,7 +146,7 @@ grant execute on function set_integration_secret(text, text) to authenticated;
 
 create or replace function integration_secret(p_provider text) returns text
 language sql stable security definer set search_path = public as $$
-  select decrypted_secret from vault.decrypted_secrets where name = 'integration_' || p_provider limit 1;
+  select nullif(decrypted_secret, '') from vault.decrypted_secrets where name = 'integration_' || p_provider limit 1;
 $$;
 revoke execute on function integration_secret(text) from public, anon, authenticated;
 grant execute on function integration_secret(text) to service_role;

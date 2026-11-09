@@ -328,11 +328,15 @@ export async function payNow(orderId: string) {
         authorization: `Bearer ${session?.access_token ?? ""}`,
         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
       },
-      body: JSON.stringify({ order_id: orderId }),
+      body: JSON.stringify({ order_id: orderId, site_url: process.env.NEXT_PUBLIC_SITE_URL || "" }),
     }).catch(() => null);
     const json = res ? await res.json().catch(() => null) : null;
     if (res?.ok && json?.authorization_url) redirect(json.authorization_url as string);
-    return { error: "We couldn't start the payment. Please try again in a moment." };
+    // Show the reason (the provider's own words when it refused), not a dead end.
+    const reason = typeof json?.error === "string" ? json.error : null;
+    if (!res) return { error: "We couldn't reach the payment service. Check your connection and try again." };
+    if (res.status === 409 || res.status === 400) return { error: reason ?? "This order can't be paid right now." };
+    return { error: reason ? `The payment provider said: ${reason}` : "We couldn't start the payment. Please try again in a moment." };
   }
 
   // Simulator: only when no payment provider is configured, and only in local
