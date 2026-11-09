@@ -391,7 +391,17 @@ riders need no login), **QR camera scanning** (`QrScanner` + `html5-qrcode`:
 attendants scan a tag's QR into the check-in form instead of typing it),
 **vendor self-serve applications** (public `/apply` form inserts into
 `vendor_applications` under anon RLS; admins review at Admin → Applications and
-approve to auto-create a pending vendor), **platform-funded bulk discount**
+approve to auto-create a pending vendor. Since `0050` a signed-out applicant also
+sets a password: `submitApplication` signs them up as a `customer` and stores
+their id on `vendor_applications.applicant_id`, so they can sign in and track
+status at `/apply/status` while they wait — the customer home shows a banner, and
+an owner-read RLS policy lets them read only their own application. On approval
+`approveApplication` links that account to the new vendor as a business-wide
+manager — `role → vendor_manager` + a `branch_id`-NULL `vendor_memberships` row,
+written with the service key, never touching a laundriroom staff account — so the
+same login reaches the vendor dashboard. Applications made before 0050, or by an
+already-signed-in user, carry the signed-in id or none and fall back to the old
+invite-from-Team path), **platform-funded bulk discount**
 (Admin → Promos: set a qualifying item count + %; `recompute_order` takes it off
 the items subtotal of any order that reaches the threshold, snapshotted to
 `orders.bulk_discount`; it's platform-funded so `schedule_payout_if_ready` never

@@ -5,8 +5,9 @@ import Link from "next/link";
 import { submitApplication } from "./actions";
 import { PARTNER_AGREEMENT_TITLE, PARTNER_AGREEMENT_ACCEPT, type AgreementClause } from "@/lib/legal";
 import { AgreementText } from "@/components/ui/AgreementText";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
-export function ApplyForm({ agreement }: { agreement: AgreementClause[] }) {
+export function ApplyForm({ agreement, signedIn }: { agreement: AgreementClause[]; signedIn: boolean }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -17,8 +18,12 @@ export function ApplyForm({ agreement }: { agreement: AgreementClause[] }) {
         <p className="font-display text-xl text-ink">Application received</p>
         <p className="mt-2 text-sm text-slate">
           Thanks — our team will review your details and reach out by email.
+          {!signedIn && " Your account is ready: sign in anytime with the email and password you just set to track your application."}
         </p>
-        <Link href="/" className="btn-ghost mt-4 inline-block">Back to home</Link>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <Link href="/apply/status" className="btn-primary inline-block">Check application status</Link>
+          <Link href="/" className="btn-ghost inline-block">Back to home</Link>
+        </div>
       </div>
     );
   }
@@ -28,6 +33,12 @@ export function ApplyForm({ agreement }: { agreement: AgreementClause[] }) {
       className="card space-y-3 p-6"
       action={(fd) => {
         setErr(null);
+        if (!signedIn) {
+          const pw = String(fd.get("password") || "");
+          const confirm = String(fd.get("password_confirm") || "");
+          if (pw.length < 8) { setErr("Choose a password of at least 8 characters."); return; }
+          if (pw !== confirm) { setErr("The passwords don't match."); return; }
+        }
         start(async () => {
           const r = await submitApplication(fd);
           if (r && "error" in r && r.error) setErr(r.error);
@@ -53,6 +64,24 @@ export function ApplyForm({ agreement }: { agreement: AgreementClause[] }) {
         <label className="label">Email</label>
         <input name="email" type="email" className="field" placeholder="you@business.com" required />
       </div>
+      {!signedIn && (
+        <div className="rounded-card border border-ink/10 bg-ivory p-4">
+          <p className="text-sm font-medium text-ink">Create your partner login</p>
+          <p className="mt-1 text-xs text-slate">
+            Set a password so you can sign in and follow your application while we review it.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label">Password</label>
+              <PasswordInput name="password" required minLength={8} className="field" placeholder="At least 8 characters" />
+            </div>
+            <div>
+              <label className="label">Confirm password</label>
+              <PasswordInput name="password_confirm" required minLength={8} className="field" placeholder="Repeat password" />
+            </div>
+          </div>
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className="label">Area</label>

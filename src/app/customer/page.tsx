@@ -15,6 +15,15 @@ export default async function CustomerHome() {
     .order("created_at", { ascending: false })
     .limit(20);
 
+  const { data: appData } = await supabase
+    .from("vendor_applications")
+    .select("status")
+    .eq("applicant_id", profile.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const application = appData as { status: "pending" | "approved" | "rejected" } | null;
+
   const list = (orders ?? []) as OrderSummary[];
   const active = list.filter((o) => !["closed", "cancelled"].includes(o.status));
   const past = list.filter((o) => ["closed", "cancelled"].includes(o.status));
@@ -37,6 +46,24 @@ export default async function CustomerHome() {
             updates. We sent a link to {profile.email}.
           </p>
         </div>
+      )}
+
+      {application && (
+        <Link href="/apply/status"
+          className="mt-5 block rounded-card border border-champagne/40 bg-champagne/10 p-4">
+          <p className="text-sm font-medium text-ink">
+            Partner application {application.status === "approved"
+              ? "approved"
+              : application.status === "rejected"
+                ? "update"
+                : "under review"}
+          </p>
+          <p className="mt-1 text-xs text-ink/70">
+            {application.status === "approved"
+              ? "You're approved — tap to open your laundry dashboard."
+              : "Tap to check the status of your laundry partner application."}
+          </p>
+        </Link>
       )}
 
       <Link href="/customer/order"
