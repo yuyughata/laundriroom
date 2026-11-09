@@ -8,10 +8,12 @@ import type { RiderContact } from "@/lib/database.types";
 /**
  * Assign a rider on an order: pick from the laundry's rider list, or type a
  * new one (saved to the list by default). Shows the assigned rider with
- * Call / WhatsApp, the WhatsApp message carrying the order code and PIN.
+ * Call / WhatsApp; the WhatsApp message carries the order code. The
+ * customer's delivery code is never shown here: the customer gives it at the
+ * door after paying, and that is what proves the handover.
  */
-export function RiderPicker({ orderId, orderCode, handoverCode, contacts, current }: {
-  orderId: string; orderCode: string; handoverCode: string | null;
+export function RiderPicker({ orderId, orderCode, contacts, current }: {
+  orderId: string; orderCode: string;
   contacts: RiderContact[];
   current: { name: string | null; phone: string | null; contactId: string | null };
 }) {
@@ -47,8 +49,8 @@ export function RiderPicker({ orderId, orderCode, handoverCode, contacts, curren
     });
   }
 
-  const message = `Hello ${current.name ?? ""}, please deliver laundriroom order ${orderCode}.${
-    handoverCode ? ` Handover code: ${handoverCode}.` : ""} The customer confirms with their PIN at the door.`;
+  const message = `Hello ${current.name ?? ""}, please deliver laundriroom order ${orderCode}. ` +
+    "At the door the customer pays in the app (if not already paid), then gives you their 4-digit delivery code. Send us the code to close the order.";
 
   return (
     <div className="mb-3 rounded-card border border-ink/10 p-3">
@@ -63,8 +65,7 @@ export function RiderPicker({ orderId, orderCode, handoverCode, contacts, curren
         <div className="mt-2 rounded-card bg-ink/5 p-3 text-sm text-ink">
           <p className="font-medium">{current.name}{current.phone ? ` · ${current.phone}` : ""}</p>
           <p className="mt-1 text-xs text-slate">
-            Order code <span className="font-mono text-ink">{orderCode}</span>
-            {handoverCode ? <> · handover code <span className="font-mono text-ink">{handoverCode}</span></> : null}
+            Order code <span className="font-mono text-ink">{orderCode}</span> · the customer gives their delivery code at the door
           </p>
           {current.phone && (
             <div className="mt-2 flex flex-wrap gap-2">

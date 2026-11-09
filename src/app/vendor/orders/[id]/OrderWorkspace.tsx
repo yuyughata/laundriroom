@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { checkInItem, pressStage, confirmHandover, markOutForDelivery, rescheduleDelivery, confirmPickup, logDispatch } from "../../actions";
 import { RiderPicker } from "@/components/riders/RiderPicker";
 import { createClient as createBrowser } from "@/lib/supabase/client";
@@ -14,7 +14,7 @@ import type {
 const SERVICES: ServiceType[] = ["wash_and_fold", "dry_clean", "press_only"];
 
 export function OrderWorkspace({
-  order, items, itemTypes, prices, paid, customerName, extras, branchName, checkedInBy = {}, showEarnings = false, riders = [],
+  order, items, itemTypes, prices, paid, customerName, extras, branchName, checkedInBy = {}, showEarnings = false, riders = [], doneStages = [],
 }: {
   order: Order; items: OrderItem[]; itemTypes: ItemType[];
   prices: PriceListRow[]; paid: boolean; customerName: string; extras: OrderExtra[];
@@ -25,7 +25,7 @@ export function OrderWorkspace({
   /** Show what the vendor receives (business-wide managers only). */
   showEarnings?: boolean;
   /** The laundry's saved riders this staff member can use (0045). */
-  riders?: RiderContact[];
+  riders?: RiderContact[]; doneStages?: string[];
 }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -59,13 +59,18 @@ export function OrderWorkspace({
   const nextStageIndex = 0; // processing stages are free-press in this build
   const isDelivery = order.return_mode === "delivery";
 
-  function run(fn: () => Promise<{ error?: string } | void>) {
+  function run(fn: () => Promise<{ error?: string } | void>, onOk?: () => void) {
     setErr(null);
     start(async () => {
       const r = await fn();
       if (r && "error" in r && r.error) setErr(r.error);
+      else onOk?.();
     });
   }
+  // Stages already pressed stay filled in ink, so staff can see where the batch is.
+  const [done, setDone] = useState<Set<string>>(() => new Set(doneStages));
+  useEffect(() => { setDone(new Set(doneStages)); }, [doneStages.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [handoverErr, setHandoverErr] = useState<string | null>(null);
 
   return (
     <div className="mt-3">
@@ -156,7 +161,7 @@ export function OrderWorkspace({
                   ))}
                 </select>
                 <div className="flex items-center gap-2">
-                  <input className="field flex-1" placeholder="Tag code (scan or type)" value={tag}
+                  <input className="field flex-1" placeholder="Tag code (scan or type) — required" aria-label="Tag code" value={tag}
                     onChange={(e) => setTag(e.target.value)} />
                   <QrScanner onResult={(t) => setTag(t)} label="Scan tag" />
                 </div>
@@ -171,7 +176,7 @@ export function OrderWorkspace({
                   {photoFiles.length > 0 && <span className="ml-2 text-xs text-slate">{photoFiles.length} selected</span>}
                 </div>
               </div>
-              <button className="btn-primary mt-3 w-full" disabled={pending || uploading || !typeId}
+              <button className="btn-primary mt-3 w-full" disabled={pending || uploading || !typeId || !tag.trim()}
                 onClick={() => run(async () => {
                   setUploading(true);
                   const paths: string[] = [];
@@ -204,14 +209,19 @@ export function OrderWorkspace({
           <div className="card p-4">
             <p className="label">Processing stages</p>
             <div className="grid grid-cols-2 gap-2">
-              {PROCESSING_STAGES.map((s) => (
-                <button key={s} className="btn-ghost justify-center text-xs" disabled={pending || items.length === 0}
-                  onClick={() => run(() => pressStage(order.id, s))}>
-                  {STAGE_LABEL[s]}
-                </button>
-              ))}
+              {PROCESSING_STAGES.map((s) => {
+                const isDone = done.has(s);
+                return (
+                  <button key={s} aria-pressed={isDone}
+                    className={`${isDone ? "btn-primary" : "btn-ghost"} justify-center text-xs`}
+                    disabled={pending || items.length === 0}
+                    onClick={() => run(() => pressStage(order.id, s), () => setDone((d) => new Set(d).add(s)))}>
+                    {isDone ? "✓ " : ""}{STAGE_LABEL[s]}
+                  </button>
+                );
+              })}
             </div>
-            <p className="mt-2 text-xs text-slate">Press a stage as the batch moves through it.</p>
+            <p className="mt-2 text-xs text-slate">Press a stage as the batch moves through it. Done stages stay dark.</p>
           </div>
 
           {/* Return leg */}
@@ -221,7 +231,6 @@ export function OrderWorkspace({
 
               {isDelivery && (
                 <RiderPicker orderId={order.id} orderCode={order.code} contacts={riders}
-                  handoverCode={order.payment_timing === "online" ? order.handover_code : null}
                   current={{ name: order.rider_name, phone: order.rider_phone, contactId: order.rider_contact_id ?? null }} />
               )}
 
@@ -272,33 +281,35 @@ export function OrderWorkspace({
                 </p>
               )}
 
-              {/* Pay on delivery: closes on payment, no code */}
-              {order.payment_timing === "on_delivery" ? (
-                <div className="mt-3 rounded-card bg-warn/10 p-3 text-sm text-ink">
-                  <p className="font-medium text-warn">Pay on delivery · {money(order.total)}</p>
-                  <p className="mt-1 text-xs">
-                    {paid
-                      ? "Payment confirmed — the order will close automatically."
-                      : "Ask the customer to tap Pay now in the app or the email. The order closes when payment is confirmed. No code needed."}
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-3">
-                  <p className="text-xs text-slate">Confirm the customer&apos;s 4-digit handover code.</p>
-                  <div className="mt-2 flex gap-2">
-                    <input className="field" inputMode="numeric" maxLength={4} placeholder="0000"
-                      value={code} onChange={(e) => setCode(e.target.value)} />
-                    <button className="btn-primary" disabled={pending || code.length < 4}
-                      onClick={() => run(async () => {
+              {/* Payment first, then the customer's code closes the order (0046). */}
+              <div className={`mt-3 rounded-card p-3 text-sm ${paid ? "bg-teal/10" : "bg-warn/10"}`}>
+                <p className={`font-medium ${paid ? "text-ink" : "text-warn"}`}>
+                  {paid ? `Paid · ${money(order.total)}` : `Waiting for payment · ${money(order.total)}`}
+                </p>
+                <p className="mt-1 text-xs text-ink">
+                  {paid
+                    ? "Payment confirmed. Ask the customer for their 4-digit delivery code and enter it to close the order."
+                    : "Ask the customer to tap Pay now in their order (or the payment email). Once payment is confirmed, enter their 4-digit delivery code to close the order."}
+                </p>
+              </div>
+              <div className="mt-3">
+                <label className="label" htmlFor="handover-code">Customer&apos;s delivery code</label>
+                <div className="flex gap-2">
+                  <input id="handover-code" className="field" inputMode="numeric" maxLength={4} placeholder="0000"
+                    value={code} onChange={(e) => { setCode(e.target.value.replace(/\D/g, "")); setHandoverErr(null); }} />
+                  <button className="btn-primary" disabled={pending || code.length < 4}
+                    onClick={() => {
+                      setHandoverErr(null);
+                      start(async () => {
                         const r = await confirmHandover(order.id, code);
-                        if (!(r && "error" in r)) setCode("");
-                        return r;
-                      })}>
-                      Close
-                    </button>
-                  </div>
+                        if (r && "error" in r && r.error) setHandoverErr(r.error); else setCode("");
+                      });
+                    }}>
+                    Confirm
+                  </button>
                 </div>
-              )}
+                {handoverErr && <p role="alert" className="mt-2 rounded-card bg-danger/10 px-3 py-2 text-xs text-danger">{handoverErr}</p>}
+              </div>
             </div>
           )}
 

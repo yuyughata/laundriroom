@@ -22,11 +22,13 @@
 // error) puts the payout back to 'due' with a failure_reason; the hourly run
 // retries it.
 //
-// Secrets: PAYSTACK_SECRET_KEY, CRON_SECRET (and the auto SUPABASE_* vars).
+// Secrets: PAYSTACK_SECRET_KEY (and the auto SUPABASE_* vars). CRON_SECRET is
+// optional: the cron secret in Vault is checked through cron_secret_ok().
 // Deploy:  supabase functions deploy process-payouts --no-verify-jwt
 // ============================================================================
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { createRecipient, initiateTransfer, getBalanceNGN } from "../_shared/paystack.ts";
+import { isServiceCaller } from "../_shared/auth.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -34,15 +36,20 @@ Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const CRON_SECRET = Deno.env.get("CRON_SECRET");
+  const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Who's calling: the database (shared cron secret) or the app server on an
-  // admin's behalf (service-role key). Fail closed otherwise.
-  const viaCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
-  const viaApp = !!SERVICE_KEY && req.headers.get("Authorization") === `Bearer ${SERVICE_KEY}`;
-  if (!viaCron && !viaApp) {
-    if (!CRON_SECRET && req.headers.get("x-cron-secret")) return json({ error: "CRON_SECRET not set" }, 503);
-    return json({ error: "unauthorized" }, 401);
+  // Who's calling: the database (the cron secret kept in Vault as
+  // process_payouts_cron_secret — checked by cron_secret_ok(), 0046 — or a
+  // CRON_SECRET function secret) or the app server on an admin's behalf
+  // (service key). Fail closed otherwise.
+  const sent = req.headers.get("x-cron-secret") ?? "";
+  let viaCron = !!sent && !!CRON_SECRET && sent === CRON_SECRET;
+  if (!viaCron && sent) {
+    const { data } = await db.rpc("cron_secret_ok", { p_secret: sent });
+    viaCron = data === true;
   }
+  const viaApp = !viaCron && (await isServiceCaller(req));
+  if (!viaCron && !viaApp) return json({ error: "unauthorized" }, 401);
 
   const PAYSTACK = Deno.env.get("PAYSTACK_SECRET_KEY");
   if (!PAYSTACK) return json({ error: "PAYSTACK_SECRET_KEY not set" }, 400);
@@ -52,8 +59,6 @@ Deno.serve(async (req: Request) => {
   if (payoutId && !UUID.test(payoutId)) return json({ error: "bad payout_id" }, 400);
   // Only an admin release may send a held payout, or one before its due time.
   const release = viaApp && body?.release === true && !!payoutId;
-
-  const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
   // Which payouts to send.
   let q = db.from("payouts").select("id, vendor_id, net, status, due_at");

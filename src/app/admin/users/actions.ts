@@ -126,3 +126,48 @@ export async function emailUser(id: string, subject: string, body: string) {
   if (!okSend) return { error: "Resend rejected the message. Check the API key and sender domain." };
   return { ok: true };
 }
+
+/**
+ * Admin → Users / Vendors: send a password-reset email. The person picks a
+ * new password at /reset-password. Platform admins only; written to audit_log.
+ */
+async function sendReset(email: string) {
+  const service = createServiceClient();
+  if (!service) return { error: "Sending reset emails needs the service-role key (SUPABASE_SERVICE_ROLE_KEY)." };
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const { error } = await service.auth.resetPasswordForEmail(email, { redirectTo: `${siteUrl}/auth/callback?next=/reset-password` });
+  if (error) return { error: /rate|limit/i.test(error.message) ? "A reset email was sent very recently — try again in a minute." : error.message };
+  return { ok: true as const };
+}
+
+export async function sendPasswordReset(id: string) {
+  const g = await requirePlatformAdmin();
+  if (!g.ok) return { error: g.error };
+  const service = createServiceClient();
+  if (!service) return { error: "Sending reset emails needs the service-role key (SUPABASE_SERVICE_ROLE_KEY)." };
+  const { data } = await service.auth.admin.getUserById(id);
+  const email = data?.user?.email;
+  if (!email) return { error: "This account has no email address (phone-only), so a reset email can't be sent." };
+  const r = await sendReset(email);
+  if ("error" in r) return r;
+  await service.from("audit_log").insert({ actor_id: g.adminId, action: "user.password_reset_sent", entity: "profile", entity_id: id, after: { email } } as never);
+  return { ok: true, message: `Password reset email sent to ${email}.` };
+}
+
+/** A vendor (the business): send the reset email to its business-wide managers. */
+export async function sendVendorPasswordReset(vendorId: string) {
+  const g = await requirePlatformAdmin();
+  if (!g.ok) return { error: g.error };
+  const service = createServiceClient();
+  if (!service) return { error: "Sending reset emails needs the service-role key (SUPABASE_SERVICE_ROLE_KEY)." };
+  const { data: rows } = await service.from("vendor_memberships")
+    .select("profile_id, profiles:profile_id(email, status)")
+    .eq("vendor_id", vendorId).eq("role", "vendor_manager").is("branch_id", null);
+  const emails = ((rows ?? []) as unknown as { profiles: { email: string | null; status: string } | null }[])
+    .filter((r) => r.profiles?.email && r.profiles.status !== "suspended").map((r) => r.profiles!.email!);
+  if (emails.length === 0) return { error: "This vendor has no manager with an email address. Add one under the vendor's Team first." };
+  const sent: string[] = [];
+  for (const e of emails) { const r = await sendReset(e); if ("error" in r) return { error: `${e}: ${r.error}` }; sent.push(e); }
+  await service.from("audit_log").insert({ actor_id: g.adminId, action: "vendor.password_reset_sent", entity: "vendor", entity_id: vendorId, after: { emails: sent } } as never);
+  return { ok: true, message: `Password reset email sent to ${sent.join(", ")}.` };
+}

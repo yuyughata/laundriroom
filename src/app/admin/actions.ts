@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type { VendorStatus, NotifChannel, IntegrationProvider } from "@/lib/database.types";
@@ -29,6 +29,20 @@ export async function setVendorStatus(vendorId: string, status: VendorStatus) {
   if (error) return { error: error.message };
   revalidatePath("/admin/vendors");
   return { ok: true };
+}
+
+/** Delete a vendor with no orders (admin_delete_vendor, 0046). Platform admins only. */
+export async function deleteVendor(vendorId: string) {
+  await requireRole(["platform_admin"]);
+  const supabase = createClient();
+  const { error } = await supabase.rpc("admin_delete_vendor" as never, { p_vendor: vendorId } as never);
+  if (error) {
+    const n = error.message.match(/HAS_ORDERS:\s*(\d+)/)?.[1];
+    if (n) return { error: `Can't delete: this vendor has ${n} order${n === "1" ? "" : "s"}, and deleting would erase their payment history. Suspend the vendor instead.` };
+    return { error: error.message };
+  }
+  revalidatePath("/admin/vendors");
+  return { ok: true, message: "Vendor deleted." };
 }
 
 export async function setGlobalDeliveryFee(amount: number) {
@@ -266,31 +280,111 @@ export async function setBulkDiscount(minItems: number, pct: number) {
  * (API key) is written to a server-side secret store by a privileged edge
  * function, never persisted here in plaintext — this records status + metadata.
  */
+/**
+ * Admin → Integrations: save a provider's settings and key, then prove they
+ * work. The key goes into Supabase Vault through set_integration_secret()
+ * (0046; platform admins only) — the browser never sees it again and the
+ * edge functions read it with the service key. Leaving the key box empty
+ * keeps the stored key. Resend sends a real test email to you; WhatsApp
+ * checks the token can see the phone number ID. A failed test still saves
+ * (so you can fix one field at a time) but shows the provider's own error.
+ */
 export async function saveIntegration(formData: FormData) {
+  const me = await requireRole(["platform_admin"]);
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
   const provider = String(formData.get("provider")) as IntegrationProvider;
-  const hasKey = String(formData.get("api_key") || "").length > 0;
+  if (!["resend", "whatsapp", "sms"].includes(provider)) return { error: "Unknown provider." };
+  const newKey = String(formData.get("api_key") || "").trim();
 
   const config: Record<string, string> = {};
   for (const [k, v] of formData.entries()) {
-    if (k.startsWith("config.")) config[k.slice(7)] = String(v);
+    if (k.startsWith("config.")) config[k.slice(7)] = String(v).trim();
   }
 
-  const { error } = await supabase
-    .from("integration_settings")
-    .update({
-      status: hasKey ? "connected" : "not_configured",
-      config,
-      // secret_ref would be set by the edge function after it stores the key
-      secret_ref: hasKey ? `secret://${provider}` : null,
-      last_test_at: hasKey ? new Date().toISOString() : null,
-      last_test_ok: hasKey ? true : null,
-      changed_by: user?.id,
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("provider", provider);
+  if (newKey) {
+    const { error } = await supabase.rpc("set_integration_secret" as never, { p_provider: provider, p_secret: newKey } as never);
+    if (error) return { error: `Couldn't store the key: ${error.message}` };
+  }
+  // The key to test with: the one just typed, or the stored one.
+  let key = newKey;
+  if (!key) {
+    const { data } = await createServiceClient().rpc("integration_secret" as never, { p_provider: provider } as never);
+    key = typeof data === "string" ? data : "";
+  }
+  if (!key) {
+    await supabase.from("integration_settings").update({
+      status: "not_configured", config, secret_ref: null, last_test_at: null, last_test_ok: null, last_error: null,
+      changed_by: me.id, updated_at: new Date().toISOString(),
+    } as never).eq("provider", provider);
+    revalidatePath("/admin/integrations");
+    return { error: "Paste the provider's API key first." };
+  }
+
+  const test = await testProvider(provider, key, config, me.email);
+  const { error } = await supabase.from("integration_settings").update({
+    status: "connected", config, secret_ref: `vault://integration_${provider}`,
+    last_test_at: new Date().toISOString(), last_test_ok: test.ok, last_error: test.ok ? null : test.error,
+    changed_by: me.id, updated_at: new Date().toISOString(),
+  } as never).eq("provider", provider);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/integrations");
+  return test.ok ? { ok: true, message: test.message } : { error: `Saved, but the test failed — ${test.error}` };
+}
+
+/** Disconnect a provider: forget its key and mark it not set up. */
+export async function disconnectIntegration(provider: IntegrationProvider) {
+  const me = await requireRole(["platform_admin"]);
+  const supabase = createClient();
+  const { error: e1 } = await supabase.rpc("set_integration_secret" as never, { p_provider: provider, p_secret: null } as never);
+  if (e1) return { error: e1.message };
+  const { error } = await supabase.from("integration_settings").update({
+    status: "not_configured", secret_ref: null, last_test_ok: null, last_error: null, changed_by: me.id, updated_at: new Date().toISOString(),
+  } as never).eq("provider", provider);
   if (error) return { error: error.message };
   revalidatePath("/admin/integrations");
   return { ok: true };
+}
+
+async function testProvider(provider: IntegrationProvider, key: string, config: Record<string, string>, myEmail: string | null):
+  Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  try {
+    if (provider === "resend") {
+      if (!config.from) return { ok: false, error: "add the From address (an address on a domain you verified in Resend)." };
+      if (!myEmail) return { ok: false, error: "your admin account has no email to send the test to." };
+      // RESEND_API_BASE: tests/staging only.
+      const res = await fetch(`${process.env.RESEND_API_BASE || "https://api.resend.com"}/emails`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: config.from, to: myEmail, subject: "laundriroom email is connected",
+          text: "This is a test from Admin → Integrations. Order, account and support emails will now be sent through Resend.",
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (res.ok) return { ok: true, message: `Test email sent to ${myEmail}.` };
+      return { ok: false, error: `Resend said: ${resendError(res.status, await res.text())}` };
+    }
+    if (provider === "whatsapp") {
+      if (!config.phone_id) return { ok: false, error: "add the Phone number ID." };
+      const res = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(config.phone_id)}?fields=display_phone_number,verified_name`, {
+        headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15000),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) return { ok: true, message: `WhatsApp connected: ${body.verified_name ?? ""} ${body.display_phone_number ?? ""}`.trim() };
+      return { ok: false, error: `Meta said: ${body?.error?.message ?? res.status}` };
+    }
+    return { ok: true, message: "Saved. SMS sending isn't built yet, so there's nothing to test." };
+  } catch (e) {
+    return { ok: false, error: `couldn't reach the provider (${(e as Error).message}).` };
+  }
+}
+
+/** Resend's error JSON → one plain sentence, with the usual fixes spelled out. */
+function resendError(status: number, raw: string) {
+  let msg = raw;
+  try { msg = JSON.parse(raw)?.message ?? raw; } catch { /* plain text */ }
+  if (status === 401 || (status === 403 && /api key/i.test(msg))) return `${msg} Check you pasted the whole key (it starts with re_) and that it has "Sending access".`;
+  if (/domain/i.test(msg)) return `${msg} Verify your domain at resend.com/domains, then use an address on it as the From address.`;
+  if (/testing emails|own email/i.test(msg)) return `${msg} Until your domain is verified Resend only sends to your own Resend login email.`;
+  return msg.slice(0, 300);
 }

@@ -2,7 +2,8 @@
 // ============================================================================
 // send-newsletter — send an Admin → Newsletters campaign by email (Resend).
 //
-// Called by the app server with `Authorization: Bearer <service-role key>`:
+// Called by the app server with `Authorization: Bearer <service key>` (old JWT
+// or new sb_secret_ key — see _shared/auth.ts):
 //   { newsletter_id, test_to?, test_profile_id?, site_url? }
 //   • test_to: send one copy to that address ("[Test]" subject), nothing else
 //     changes except last_test_at.
@@ -13,11 +14,14 @@
 //     own unsubscribe link (/unsubscribe?t=<token>) and a one-click
 //     List-Unsubscribe header (POST /api/unsubscribe?t=<token>).
 //
-// Needs Resend connected on Admin → Integrations (from address) and the
-// RESEND_API_KEY secret. SITE_URL (secret) or site_url builds the links.
+// Needs Resend connected on Admin → Integrations (from address + API key, the
+// key kept in Vault; the RESEND_API_KEY secret is a fallback). SITE_URL
+// (secret) or site_url builds the links.
 // ============================================================================
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { renderNewsletter, newsletterText, UNSUBSCRIBE_PLACEHOLDER } from "../_shared/newsletter.ts";
+import { isServiceCaller } from "../_shared/auth.ts";
+import { providerKey } from "../_shared/secrets.ts";
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
@@ -27,7 +31,7 @@ Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
-  if (!SERVICE_KEY || req.headers.get("Authorization") !== `Bearer ${SERVICE_KEY}`) return json({ error: "unauthorized" }, 401);
+  if (!SERVICE_KEY || !(await isServiceCaller(req))) return json({ error: "unauthorized" }, 401);
 
   const body = await req.json().catch(() => ({} as any));
   const id = String(body?.newsletter_id || "");
@@ -40,9 +44,9 @@ Deno.serve(async (req: Request) => {
   if (!n) return json({ error: "newsletter not found" }, 404);
 
   const { data: integ } = await db.from("integration_settings").select("status, config").eq("provider", "resend").maybeSingle();
-  const KEY = Deno.env.get("RESEND_API_KEY");
+  const KEY = await providerKey(db, "resend");
   if (!KEY || (integ as any)?.status !== "connected") {
-    return json({ error: "Email isn't connected: set up Resend on Admin → Integrations (and the RESEND_API_KEY secret)." }, 400);
+    return json({ error: "Email isn't connected: add the Resend API key and sender on Admin → Integrations." }, 400);
   }
   const from = (integ as any)?.config?.from ?? "laundriroom <notifications@laundriroom.example>";
 

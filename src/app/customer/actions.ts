@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import { isVendorOpenNow } from "@/lib/hours";
 import { notifyUser, notifyOrder } from "@/lib/notify";
 import { loadPricing, quoteDelivery, type DeliveryQuote } from "@/lib/deliveryPricing";
-import { geocode, addressText, mapsConfigured } from "@/lib/maps";
+import { geocode, addressText, mapsConfigured, drivingDistancesKm, straightKm, type LatLng } from "@/lib/maps";
 import type {
   EntryMode, ReturnMode, DeliveredBy, PaymentTiming, ServiceTier, Turnaround,
 } from "@/lib/database.types";
@@ -81,6 +81,52 @@ export async function quoteDeliveryFee(input: {
   }
   if (!to) return { fee: pricing.flat, km: null, pricedBy: "flat", note: "Add your address to see the delivery fee." };
   return quoteDelivery(pricing, branch, to);
+}
+
+/**
+ * Nearest laundries: distance from the customer (a saved address, or the
+ * phone's location) to every active branch. Straight-line distance picks the
+ * 10 closest; Google's Routes API then gives road distances for those in one
+ * request (no key / no answer → straight-line). Returns branch id → km.
+ */
+export async function nearestBranches(input: { addressId?: string; lat?: number; lng?: number }):
+  Promise<{ km: Record<string, number>; by: "road" | "straight" } | { error: string }> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Please sign in again." };
+
+  let from: LatLng | null = null;
+  if (input.addressId && input.addressId !== "new") {
+    const { data } = await supabase.from("customer_addresses")
+      .select("line1, area, city, lat, lng").eq("id", input.addressId).eq("customer_id", user.id).maybeSingle();
+    const a = data as { line1: string; area: string | null; city: string | null; lat: number | null; lng: number | null } | null;
+    if (!a) return { error: "Address not found." };
+    from = a.lat != null && a.lng != null ? { lat: Number(a.lat), lng: Number(a.lng) } : await geocode(addressText(a));
+    if (!from) return { error: "We couldn't place that address on the map. Try “Use my location” instead." };
+  } else if (Number.isFinite(input.lat) && Number.isFinite(input.lng)
+    && Math.abs(input.lat!) <= 90 && Math.abs(input.lng!) <= 180) {
+    from = { lat: Number(input.lat), lng: Number(input.lng) };
+  } else {
+    return { error: "Choose an address or use your location." };
+  }
+
+  const { data: rows } = await supabase.from("branches").select("id, lat, lng, address_line, area, city").eq("active", true);
+  const branches = ((rows ?? []) as { id: string; lat: number | null; lng: number | null; address_line: string | null; area: string | null; city: string | null }[]);
+  const placed: { id: string; at: LatLng; straight: number }[] = [];
+  for (const b of branches) {
+    const at = b.lat != null && b.lng != null ? { lat: Number(b.lat), lng: Number(b.lng) } : null;
+    if (at) placed.push({ id: b.id, at, straight: straightKm(from, at) });
+  }
+  placed.sort((a, b) => a.straight - b.straight);
+  const km: Record<string, number> = {};
+  for (const p of placed) km[p.id] = p.straight;
+  if (!mapsConfigured() || placed.length === 0) return { km, by: "straight" };
+
+  const top = placed.slice(0, 10);
+  const road = await drivingDistancesKm(from, top.map((p) => p.at));
+  let any = false;
+  top.forEach((p, i) => { if (road[i] != null) { km[p.id] = road[i]!; any = true; } });
+  return { km, by: any ? "road" : "straight" };
 }
 
 /** Create an order. Items are added by the vendor at check-in (plan rule). */

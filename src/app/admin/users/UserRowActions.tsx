@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateUserRole, setUserStatus, attachToVendor, deleteUser, emailUser } from "./actions";
+import { updateUserRole, setUserStatus, attachToVendor, deleteUser, emailUser, sendPasswordReset } from "./actions";
 import type { UserDirectoryRow, UserRole } from "@/lib/database.types";
 
 const ROLES: UserRole[] = ["customer", "attendant", "vendor_manager", "rider", "support_agent", "platform_admin"];
@@ -16,13 +16,15 @@ export function UserRowActions({
 }: { user: UserDirectoryRow; vendors: { id: string; name: string }[] }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [compose, setCompose] = useState(false);
 
-  function run(fn: () => Promise<{ error?: string; ok?: boolean }>) {
-    setMsg(null);
+  function run(fn: () => Promise<{ error?: string; ok?: boolean; message?: string }>) {
+    setMsg(null); setNote(null);
     start(async () => {
       const r = await fn();
       if (r?.error) setMsg(r.error);
+      else if (r?.message) setNote(r.message);
     });
   }
 
@@ -56,6 +58,13 @@ export function UserRowActions({
         {/* message */}
         <button className="btn-ghost px-2.5 py-1.5 text-xs" onClick={() => setCompose((v) => !v)}>Message</button>
 
+        {/* password reset email */}
+        <button className="btn-ghost px-2.5 py-1.5 text-xs" disabled={pending || !user.email}
+          title={user.email ? `Email ${user.email} a link to set a new password` : "No email on this account"}
+          onClick={() => { if (confirm(`Send a password reset email to ${user.email}?`)) run(() => sendPasswordReset(user.id)); }}>
+          Reset password
+        </button>
+
         {/* delete */}
         <button className="btn-ghost border-danger/30 px-2.5 py-1.5 text-xs text-danger" disabled={pending}
           onClick={() => { if (confirm(`Delete ${user.full_name || "this user"}? This can't be undone.`)) run(() => deleteUser(user.id)); }}>
@@ -76,6 +85,7 @@ export function UserRowActions({
       )}
 
       {msg && <p className="text-xs text-danger">{msg}</p>}
+      {note && <p className="text-xs text-teal">{note}</p>}
     </div>
   );
 }

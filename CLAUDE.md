@@ -274,6 +274,53 @@ promote an admin → deploy edge functions → wire Paystack).
   changes past orders. Vendor → Dispatch (`app/vendor/dispatch`; the old `/vendor/riders` link redirects;
   `components/riders/RiderManager.tsx`) lists them with order counts.
   Pickups don't use the picker yet.
+- **Payment before handover (`0046`):** the customer's 4-digit delivery code
+  (`orders.handover_code`, shown on their order page until the order closes)
+  closes an order only through `confirm_handover(order, code)`: it refuses
+  until a payment has succeeded (`PAYMENT_PENDING`, the vendor is told to get
+  the customer to pay and retry), then checks the code (`WRONG_CODE`). A
+  payment no longer closes a pay-on-delivery order by itself
+  (`on_payment_succeeded` only schedules the payout); the order stays
+  Ready / Out for delivery. API users can't insert a `handover` stage
+  directly (`guard_stage_event`). The vendor's rider box and the rider's
+  WhatsApp message never show the code. Pressed processing stages stay ink
+  (`OrderWorkspace` gets `doneStages`).
+- **Tags at check-in (`0046`):** `check_item_tag` (before insert/update of
+  `order_items.tag_code`) only accepts the order vendor's generated tags that
+  are free (or already on this item): `TAG_UNKNOWN` / `TAG_IN_USE` /
+  `TAG_UNAVAILABLE` (missing, damaged, retired). Codes are upper-cased; a
+  bare number becomes `PREFIX-NNNN`. The check-in form requires a tag.
+- **Nearest laundry:** the customer order form has "Find the nearest
+  laundry" (phone location or a saved address) → `nearestBranches`
+  (`customer/actions.ts`): straight-line km to every geocoded branch, then
+  road km for the 10 closest in one Routes API `computeRouteMatrix` call
+  (`drivingDistancesKm` in `src/lib/maps.ts`); without a key it stays
+  straight-line. Laundries sort nearest first with "km away", and the
+  nearest open laundry + branch is pre-selected (not when opened from a
+  laundry's own link).
+- **Provider keys + function auth (`0046`):** Admin → Integrations stores the
+  Resend / WhatsApp / SMS key in Supabase Vault (`set_integration_secret`,
+  platform admins; read by edge functions with `integration_secret`, service
+  role only; `supabase/functions/_shared/secrets.ts` falls back to the
+  `RESEND_API_KEY` / `WHATSAPP_API_TOKEN` secrets). "Save & send test" really
+  tests (Resend: email to you; WhatsApp: token can see the phone number ID)
+  and shows the provider's error (`integration_settings.last_error`); an empty
+  key box keeps the stored key; Disconnect deletes it. The server-only
+  functions accept either service-key kind (old JWT or `sb_secret_…`):
+  `_shared/auth.ts → isServiceCaller` — the hosted functions' own
+  `SUPABASE_SERVICE_ROLE_KEY` is now an `sb_secret_` key while the app holds
+  the JWT, which is what made sending say "unauthorized". The app passes
+  `site_url` to `send-notification` for links/logo when the `SITE_URL` secret
+  isn't set. `process-payouts` checks the hourly job's secret with
+  `cron_secret_ok` (Vault copy), so `CRON_SECRET` is optional.
+- **Admin vendor/user tools:** Admin → Vendors (list + a vendor's page) has
+  Reset password (emails the vendor's business-wide managers) and Delete
+  (`admin_delete_vendor`: only a vendor with no orders — `HAS_ORDERS`
+  otherwise, suspend instead; its staff become customers; audit-logged).
+  Admin → Users has Reset password per user (`sendPasswordReset`).
+- **Set-up guide:** `docs/setup/laundriroom-setup-guide.pdf` (Google Maps,
+  WhatsApp, Resend), from `docs/setup/setup-guide.html` via
+  `scripts/render-setup-guide.mjs`.
 - **Training decks:** `docs/presentations/` holds the team training deck and
   the Partner Playbook: PDFs, speaker notes and the slide sources (claude.ai
   Slides format, with images). Rebuild the PDFs with

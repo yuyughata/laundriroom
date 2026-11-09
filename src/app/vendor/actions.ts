@@ -21,14 +21,17 @@ export async function checkInItem(formData: FormData) {
   const service = String(formData.get("service")) as ServiceType;
   const customer_comment = String(formData.get("customer_comment") || "") || null;
   const condition_notes = String(formData.get("condition_notes") || "") || null;
-  const tag_code = String(formData.get("tag_code") || "") || null;
+  const tag_code = String(formData.get("tag_code") || "").trim().toUpperCase() || null;
+  // Every item carries one of this laundry's printed tags (checked again in the
+  // database by check_item_tag, 0046).
+  if (!tag_code) return { error: "Scan or type the item's tag. Print tags at Tags if you've run out." };
   let photos: string[] = [];
   try { photos = JSON.parse(String(formData.get("photos") || "[]")); } catch { photos = []; }
 
   const { error } = await supabase.from("order_items").insert({
     order_id, item_type_id, service, customer_comment, condition_notes, tag_code, photos,
   } as never);
-  if (error) return { error: error.message };
+  if (error) return { error: tagError(error.message) ?? error.message };
 
   // record the check-in stage once (first item)
   const { count } = await supabase
@@ -42,6 +45,15 @@ export async function checkInItem(formData: FormData) {
   return { ok: true };
 }
 
+/** check_item_tag() errors → what to do about them. */
+function tagError(m: string): string | null {
+  const after = (k: string) => m.split(`${k}:`)[1]?.trim() ?? "";
+  if (m.includes("TAG_UNKNOWN")) return `${after("TAG_UNKNOWN")} isn't one of your tags. Use a tag printed from Tags (generate more there if needed).`;
+  if (m.includes("TAG_IN_USE")) return `That tag is already on another item (${after("TAG_IN_USE")}). Use a free tag.`;
+  if (m.includes("TAG_UNAVAILABLE")) return `That tag is marked ${after("TAG_UNAVAILABLE")}. Mark it found at Tags, or use another tag.`;
+  return null;
+}
+
 /** Press a processing stage. */
 export async function pressStage(order_id: string, stage: StageKind) {
   const supabase = createClient();
@@ -53,21 +65,27 @@ export async function pressStage(order_id: string, stage: StageKind) {
   return { ok: true };
 }
 
-/** Close a prepaid order by confirming the handover code. */
+/**
+ * Close an order with the customer's 4-digit delivery code. confirm_handover()
+ * (0046) checks payment first: until a payment has succeeded the code isn't
+ * accepted and the order stays Ready / Out for delivery.
+ */
 export async function confirmHandover(order_id: string, code: string) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: order } = await supabase
-    .from("orders").select("handover_code, payment_timing").eq("id", order_id).single();
-  if (!order) return { error: "Order not found." };
-  if (order.payment_timing === "online" && order.handover_code !== code) {
-    return { error: "That code doesn't match." };
+  const { error } = await supabase.rpc("confirm_handover" as never, { p_order: order_id, p_code: code.trim() } as never);
+  if (error) {
+    const m = error.message;
+    if (m.includes("PAYMENT_PENDING")) {
+      const amount = m.split("PAYMENT_PENDING:")[1]?.trim();
+      return { error: `Payment isn't confirmed yet${amount ? ` (${amount})` : ""}. Ask the customer to tap Pay now in their order or the payment email, wait for it to go through, then enter the code again.` };
+    }
+    if (m.includes("WRONG_CODE")) return { error: "That code doesn't match. Check the 4 digits with the customer and try again." };
+    if (m.includes("NOT_READY")) return { error: "This order isn't ready for handover yet." };
+    if (m.includes("not authorized")) return { error: "You can't close orders for this branch." };
+    return { error: m };
   }
-  const { error } = await supabase
-    .from("stage_events").insert({ order_id, stage: "handover", pressed_by: user?.id } as never);
-  if (error) return { error: error.message };
   revalidatePath(`/vendor/orders/${order_id}`);
+  revalidatePath("/vendor/queue");
   return { ok: true };
 }
 

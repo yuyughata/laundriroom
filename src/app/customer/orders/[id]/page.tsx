@@ -141,7 +141,7 @@ export default async function TrackOrder({
               </p>
               <p className="text-xs text-slate">
                 {o.payment_timing === "on_delivery"
-                  ? "Tap when the rider arrives. Paying closes the order."
+                  ? "Pay when the rider arrives, then give them your delivery code below."
                   : "Pay securely to confirm your order."}
               </p>
             </div>
@@ -161,16 +161,19 @@ export default async function TrackOrder({
         </div>
       )}
 
-      {/* Handover PIN — show at delivery/collection */}
+      {/* Delivery code — stays here until payment has gone through and the
+          laundry has confirmed the code (the order then closes). */}
       {["ready", "out_for_delivery", "awaiting_collection"].includes(o.status) && o.handover_code && (
         <div className="card mb-6 p-5 text-center">
           <p className="text-sm text-slate">
-            Handover PIN — show this {o.return_mode === "delivery" ? "to the rider" : "at the counter"}
+            Delivery code — give this {o.return_mode === "delivery" ? "to the rider" : "at the counter"} when you receive your laundry
           </p>
           <p className="mt-1 font-display text-3xl tracking-[0.3em] text-ink">{o.handover_code}</p>
-          {o.payment_timing === "on_delivery" && !isPaid && (
-            <p className="mt-2 text-xs text-warn">Pay on delivery — the order closes once you pay.</p>
-          )}
+          <p className={`mt-2 text-xs ${isPaid ? "text-slate" : "text-warn"}`}>
+            {isPaid
+              ? "Paid. The order closes once the laundry confirms this code."
+              : "Pay first: the laundry can only accept this code once your payment has gone through."}
+          </p>
         </div>
       )}
 

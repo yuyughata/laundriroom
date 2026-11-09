@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>laundriroom — Set-up guide: Google Maps, WhatsApp, email</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  @page :first { margin: 0; }
+  :root { --ink: #0F1B2D; --ivory: #F8F5EF; --champ: #C6A664; --slate: #5B6678; --teal: #5FB3A8; --warn: #B7791F; --line: #E4DED2; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 10.5pt/1.5 "Inter", "Helvetica Neue", Arial, sans-serif; color: var(--ink); background: #fff; }
+  h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; color: var(--ink); }
+  .cover { background: var(--ink); color: var(--ivory); padding: 22mm 18mm 18mm; width: 210mm; height: 296mm; overflow: hidden; page-break-after: always; position: relative; }
+  .cover .brand { display: flex; align-items: center; gap: 10px; font: 600 16pt "Helvetica Neue", Arial, sans-serif; }
+  .cover .brand img { height: 30px; }
+  .cover h1 { color: var(--ivory); font-size: 30pt; line-height: 1.15; margin: 34mm 0 6mm; }
+  .cover p { color: #C9CED6; font-size: 12pt; max-width: 150mm; }
+  .cover .rule { width: 40mm; height: 3px; background: var(--champ); margin: 8mm 0; }
+  .cover ol { color: var(--ivory); font-size: 12pt; padding-left: 5mm; }
+  .cover ol li { margin: 2mm 0; }
+  .cover .foot { position: absolute; bottom: 16mm; left: 18mm; right: 18mm; font-size: 9pt; color: #9AA3B1; }
+  h2 { font-size: 20pt; margin: 0 0 2mm; padding-top: 2mm; }
+  h2 .num { color: var(--champ); margin-right: 3mm; }
+  section { page-break-before: always; }
+  section:first-of-type { page-break-before: auto; }
+  .lede { color: var(--slate); margin: 0 0 6mm; }
+  h3 { font-size: 13pt; margin: 7mm 0 2mm; }
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
+  ol.steps > li { counter-increment: s; position: relative; padding: 0 0 0 11mm; margin: 0 0 3.2mm; page-break-inside: avoid; }
+  ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 7mm; height: 7mm; border-radius: 50%; background: var(--ink); color: var(--ivory); font: 600 9pt/7mm Arial, sans-serif; text-align: center; }
+  ol.steps ul { margin: 1mm 0 0; padding-left: 5mm; }
+  b, strong { font-weight: 600; }
+  code, .path { font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-size: 9pt; background: var(--ivory); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  .box { border-radius: 8px; padding: 3.5mm 4.5mm; margin: 4mm 0; page-break-inside: avoid; }
+  .tip { background: #EEF7F5; border-left: 3px solid var(--teal); }
+  .warn { background: #FBF3E4; border-left: 3px solid var(--warn); }
+  .box p { margin: 0; }
+  .box p + p { margin-top: 1.5mm; }
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 9.5pt; page-break-inside: avoid; }
+  th, td { text-align: left; vertical-align: top; padding: 2mm 2.5mm; border-bottom: 1px solid var(--line); }
+  th { background: var(--ivory); font-weight: 600; }
+  .check { list-style: none; padding: 0; }
+  .check li { padding-left: 7mm; position: relative; margin: 1.5mm 0; }
+  .check li::before { content: ""; position: absolute; left: 0; top: 1.2mm; width: 3.4mm; height: 3.4mm; border: 1.3px solid var(--ink); border-radius: 2px; }
+  .small { font-size: 9pt; color: var(--slate); }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="brand"><img src="../../public/brand/mark-light.png" alt=""> laundriroom</div>
+  <h1>Set-up guide:<br>Google Maps, WhatsApp<br>and email</h1>
+  <div class="rule"></div>
+  <p>Step-by-step instructions for connecting the three outside services laundriroom uses. Each one is optional: without it the app still works, it just does less.</p>
+  <ol>
+    <li><b>Google Maps</b>: delivery fees by distance, and “find the nearest laundry”.</li>
+    <li><b>WhatsApp</b>: order, support and vendor alerts on WhatsApp.</li>
+    <li><b>Email (Resend)</b>: order, account and support emails, and Admin → Emails.</li>
+  </ol>
+  <div class="foot">For the laundriroom admin team · Keep keys private: never paste them into chats, emails or documents.</div>
+</div>
+
+<!-- ───────────────────────────── Google Maps ───────────────────────────── -->
+<section>
+  <h2><span class="num">1</span>Google Maps</h2>
+  <p class="lede">What it switches on: delivery fees worked out from the road distance between the laundry branch and the customer, and a <b>Find the nearest laundry</b> box on the customer’s order screen (from their saved address or their phone’s location). Without a key, deliveries use the flat fee and “nearest” uses straight-line distance.</p>
+
+  <h3>Before you start</h3>
+  <ul class="check">
+    <li>A Google account you’ll keep for the business (not a personal one that might be closed).</li>
+    <li>A bank card for Google Cloud billing. Google gives a free monthly allowance; small volumes usually stay within it.</li>
+    <li>Access to the website’s hosting settings (for example Vercel), where the app’s settings live.</li>
+  </ul>
+
+  <h3>A. Create the key in Google Cloud</h3>
+  <ol class="steps">
+    <li>Go to <b>console.cloud.google.com</b> and sign in. At the top, open the project picker → <b>New project</b>. Name it <code>laundriroom</code> → <b>Create</b>, then select it.</li>
+    <li>Turn on billing: menu ☰ → <b>Billing</b> → link a billing account (add the card if asked).</li>
+    <li>Set a spending alert so there are no surprises: <b>Billing → Budgets &amp; alerts → Create budget</b>, e.g. ₦20,000 / month, alerts at 50%, 90% and 100%.</li>
+    <li>Turn on the two services the app uses: menu ☰ → <b>APIs &amp; Services → Library</b>. Search for and <b>Enable</b>:
+      <ul><li><b>Geocoding API</b>: turns addresses into map points.</li>
+          <li><b>Routes API</b>: road distances. (Don’t use “Distance Matrix API”: it’s the old version and new projects can’t turn it on.)</li></ul></li>
+    <li>Create the key: <b>APIs &amp; Services → Credentials → Create credentials → API key</b>. Copy it (it starts with <code>AIza</code>).</li>
+    <li>Lock the key down: click the key’s name → under <b>API restrictions</b> choose <b>Restrict key</b> and tick only <b>Geocoding API</b> and <b>Routes API</b> → <b>Save</b>. Leave <b>Application restrictions</b> on <b>None</b>: only the app’s server uses the key, never the browser.</li>
+  </ol>
+
+  <h3>B. Give the key to the website</h3>
+  <ol class="steps">
+    <li>Open the hosting dashboard. On Vercel: your project → <b>Settings → Environment Variables</b>.</li>
+    <li>Add a variable named exactly <code>GOOGLE_MAPS_API_KEY</code>, paste the key as the value, tick <b>Production</b> (and Preview if you test there) → <b>Save</b>.
+      <div class="box warn"><p>Don’t add <code>NEXT_PUBLIC_</code> to the name. That prefix would publish the key to every visitor’s browser.</p></div></li>
+    <li><b>Redeploy</b> so the site picks it up: <b>Deployments</b> → latest → ⋯ → <b>Redeploy</b>.</li>
+  </ol>
+
+  <h3>C. Switch it on in laundriroom</h3>
+  <ol class="steps">
+    <li>Sign in as the admin → <b>Admin → Fees &amp; charges → Delivery pricing</b> → choose <b>By distance</b>. If a yellow note says “Google Maps isn’t connected”, the key isn’t in place yet (check step B and the redeploy).</li>
+    <li>Set the <b>amount per km</b>, a <b>base fare</b> and a <b>minimum fee</b> → <b>Save</b>. Fees are rounded up to the next ₦50.</li>
+    <li>Put each branch on the map: <b>Vendor → Branches → Edit → Save</b> (no changes needed) for every branch. The address is looked up when it’s saved. Do the same for new branches as they’re added.</li>
+  </ol>
+
+  <h3>D. Check it works</h3>
+  <ul class="check">
+    <li>As a customer, open <b>Order</b> → <b>Use my location</b>: laundries are listed nearest first with “km away” and the note “distance by road”.</li>
+    <li>Choose <b>Deliver to me</b> with an address: the delivery fee shows the distance and the price for it.</li>
+  </ul>
+  <div class="box tip"><p><b>If something goes wrong,</b> orders are never blocked: any failed look-up falls back to the flat delivery fee (and straight-line distance for “nearest”). “Couldn’t place that address on the map” usually means the address is too vague. Add the street and area.</p></div>
+  <p class="small">Cost control: each “nearest laundry” search asks Google for up to 10 road distances in one request, and each delivery quote asks for one. Keep the budget alert from step A3.</p>
+</section>
+
+<!-- ───────────────────────────── WhatsApp ───────────────────────────── -->
+<section>
+  <h2><span class="num">2</span>WhatsApp</h2>
+  <p class="lede">What it switches on: alerts on WhatsApp alongside email (new orders for laundries and admins, order confirmations and support replies for customers, vendor quality notices). It uses Meta’s official <b>WhatsApp Cloud API</b>. Messages come from a business number you set up, not from someone’s personal WhatsApp.</p>
+
+  <h3>Before you start</h3>
+  <ul class="check">
+    <li>A <b>Meta Business account</b> (business.facebook.com) for laundriroom, with an admin you control.</li>
+    <li>A phone number for laundriroom alerts that is <b>not</b> already registered on the WhatsApp or WhatsApp Business app (or one you’re ready to move off the app). It must be able to receive an SMS or call for the code.</li>
+    <li>A payment method for Meta: messages the business starts are charged per conversation.</li>
+  </ul>
+
+  <h3>A. Create the WhatsApp app</h3>
+  <ol class="steps">
+    <li>Go to <b>developers.facebook.com</b> → <b>My Apps → Create app</b>. Use case: <b>Other</b> → type <b>Business</b> → name it <code>laundriroom</code> → choose your Business account → <b>Create</b>.</li>
+    <li>On the app’s page, find <b>WhatsApp</b> → <b>Set up</b>. Pick the same Business account.</li>
+    <li><b>WhatsApp → API Setup</b> → <b>Add phone number</b>: enter the display name (<code>laundriroom</code>), category, then the number; confirm it with the code Meta sends. The display name is reviewed by Meta, usually within a day or two.</li>
+    <li>Still on <b>API Setup</b>, select your number in the “From” list and copy the <b>Phone number ID</b> (a long number, <i>not</i> the phone number itself).</li>
+    <li>Verify the business (<b>Business settings → Security centre → Start verification</b>). It isn’t needed to start, but it raises how many people you can message per day.</li>
+    <li>Add a payment method: <b>WhatsApp Manager → Overview → Add payment method</b>.</li>
+  </ol>
+
+  <h3>B. Make a permanent access token</h3>
+  <p>The token on the API Setup page expires after 24 hours, so make one that doesn’t:</p>
+  <ol class="steps">
+    <li><b>business.facebook.com → Business settings → Users → System users → Add</b>. Name it <code>laundriroom-server</code>, role <b>Admin</b>.</li>
+    <li>With that system user selected → <b>Assign assets</b>: add the <b>laundriroom app</b> (Full control) and your <b>WhatsApp account</b> (Full control).</li>
+    <li><b>Generate new token</b> → choose the laundriroom app → expiry <b>Never</b> → tick <code>whatsapp_business_messaging</code> and <code>whatsapp_business_management</code> → <b>Generate</b>. Copy the token now: it’s shown only once.</li>
+  </ol>
+
+  <h3>C. Create the message template</h3>
+  <p>WhatsApp only lets a business start a conversation with an <b>approved template</b>. laundriroom uses one template for every alert and fills in the message:</p>
+  <ol class="steps">
+    <li><b>WhatsApp Manager → Message templates → Create template</b>.</li>
+    <li>Category <b>Utility</b>, name <code>laundriroom_alert</code> (lower case, underscores), language <b>English</b>.</li>
+    <li>Body, with exactly one variable: <code>laundriroom: {{1}}</code>. For the sample value, write e.g. <i>Your order ORD-261109-0001 is ready for collection.</i></li>
+    <li><b>Submit</b>. Approval usually takes minutes to a few hours. Note the language code shown on the template (<code>en</code> or <code>en_US</code>): it must match exactly in step D.</li>
+  </ol>
+
+  <h3>D. Connect it in laundriroom</h3>
+  <ol class="steps">
+    <li><b>Admin → Integrations → WhatsApp → Connect</b>.</li>
+    <li>Paste the <b>Access token</b> (from B3), the <b>Phone number ID</b> (A4), the template name <code>laundriroom_alert</code> and its <b>language code</b> (C4).</li>
+    <li><b>Save &amp; send test</b>. The app checks the token can see that number and shows its name; any problem shows Meta’s own error message. The token is stored encrypted in Supabase Vault and never shown again.</li>
+    <li>Choose which events go out on WhatsApp: <b>Admin → Communications</b>. Tick WhatsApp on the events you want.</li>
+  </ol>
+
+  <table>
+    <tr><th style="width:36%">If you see…</th><th>Do this</th></tr>
+    <tr><td>Error 190 / “token expired”</td><td>Make a permanent system-user token (section B) and paste it again.</td></tr>
+    <tr><td>132001 “template name does not exist”</td><td>The template isn’t approved yet, or the name/language code differs from WhatsApp Manager.</td></tr>
+    <tr><td>131030 “recipient not in allowed list”</td><td>You’re still on Meta’s test number. Add and use your own number (A3).</td></tr>
+    <tr><td>Customer gets nothing</td><td>Their account needs a phone number. Nigerian numbers in any format (0803…, +234 803…) are fine.</td></tr>
+  </table>
+</section>
+
+<!-- ───────────────────────────── Email ───────────────────────────── -->
+<section>
+  <h2><span class="num">3</span>Email (Resend)</h2>
+  <p class="lede">What it switches on: order, account and support emails, and broadcasts from Admin → Emails. Password-reset and invite emails are sent by Supabase itself and don’t need this.</p>
+
+  <h3>A. Set up Resend</h3>
+  <ol class="steps">
+    <li>Sign up at <b>resend.com</b> with the business email.</li>
+    <li><b>Domains → Add domain</b>: enter the domain you send from (e.g. <code>laundriroom.ng</code>). Resend lists 3–4 DNS records (TXT/MX/CNAME).</li>
+    <li>Add those records at your domain provider’s DNS settings, then click <b>Verify</b> in Resend. It can take from minutes to a few hours.
+      <div class="box warn"><p>Until the domain is verified, Resend only delivers to the email you signed up with. This is the most common reason test emails fail.</p></div></li>
+    <li><b>API Keys → Create API key</b>: name <code>laundriroom</code>, permission <b>Sending access</b>, domain: yours → <b>Add</b>. Copy the key (starts with <code>re_</code>).</li>
+  </ol>
+
+  <h3>B. Connect it in laundriroom</h3>
+  <ol class="steps">
+    <li><b>Admin → Integrations → Resend (email) → Connect</b> (or <b>Edit / test again</b>).</li>
+    <li>Paste the <b>API key</b>, and set the <b>From address</b> on your verified domain, e.g. <code>laundriroom &lt;hello@laundriroom.ng&gt;</code>.</li>
+    <li><b>Save &amp; send test</b>: a test email goes to your admin email. If it fails, Resend’s reason is shown on the card with the fix (wrong key, domain not verified, etc.).</li>
+  </ol>
+  <div class="box tip">
+    <p><b>Already pasted a key before?</b> Older versions of the app didn’t store the key from this screen, which is why sending said “unauthorized”. Paste the key once more: it’s now kept encrypted in Supabase Vault.</p>
+  </div>
+
+  <h3>Final checklist</h3>
+  <ul class="check">
+    <li>Google Maps: key added to hosting as <code>GOOGLE_MAPS_API_KEY</code>, site redeployed, Delivery pricing set to By distance, branches re-saved.</li>
+    <li>WhatsApp: own number added, permanent token, template approved, connected and tested on Integrations, events ticked on Communications.</li>
+    <li>Email: domain verified, key connected and tested on Integrations.</li>
+    <li>Budget alerts set in Google Cloud and a payment method on Meta.</li>
+  </ul>
+  <p class="small">Screens and menu names at Google, Meta and Resend change from time to time. If a button has moved, search the provider’s help for the step’s title.</p>
+</section>
+</body>
+</html>

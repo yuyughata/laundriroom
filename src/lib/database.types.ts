@@ -197,7 +197,7 @@ export type NotificationRule = {
 export type IntegrationSetting = {
   id: string; provider: IntegrationProvider; status: IntegrationStatus;
   secret_ref: string | null; config: Record<string, unknown>;
-  last_test_at: string | null; last_test_ok: boolean | null;
+  last_test_at: string | null; last_test_ok: boolean | null; last_error?: string | null;
   changed_by: string | null; updated_at: string;
 }
 export type ServiceExtra = {
