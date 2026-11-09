@@ -228,6 +228,8 @@ export default async function TrackOrder({
         {o.extras_total > 0 && <Row label="Premium extras" value={money(o.extras_total)} />}
         {o.premium_fee > 0 && <Row label="Premium service" value={money(o.premium_fee)} />}
         {o.express_fee > 0 && <Row label="Express" value={money(o.express_fee)} />}
+
+        {o.pickup_fee > 0 && <Row label="Pickup" value={money(o.pickup_fee)} />}
         <Row label="Delivery" value={o.delivery_fee > 0 ? money(o.delivery_fee) : "Free"} />
         {o.reschedule_penalty > 0 && <Row label="Re-delivery penalty" value={money(o.reschedule_penalty)} />}
         {o.discount > 0 && <Row label={`Promo ${o.promo_code ?? ""}`} value={`−${money(o.discount)}`} />}

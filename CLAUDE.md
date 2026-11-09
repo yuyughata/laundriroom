@@ -113,14 +113,22 @@ promote an admin → deploy edge functions → wire Paystack).
   lists branches with per-branch order links (`?branch=`); the queue has a
   branch filter for business-wide staff; ledger has income by branch; vendor
   new-order alerts go to that branch's staff + business-wide staff.
-- **Delivery pricing (`0035`):** Admin → Fees & charges → Delivery pricing:
-  flat fee, or by distance (`GOOGLE_MAPS_API_KEY`, server-side only,
-  `src/lib/maps.ts`): base + per-km × driving km (Routes API computeRoutes) from the
-  branch to the customer's address, at least the minimum, rounded up to ₦50
+- **Trip pricing — pickup & delivery (`0035`/`0047`):** Admin → Fees & charges →
+  Delivery pricing sets one fee for a trip between the branch and the
+  customer's address: flat, or by distance (`GOOGLE_MAPS_API_KEY`,
+  server-side only, `src/lib/maps.ts`): base + per-km × driving km (Routes API
+  computeRoutes), at least the minimum, rounded up to ₦50
   (`src/lib/deliveryPricing.ts`). Any failure (no key, address not found) falls
-  back to the flat fee. The server prices the order at creation
-  (`orders.delivery_fee`, `delivery_distance_km`); the form shows a live quote
-  (`quoteDeliveryFee`). Pickup/delivery orders now take an address
+  back to the flat fee. **Pickup ("Pick up from me") and delivery ("Deliver to
+  me") each cost one such trip** — an order that is both picked up and
+  delivered pays both (`0047`). The server prices each leg at creation from the
+  same address (`orders.delivery_fee`/`delivery_distance_km`,
+  `orders.pickup_fee`/`pickup_distance_km`); the order form shows a live quote
+  per chosen leg (`quoteDeliveryFee`, one quote serves both). `recompute_order`
+  is the single place the total is worked out, so both fees are added to what
+  the customer pays and kept by the vendor (its rider makes each trip) — total,
+  `vendor_earnings` and the payout all include them. The non-collection penalty
+  stays a % of `delivery_fee` only. Pickup/delivery orders take an address
   (`customer_addresses`, geocoded on save; `orders.pickup_address_id` is the
   customer's address for both legs).
 - **Partner Agreement (`0034`):** the terms vendors accept (`/apply`, Vendor →
@@ -161,7 +169,7 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0045 are applied to the hosted project
+- **Live database:** migrations 0001–0047 are applied to the hosted project
   (0033–0038 on 2026-11-03, 0039–0045 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`

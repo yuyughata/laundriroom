@@ -172,13 +172,17 @@ export async function createOrder(formData: FormData) {
     address = a.address;
   }
 
-  // Delivery fee: the admin's flat fee, or priced by distance (Google Maps).
+  // Trip fees: pickup and/or delivery each cost a trip between the branch and
+  // the customer's address — the admin's flat fee, or priced by distance
+  // (Google Maps). An order that's both picked up and delivered pays both.
   let delivery_fee = 0;
+  let pickup_fee = 0;
   let distanceKm: number | null = null;
-  if (return_mode === "delivery") {
+  let pickupKm: number | null = null;
+  if (return_mode === "delivery" || entry_mode === "pickup") {
     const q = await quoteDelivery(await loadPricing(supabase), branch, address);
-    delivery_fee = q.fee;
-    distanceKm = q.km;
+    if (return_mode === "delivery") { delivery_fee = q.fee; distanceKm = q.km; }
+    if (entry_mode === "pickup")    { pickup_fee = q.fee; pickupKm = q.km; }
   }
 
   // Express/premium markups are percentages applied by DB triggers once items
@@ -196,7 +200,9 @@ export async function createOrder(formData: FormData) {
       service_tier,
       turnaround,
       delivery_fee,
+      pickup_fee,
       ...(distanceKm != null ? { delivery_distance_km: distanceKm } : {}),
+      ...(pickupKm != null ? { pickup_distance_km: pickupKm } : {}),
       pickup_address_id: addressId,
       total: delivery_fee, // items/extras/markups recompute via triggers
       notes,

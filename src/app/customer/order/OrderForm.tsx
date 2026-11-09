@@ -116,10 +116,12 @@ export function OrderForm({
     ? [...shown].sort((a, b) => (vendorKm(a) ?? Infinity) - (vendorKm(b) ?? Infinity))
     : shown;
 
-  // Distance pricing: re-quote when the branch or the address changes.
+  // Distance pricing: re-quote when the branch or the address changes. A pickup
+  // and a delivery to the same address cost the same trip, so one quote serves
+  // both legs.
   const addrKey = addressId === "new" ? `${addr.line1}|${addr.area}|${addr.city}` : addressId;
   useEffect(() => {
-    if (!pricedByDistance || ret !== "delivery" || !vendor) { setQuote(null); return; }
+    if (!pricedByDistance || !needsAddress || !vendor) { setQuote(null); return; }
     if (addressId === "new" && addr.line1.trim().length < 4) { setQuote(null); return; }
     let live = true;
     setQuoting(true);
@@ -134,7 +136,7 @@ export function OrderForm({
     }, 600);
     return () => { live = false; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pricedByDistance, ret, vendor?.id, branch?.id, addrKey]);
+  }, [pricedByDistance, needsAddress, vendor?.id, branch?.id, addrKey]);
 
   const extrasTotal = tier === "premium"
     ? extras.filter((e) => chosenExtras.includes(e.id)).reduce((s, e) => s + Number(e.price), 0)
@@ -382,6 +384,13 @@ export function OrderForm({
       <div className="card p-4">
         <p className="text-sm font-medium text-ink">Estimate</p>
         <div className="mt-2 space-y-1 text-sm">
+          {entry === "pickup" && (
+            <Line label={quote?.km != null ? `Pickup · ${quote.km} km` : "Pickup"}
+              value={!pricedByDistance ? deliveryFeeLabel
+                : quoting ? "Working it out…"
+                : quote ? money(quote.fee)
+                : "Priced by distance"} />
+          )}
           {ret === "delivery" && (
             <Line label={quote?.km != null ? `Delivery · ${quote.km} km` : "Delivery"}
               value={!pricedByDistance ? deliveryFeeLabel
@@ -389,7 +398,7 @@ export function OrderForm({
                 : quote ? money(quote.fee)
                 : "Priced by distance"} />
           )}
-          {ret === "delivery" && pricedByDistance && quote?.note && <p className="text-xs text-slate">{quote.note}</p>}
+          {needsAddress && pricedByDistance && quote?.note && <p className="text-xs text-slate">{quote.note}</p>}
           {extrasTotal > 0 && <Line label="Premium extras" value={money(extrasTotal)} />}
         </div>
         <p className="mt-2 text-xs text-slate">

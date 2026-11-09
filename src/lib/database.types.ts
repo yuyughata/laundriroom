@@ -121,7 +121,7 @@ export type Order = {
   entry_mode: EntryMode; return_mode: ReturnMode; delivered_by: DeliveredBy | null;
   payment_timing: PaymentTiming; service_tier: ServiceTier; turnaround: Turnaround;
   status: OrderStatus;
-  delivery_fee: number; express_fee: number; premium_fee: number;
+  delivery_fee: number; pickup_fee: number; express_fee: number; premium_fee: number;
   reschedule_penalty: number; delivery_attempts: number;
   items_total: number; extras_total: number; bulk_discount: number; total: number;
   /** Commission added on top of the vendor's item prices (snapshot when placed). Null = older order: commission was deducted from the payout. */

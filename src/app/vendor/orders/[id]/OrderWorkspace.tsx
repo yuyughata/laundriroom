@@ -333,6 +333,8 @@ export function OrderWorkspace({
             {order.extras_total > 0 && <Row label="Premium extras" value={money(order.extras_total)} />}
             {order.premium_fee > 0 && <Row label="Premium service" value={money(order.premium_fee)} />}
             {order.express_fee > 0 && <Row label="Express" value={money(order.express_fee)} />}
+
+            {order.pickup_fee > 0 && <Row label="Pickup" value={money(order.pickup_fee)} />}
             <Row label="Delivery" value={order.delivery_fee > 0 ? money(order.delivery_fee) : "Free"} />
             {order.reschedule_penalty > 0 && <Row label="Re-delivery penalty" value={money(order.reschedule_penalty)} />}
             {order.discount > 0 && <Row label={`Promo ${order.promo_code ?? ""}`} value={`− ${money(order.discount)}`} />}
