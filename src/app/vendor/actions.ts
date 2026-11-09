@@ -435,10 +435,14 @@ export async function createVendorOrder(_prev: unknown, formData: FormData) {
     }
   }
 
-  // Delivery fee: flat, or by Google Maps distance from the branch.
+  // Trip fees: pickup and/or delivery each cost a trip — flat, or by Google
+  // Maps distance from the branch to the customer's address (same address, so
+  // same fee for each leg).
   let delivery_fee = 0;
+  let pickup_fee = 0;
   let distanceKm: number | null = null;
-  if (return_mode === "delivery") {
+  let pickupKm: number | null = null;
+  if (return_mode === "delivery" || entry_mode === "pickup") {
     let from = null;
     if (branchId) {
       const { data: b } = await supabase.from("branches")
@@ -446,8 +450,8 @@ export async function createVendorOrder(_prev: unknown, formData: FormData) {
       from = b ?? null;
     }
     const q = await quoteDelivery(await loadPricing(supabase), from, address);
-    delivery_fee = q.fee;
-    distanceKm = q.km;
+    if (return_mode === "delivery") { delivery_fee = q.fee; distanceKm = q.km; }
+    if (entry_mode === "pickup")    { pickup_fee = q.fee; pickupKm = q.km; }
   }
 
   const { data, error } = await supabase
@@ -458,6 +462,7 @@ export async function createVendorOrder(_prev: unknown, formData: FormData) {
       ...(branchId ? { branch_id: branchId } : {}),
       ...(addressId ? { pickup_address_id: addressId } : {}),
       ...(distanceKm != null ? { delivery_distance_km: distanceKm } : {}),
+      ...(pickupKm != null ? { pickup_distance_km: pickupKm } : {}),
       entry_mode,
       return_mode,
       delivered_by: return_mode === "delivery" ? (delivered_by ?? "own_rider") : null,
@@ -465,7 +470,8 @@ export async function createVendorOrder(_prev: unknown, formData: FormData) {
       service_tier,
       turnaround,
       delivery_fee,
-      total: delivery_fee, // items/extras/markups recompute via triggers
+      pickup_fee,
+      total: delivery_fee + pickup_fee, // items/extras/markups recompute via triggers
       notes,
       status: entry_mode === "pickup" ? "pickup_requested" : "awaiting_dropoff",
     } as never)
@@ -499,5 +505,20 @@ export async function respondQualityAction(actionId: string, response: string) {
   if (error) return { error: error.message };
   revalidatePath("/vendor/reviews");
   revalidatePath("/admin/quality");
+  return { ok: true };
+}
+
+/**
+ * Vendor → My page (manager only): opt in or out of the flat-rate
+ * "wash & dry only" bulk service. The price and qualifying count are set by
+ * the admin (Services & extras); the vendor only chooses whether to offer it.
+ */
+export async function setOffersWashDry(on: boolean) {
+  const ctx = await getVendorContext();
+  if (!ctx.isManager) return { error: "Only a business-wide manager can change the services you offer." };
+  const supabase = createClient();
+  const { error } = await supabase.from("vendors").update({ offers_wash_dry: on } as never).eq("id", ctx.vendorId);
+  if (error) return { error: error.message };
+  revalidatePath("/vendor/profile");
   return { ok: true };
 }

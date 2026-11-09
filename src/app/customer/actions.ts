@@ -140,19 +140,33 @@ export async function createOrder(formData: FormData) {
   const entry_mode = String(formData.get("entry_mode") || "drop_off") as EntryMode;
   const return_mode = String(formData.get("return_mode") || "collection") as ReturnMode;
   const payment_timing = String(formData.get("payment_timing") || "online") as PaymentTiming;
-  const service_tier = String(formData.get("service_tier") || "standard") as ServiceTier;
+  const wantsWashDry = formData.get("wash_dry") === "1";
+  // Wash & dry only forces the standard tier (no premium extras).
+  const service_tier = (wantsWashDry ? "standard" : String(formData.get("service_tier") || "standard")) as ServiceTier;
   const turnaround = String(formData.get("turnaround") || "normal") as Turnaround;
   const delivered_by = (formData.get("delivered_by") as DeliveredBy | null) || null;
   const notes = String(formData.get("notes") || "") || null;
-  const extraIds = formData.getAll("extras").map(String).filter(Boolean);
+  const extraIds = wantsWashDry ? [] : formData.getAll("extras").map(String).filter(Boolean);
   // Placed from the vendor's own profile link (/v/<slug>)?
   const via_vendor_link = formData.get("via_vendor_link") === "1";
 
   if (!vendor_id) return { error: "Please choose a laundry." };
 
   const { data: vendor } = await supabase
-    .from("vendors").select("status, is_open, opens_at, closes_at").eq("id", vendor_id).maybeSingle();
+    .from("vendors").select("status, is_open, opens_at, closes_at, offers_wash_dry").eq("id", vendor_id).maybeSingle();
   if (!vendor || vendor.status !== "verified") return { error: "That laundry isn't available." };
+
+  // Wash & dry only: the laundry must offer it and the platform must have a price.
+  let wash_dry = false;
+  let wash_dry_price = 0;
+  if (wantsWashDry) {
+    const { data: ps } = await supabase.from("platform_settings").select("wash_dry_price").eq("id", true).maybeSingle();
+    wash_dry_price = Number((ps as { wash_dry_price?: number } | null)?.wash_dry_price ?? 0);
+    if (!vendor.offers_wash_dry || wash_dry_price <= 0) {
+      return { error: "That laundry isn't offering wash & dry only. Please choose the full service." };
+    }
+    wash_dry = true;
+  }
 
   // The branch, and its opening hours (drop-off and pickup follow them).
   const b = await resolveBranch(supabase, vendor_id, branchChoice);
@@ -172,13 +186,17 @@ export async function createOrder(formData: FormData) {
     address = a.address;
   }
 
-  // Delivery fee: the admin's flat fee, or priced by distance (Google Maps).
+  // Trip fees: pickup and/or delivery each cost a trip between the branch and
+  // the customer's address — the admin's flat fee, or priced by distance
+  // (Google Maps). An order that's both picked up and delivered pays both.
   let delivery_fee = 0;
+  let pickup_fee = 0;
   let distanceKm: number | null = null;
-  if (return_mode === "delivery") {
+  let pickupKm: number | null = null;
+  if (return_mode === "delivery" || entry_mode === "pickup") {
     const q = await quoteDelivery(await loadPricing(supabase), branch, address);
-    delivery_fee = q.fee;
-    distanceKm = q.km;
+    if (return_mode === "delivery") { delivery_fee = q.fee; distanceKm = q.km; }
+    if (entry_mode === "pickup")    { pickup_fee = q.fee; pickupKm = q.km; }
   }
 
   // Express/premium markups are percentages applied by DB triggers once items
@@ -196,9 +214,13 @@ export async function createOrder(formData: FormData) {
       service_tier,
       turnaround,
       delivery_fee,
+      pickup_fee,
+      wash_dry,
+      wash_dry_price,
       ...(distanceKm != null ? { delivery_distance_km: distanceKm } : {}),
+      ...(pickupKm != null ? { pickup_distance_km: pickupKm } : {}),
       pickup_address_id: addressId,
-      total: delivery_fee, // items/extras/markups recompute via triggers
+      total: delivery_fee + pickup_fee, // items/extras/markups recompute via triggers (0049 reprices on insert)
       notes,
       via_vendor_link,
       status: entry_mode === "pickup" ? "pickup_requested" : "awaiting_dropoff",
@@ -328,11 +350,15 @@ export async function payNow(orderId: string) {
         authorization: `Bearer ${session?.access_token ?? ""}`,
         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
       },
-      body: JSON.stringify({ order_id: orderId }),
+      body: JSON.stringify({ order_id: orderId, site_url: process.env.NEXT_PUBLIC_SITE_URL || "" }),
     }).catch(() => null);
     const json = res ? await res.json().catch(() => null) : null;
     if (res?.ok && json?.authorization_url) redirect(json.authorization_url as string);
-    return { error: "We couldn't start the payment. Please try again in a moment." };
+    // Show the reason (the provider's own words when it refused), not a dead end.
+    const reason = typeof json?.error === "string" ? json.error : null;
+    if (!res) return { error: "We couldn't reach the payment service. Check your connection and try again." };
+    if (res.status === 409 || res.status === 400) return { error: reason ?? "This order can't be paid right now." };
+    return { error: reason ? `The payment provider said: ${reason}` : "We couldn't start the payment. Please try again in a moment." };
   }
 
   // Simulator: only when no payment provider is configured, and only in local

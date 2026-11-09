@@ -100,6 +100,8 @@ export type Vendor = {
   lat: number | null; lng: number | null; service_radius_km: number;
   opens_at: string | null; closes_at: string | null; is_open: boolean;
   kyc_verified: boolean; terms_accepted_at: string | null;
+  /** Opt-in: offer the flat-rate "wash & dry only" bulk service (0049). */
+  offers_wash_dry: boolean;
   /** Shareable profile link name: /v/<slug> (auto-generated, admin-only to change). */
   slug: string;
   created_at: string; updated_at: string;
@@ -121,7 +123,9 @@ export type Order = {
   entry_mode: EntryMode; return_mode: ReturnMode; delivered_by: DeliveredBy | null;
   payment_timing: PaymentTiming; service_tier: ServiceTier; turnaround: Turnaround;
   status: OrderStatus;
-  delivery_fee: number; express_fee: number; premium_fee: number;
+  delivery_fee: number; pickup_fee: number; express_fee: number; premium_fee: number;
+  /** Flat-rate wash & dry only order (0049), and its snapshot base price. */
+  wash_dry: boolean; wash_dry_price: number;
   reschedule_penalty: number; delivery_attempts: number;
   items_total: number; extras_total: number; bulk_discount: number; total: number;
   /** Commission added on top of the vendor's item prices (snapshot when placed). Null = older order: commission was deducted from the payout. */
@@ -213,6 +217,8 @@ export type PlatformSettings = {
   noncollection_penalty_pct: number; payment_provider: "paystack" | "flutterwave";
   referral_reward: number;
   bulk_min_items: number; bulk_discount_pct: number;
+  /** Wash & dry only (bulk): base price the vendor receives (0 = off) and qualifying clothes count (0049). */
+  wash_dry_price: number; wash_dry_min_items: number;
   updated_at: string;
 };
 export type VendorDocType = "id" | "cac" | "other";

@@ -113,16 +113,48 @@ promote an admin → deploy edge functions → wire Paystack).
   lists branches with per-branch order links (`?branch=`); the queue has a
   branch filter for business-wide staff; ledger has income by branch; vendor
   new-order alerts go to that branch's staff + business-wide staff.
-- **Delivery pricing (`0035`):** Admin → Fees & charges → Delivery pricing:
-  flat fee, or by distance (`GOOGLE_MAPS_API_KEY`, server-side only,
-  `src/lib/maps.ts`): base + per-km × driving km (Routes API computeRoutes) from the
-  branch to the customer's address, at least the minimum, rounded up to ₦50
+- **Trip pricing — pickup & delivery (`0035`/`0047`):** Admin → Fees & charges →
+  Delivery pricing sets one fee for a trip between the branch and the
+  customer's address: flat, or by distance (`GOOGLE_MAPS_API_KEY`,
+  server-side only, `src/lib/maps.ts`): base + per-km × driving km (Routes API
+  computeRoutes), at least the minimum, rounded up to ₦50
   (`src/lib/deliveryPricing.ts`). Any failure (no key, address not found) falls
-  back to the flat fee. The server prices the order at creation
-  (`orders.delivery_fee`, `delivery_distance_km`); the form shows a live quote
-  (`quoteDeliveryFee`). Pickup/delivery orders now take an address
+  back to the flat fee. **Pickup ("Pick up from me") and delivery ("Deliver to
+  me") each cost one such trip** — an order that is both picked up and
+  delivered pays both (`0047`). The server prices each leg at creation from the
+  same address (`orders.delivery_fee`/`delivery_distance_km`,
+  `orders.pickup_fee`/`pickup_distance_km`); the order form shows a live quote
+  per chosen leg (`quoteDeliveryFee`, one quote serves both). `recompute_order`
+  is the single place the total is worked out, so both fees are added to what
+  the customer pays and kept by the vendor (its rider makes each trip) — total,
+  `vendor_earnings` and the payout all include them. The non-collection penalty
+  stays a % of `delivery_fee` only. Pickup/delivery orders take an address
   (`customer_addresses`, geocoded on save; `orders.pickup_address_id` is the
   customer's address for both legs).
+  **Who keeps the delivery fee (`0048`):** the customer always pays it, but who
+  keeps it follows `orders.delivered_by` — `own_rider` (or unset) → the vendor
+  keeps it; `dispatch_partner` → the platform keeps it and settles the dispatch
+  company out of band. Pickup is always the vendor's own rider, so the pickup
+  fee always goes to the vendor. `delivered_by` follows the vendor's rider
+  choice: `assign_order_rider` sets it from the assigned rider's kind on a
+  delivery order and re-prices (`recompute_order`), so the delivery fee is in
+  `vendor_earnings`/the payout only for own-rider deliveries; the vendor order
+  page says so in "You receive".
+- **Wash & dry only (bulk) (`0049`):** the full service is wash, dry, press &
+  fold; this adds an optional flat-rate "wash & dry only" service for bulk
+  family loads. Admin → Services & extras sets one platform price
+  (`platform_settings.wash_dry_price` — the base the laundry receives; 0 = the
+  offering is off) and the qualifying clothes count (`wash_dry_min_items`). A
+  vendor opts in on Vendor → My page (`vendors.offers_wash_dry`, manager only).
+  A customer who picks it (shown only when the chosen laundry offers it) places
+  a flat-priced order (`orders.wash_dry`, `orders.wash_dry_price` snapshots the
+  base); the customer pays base + commission (0041 model), the vendor keeps the
+  base; standard tier only (no premium extras); express still allowed; trips
+  added as usual. `recompute_order` prices a wash-&-dry order from the flat base
+  instead of the per-item sum (items still tagged for tracking, prices ignored).
+  A new after-insert reprice (`orders_reprice_on_insert` → `reprice_new_order`)
+  gives every order its price straight away — essential here (priced before any
+  check-in) and it also makes a pickup-only order show its pickup fee at once.
 - **Partner Agreement (`0034`):** the terms vendors accept (`/apply`, Vendor →
   Verification) are `agreement_clauses`, edited at Admin → Partner agreement
   (add, edit, reorder, hide, delete). Any change bumps
@@ -161,7 +193,7 @@ promote an admin → deploy edge functions → wire Paystack).
   business-wide managers (`vendor_inquiry`/`vendor_warning`/
   `vendor_suspended`, payload `vendor_action_id`); they reply at
   Vendor → Reviews (`respond_quality_action`).
-- **Live database:** migrations 0001–0045 are applied to the hosted project
+- **Live database:** migrations 0001–0049 are applied to the hosted project
   (0033–0038 on 2026-11-03, 0039–0045 on 2026-11-04, via the Supabase MCP `execute_sql`, versions
   recorded in `supabase_migrations.schema_migrations`). The MCP asks for an
   approval this cloud session can't show whenever SQL contains `drop …`
@@ -297,7 +329,10 @@ promote an admin → deploy edge functions → wire Paystack).
   (`drivingDistancesKm` in `src/lib/maps.ts`); without a key it stays
   straight-line. Laundries sort nearest first with "km away", and the
   nearest open laundry + branch is pre-selected (not when opened from a
-  laundry's own link).
+  laundry's own link). The "Find the nearest laundry" box shows only
+  when Google Maps is connected **and** the admin has turned on distance
+  pricing (`mapsConfigured() && pricing.mode === "distance"`, passed as
+  `nearestEnabled`); otherwise it's hidden.
 - **Provider keys + function auth (`0046`):** Admin → Integrations stores the
   Resend / WhatsApp / SMS key in Supabase Vault (`set_integration_secret`,
   platform admins; read by edge functions with `integration_secret`, service

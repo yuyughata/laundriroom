@@ -16,6 +16,7 @@ export type OrderBranch = {
 export type OrderVendor = {
   id: string; slug: string; name: string; area: string | null; city: string | null;
   delivery: string; openNow: boolean; hours: string;
+  offersWashDry: boolean;
   rating: number; reviewCount: number;
   branches: OrderBranch[];
 };
@@ -23,11 +24,15 @@ export type OrderVendor = {
 export type SavedAddress = { id: string; label: string; text: string };
 
 export function OrderForm({
-  vendors, deliveryFee, deliveryFeeLabel, pricedByDistance, extras, linkedVendorId, linkedBranchId, addresses, promoCode,
+  vendors, deliveryFee, deliveryFeeLabel, pricedByDistance, nearestEnabled = false, washDry = null, extras, linkedVendorId, linkedBranchId, addresses, promoCode,
 }: {
   vendors: OrderVendor[]; deliveryFee: number; deliveryFeeLabel: string;
   /** Admin turned on Google Maps distance pricing for deliveries. */
   pricedByDistance: boolean;
+  /** Google Maps is connected and distance pricing is on → show "find the nearest laundry". */
+  nearestEnabled?: boolean;
+  /** Platform wash & dry only (bulk) pricing, or null when the offering is off. */
+  washDry?: { price: number; minItems: number; customerPrice: number } | null;
   extras: ServiceExtra[];
   /** Opened from this vendor's profile link: order from them, list collapsed. */
   linkedVendorId?: string;
@@ -54,6 +59,9 @@ export function OrderForm({
   const [speed, setSpeed] = useState<"normal" | "express">("normal");
   const [pay, setPay] = useState<"online" | "on_delivery">("online");
   const [chosenExtras, setChosenExtras] = useState<string[]>([]);
+  // Wash & dry only (bulk): a flat-rate alternative to the full service, when
+  // the platform offers it and this laundry opted in.
+  const [washDryMode, setWashDryMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Nearest laundries (branch id → km), from a saved address or the phone's location.
   const [near, setNear] = useState<{ km: Record<string, number>; by: "road" | "straight"; from: string } | null>(null);
@@ -76,9 +84,12 @@ export function OrderForm({
     return (ranked.find((b) => b.openNow) ?? ranked[0])?.id ?? pickBranch(v);
   };
 
+  const canWashDry = !!washDry && !!vendor?.offersWashDry;
+
   function chooseVendor(v: OrderVendor) {
     setVendorId(v.id);
     setBranchId(near ? nearestBranch(v) : pickBranch(v));
+    if (!(washDry && v.offersWashDry)) setWashDryMode(false); // new laundry may not offer it
   }
 
   async function findNear(input: { addressId?: string; lat?: number; lng?: number }, from: string) {
@@ -116,10 +127,12 @@ export function OrderForm({
     ? [...shown].sort((a, b) => (vendorKm(a) ?? Infinity) - (vendorKm(b) ?? Infinity))
     : shown;
 
-  // Distance pricing: re-quote when the branch or the address changes.
+  // Distance pricing: re-quote when the branch or the address changes. A pickup
+  // and a delivery to the same address cost the same trip, so one quote serves
+  // both legs.
   const addrKey = addressId === "new" ? `${addr.line1}|${addr.area}|${addr.city}` : addressId;
   useEffect(() => {
-    if (!pricedByDistance || ret !== "delivery" || !vendor) { setQuote(null); return; }
+    if (!pricedByDistance || !needsAddress || !vendor) { setQuote(null); return; }
     if (addressId === "new" && addr.line1.trim().length < 4) { setQuote(null); return; }
     let live = true;
     setQuoting(true);
@@ -134,7 +147,7 @@ export function OrderForm({
     }, 600);
     return () => { live = false; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pricedByDistance, ret, vendor?.id, branch?.id, addrKey]);
+  }, [pricedByDistance, needsAddress, vendor?.id, branch?.id, addrKey]);
 
   const extrasTotal = tier === "premium"
     ? extras.filter((e) => chosenExtras.includes(e.id)).reduce((s, e) => s + Number(e.price), 0)
@@ -170,7 +183,7 @@ export function OrderForm({
 
       <section>
         <p className="label">{showAll ? "Choose a laundry" : "Your laundry"}</p>
-        {showAll && vendors.length > 1 && (
+        {showAll && vendors.length > 1 && nearestEnabled && (
           <div className="mb-3 rounded-card border border-ink/10 bg-white p-3">
             <p className="text-xs font-medium text-ink">Find the nearest laundry</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -253,7 +266,30 @@ export function OrderForm({
         </section>
       )}
 
-      {/* Service tier */}
+      {/* Service type: full service vs wash & dry only (when this laundry offers it) */}
+      <input type="hidden" name="wash_dry" value={washDryMode ? "1" : "0"} />
+      {canWashDry && washDry && (
+        <section>
+          <p className="label">Service type</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button type="button" onClick={() => setWashDryMode(false)}
+              className={`rounded-card border p-3 text-left ${!washDryMode ? "border-ink bg-ink text-ivory" : "border-ink/15 bg-white text-ink"}`}>
+              <p className="text-sm font-medium">Full service</p>
+              <p className={`text-xs ${!washDryMode ? "text-ivory/70" : "text-slate"}`}>Wash, dry, press &amp; fold · priced per item</p>
+            </button>
+            <button type="button" onClick={() => setWashDryMode(true)}
+              className={`rounded-card border p-3 text-left ${washDryMode ? "border-ink bg-ink text-ivory" : "border-ink/15 bg-white text-ink"}`}>
+              <p className="text-sm font-medium">Wash &amp; dry only · {money(washDry.customerPrice)}</p>
+              <p className={`text-xs ${washDryMode ? "text-ivory/70" : "text-slate"}`}>
+                Bulk flat rate{washDry.minItems > 0 ? ` for ${washDry.minItems}+ clothes` : ""} · no pressing or folding
+              </p>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Service tier (full service only) */}
+      {!washDryMode && (
       <section>
         <p className="label">Service</p>
         <input type="hidden" name="service_tier" value={tier} />
@@ -271,9 +307,10 @@ export function OrderForm({
           ))}
         </div>
       </section>
+      )}
 
       {/* Premium extras */}
-      {tier === "premium" && (
+      {!washDryMode && tier === "premium" && (
         <section>
           <p className="label">Premium extras</p>
           {extras.length === 0 ? (
@@ -382,6 +419,16 @@ export function OrderForm({
       <div className="card p-4">
         <p className="text-sm font-medium text-ink">Estimate</p>
         <div className="mt-2 space-y-1 text-sm">
+          {washDryMode && washDry && (
+            <Line label="Wash & dry only (bulk)" value={money(washDry.customerPrice)} />
+          )}
+          {entry === "pickup" && (
+            <Line label={quote?.km != null ? `Pickup · ${quote.km} km` : "Pickup"}
+              value={!pricedByDistance ? deliveryFeeLabel
+                : quoting ? "Working it out…"
+                : quote ? money(quote.fee)
+                : "Priced by distance"} />
+          )}
           {ret === "delivery" && (
             <Line label={quote?.km != null ? `Delivery · ${quote.km} km` : "Delivery"}
               value={!pricedByDistance ? deliveryFeeLabel
@@ -389,12 +436,13 @@ export function OrderForm({
                 : quote ? money(quote.fee)
                 : "Priced by distance"} />
           )}
-          {ret === "delivery" && pricedByDistance && quote?.note && <p className="text-xs text-slate">{quote.note}</p>}
-          {extrasTotal > 0 && <Line label="Premium extras" value={money(extrasTotal)} />}
+          {needsAddress && pricedByDistance && quote?.note && <p className="text-xs text-slate">{quote.note}</p>}
+          {!washDryMode && extrasTotal > 0 && <Line label="Premium extras" value={money(extrasTotal)} />}
         </div>
         <p className="mt-2 text-xs text-slate">
-          Item prices are added when staff check in your laundry. You&apos;ll see the
-          full total before you pay.
+          {washDryMode
+            ? "A flat rate for washing and drying only — no pressing or folding. Delivery or pickup, if chosen, is added."
+            : "Item prices are added when staff check in your laundry. You'll see the full total before you pay."}
         </p>
       </div>
 

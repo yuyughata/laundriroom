@@ -88,9 +88,17 @@ export function OrderWorkspace({
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2">
-        <span className={order.service_tier === "premium" ? "chip-ink" : "chip-muted"}>{TIER_LABEL[order.service_tier]}</span>
+        {order.wash_dry
+          ? <span className="chip-ink">Wash &amp; dry only (bulk)</span>
+          : <span className={order.service_tier === "premium" ? "chip-ink" : "chip-muted"}>{TIER_LABEL[order.service_tier]}</span>}
         {order.turnaround === "express" && <span className="chip-warn">Express</span>}
       </div>
+
+      {order.wash_dry && (
+        <p className="mt-3 rounded-card bg-warn/10 px-3 py-2 text-xs text-ink">
+          <span className="font-medium">Wash &amp; dry only</span> — a flat-rate bulk load. Wash and dry, <span className="font-medium">no pressing or folding</span>. Tag the garments to track them; the price is the fixed bundle, not per item.
+        </p>
+      )}
 
       {err && <p className="mt-3 text-sm text-danger">{err}</p>}
 
@@ -198,7 +206,7 @@ export function OrderWorkspace({
                   if (!(r && "error" in r)) { setTag(""); setComment(""); setCondNotes(""); setPhotoFiles([]); }
                   return r;
                 })}>
-                {uploading ? "Uploading…" : `Add item · ${money(addPrice)}${markup ? ` (customer pays ${money(customerPrice(addPrice, markup))})` : ""}`}
+                {uploading ? "Uploading…" : order.wash_dry ? "Add item (tag only)" : `Add item · ${money(addPrice)}${markup ? ` (customer pays ${money(customerPrice(addPrice, markup))})` : ""}`}
               </button>
             </div>
           )}
@@ -329,10 +337,12 @@ export function OrderWorkspace({
 
           <div className="card p-4">
             {markup != null && <p className="label">What the customer pays</p>}
-            <Row label="Items" value={money(order.items_total)} />
+            <Row label={order.wash_dry ? "Wash & dry (bulk)" : "Items"} value={money(order.items_total)} />
             {order.extras_total > 0 && <Row label="Premium extras" value={money(order.extras_total)} />}
             {order.premium_fee > 0 && <Row label="Premium service" value={money(order.premium_fee)} />}
             {order.express_fee > 0 && <Row label="Express" value={money(order.express_fee)} />}
+
+            {order.pickup_fee > 0 && <Row label="Pickup" value={money(order.pickup_fee)} />}
             <Row label="Delivery" value={order.delivery_fee > 0 ? money(order.delivery_fee) : "Free"} />
             {order.reschedule_penalty > 0 && <Row label="Re-delivery penalty" value={money(order.reschedule_penalty)} />}
             {order.discount > 0 && <Row label={`Promo ${order.promo_code ?? ""}`} value={`− ${money(order.discount)}`} />}
@@ -345,8 +355,12 @@ export function OrderWorkspace({
                 <div className="my-2 border-t border-ink/10" />
                 <Row label="You receive" value={money(order.vendor_earnings ?? 0)} strong />
                 <p className="mt-1 text-xs text-slate">
-                  Your prices{order.extras_total > 0 ? ", extras" : ""} and delivery, in full
+                  Your prices{order.extras_total > 0 ? ", extras" : ""}{order.pickup_fee > 0 ? ", pickup" : ""}
+                  {order.delivered_by !== "dispatch_partner" && order.delivery_fee > 0 ? " and delivery" : ""}, in full
                   {order.discount_vendor_funded && order.discount > 0 ? ", less your share of the promo" : ""}.
+                  {order.delivered_by === "dispatch_partner" && order.delivery_fee > 0 && (
+                    <> The {money(order.delivery_fee)} delivery fee is collected by laundriroom to pay the dispatch company.</>
+                  )}
                   {addedOnTop.length > 0 && <> {addedOnTop.join(" and ")} {addedOnTop.length > 1 ? "are" : "is"} added on top for the customer.</>}
                 </p>
               </>

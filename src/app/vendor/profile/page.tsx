@@ -4,6 +4,8 @@ import { getVendorContext } from "@/lib/vendor";
 import { createClient } from "@/lib/supabase/server";
 import { vendorProfileUrl } from "@/lib/vendorProfile";
 import { ShareKit } from "./ShareKit";
+import { WashDryToggle } from "./WashDryToggle";
+import { money } from "@/lib/format";
 
 /**
  * Vendor → My page: the vendor's public profile link (created automatically
@@ -14,12 +16,14 @@ export default async function VendorProfileLink() {
   const ctx = await getVendorContext();
   const supabase = createClient();
 
-  const [{ data: vendor }, { data: linkOrders }] = await Promise.all([
-    supabase.from("vendors").select("slug, status, kyc_verified").eq("id", ctx.vendorId).maybeSingle(),
+  const [{ data: vendor }, { data: linkOrders }, { data: settings }] = await Promise.all([
+    supabase.from("vendors").select("slug, status, kyc_verified, offers_wash_dry").eq("id", ctx.vendorId).maybeSingle(),
     supabase.from("orders").select("customer_id, status").eq("vendor_id", ctx.vendorId).eq("via_vendor_link", true),
+    supabase.from("platform_settings").select("wash_dry_price, wash_dry_min_items").eq("id", true).maybeSingle(),
   ]);
 
-  const v = vendor as { slug: string; status: string; kyc_verified: boolean } | null;
+  const v = vendor as { slug: string; status: string; kyc_verified: boolean; offers_wash_dry: boolean } | null;
+  const wd = (settings ?? { wash_dry_price: 0, wash_dry_min_items: 0 }) as { wash_dry_price: number; wash_dry_min_items: number };
   const orders = (linkOrders ?? []) as { customer_id: string; status: string }[];
   const customers = new Set(orders.map((o) => o.customer_id)).size;
   const completed = orders.filter((o) => o.status === "closed").length;
@@ -60,6 +64,18 @@ export default async function VendorProfileLink() {
               </div>
             ))}
           </div>
+
+          {ctx.isManager && wd.wash_dry_price > 0 && (
+            <div className="card mt-6 p-5">
+              <p className="font-medium text-ink">Wash &amp; dry only (bulk)</p>
+              <p className="mt-1 text-sm text-slate">
+                A flat-rate service for bulk, family-size loads — washed and dried only, no pressing or folding.
+                Customers pay {money(Math.round(wd.wash_dry_price))}+ commission{wd.wash_dry_min_items > 0 ? <> for {wd.wash_dry_min_items}+ clothes</> : null}, and you&apos;re paid {money(wd.wash_dry_price)} in full.
+                Offer it alongside your full wash, dry, press &amp; fold service, or leave it off.
+              </p>
+              <WashDryToggle on={v.offers_wash_dry} />
+            </div>
+          )}
 
           <div className="card mt-6 p-5 text-sm">
             <p className="font-medium text-ink">Make your page stronger</p>
