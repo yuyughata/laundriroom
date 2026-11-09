@@ -88,9 +88,17 @@ export function OrderWorkspace({
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2">
-        <span className={order.service_tier === "premium" ? "chip-ink" : "chip-muted"}>{TIER_LABEL[order.service_tier]}</span>
+        {order.wash_dry
+          ? <span className="chip-ink">Wash &amp; dry only (bulk)</span>
+          : <span className={order.service_tier === "premium" ? "chip-ink" : "chip-muted"}>{TIER_LABEL[order.service_tier]}</span>}
         {order.turnaround === "express" && <span className="chip-warn">Express</span>}
       </div>
+
+      {order.wash_dry && (
+        <p className="mt-3 rounded-card bg-warn/10 px-3 py-2 text-xs text-ink">
+          <span className="font-medium">Wash &amp; dry only</span> — a flat-rate bulk load. Wash and dry, <span className="font-medium">no pressing or folding</span>. Tag the garments to track them; the price is the fixed bundle, not per item.
+        </p>
+      )}
 
       {err && <p className="mt-3 text-sm text-danger">{err}</p>}
 
@@ -198,7 +206,7 @@ export function OrderWorkspace({
                   if (!(r && "error" in r)) { setTag(""); setComment(""); setCondNotes(""); setPhotoFiles([]); }
                   return r;
                 })}>
-                {uploading ? "Uploading…" : `Add item · ${money(addPrice)}${markup ? ` (customer pays ${money(customerPrice(addPrice, markup))})` : ""}`}
+                {uploading ? "Uploading…" : order.wash_dry ? "Add item (tag only)" : `Add item · ${money(addPrice)}${markup ? ` (customer pays ${money(customerPrice(addPrice, markup))})` : ""}`}
               </button>
             </div>
           )}
@@ -329,7 +337,7 @@ export function OrderWorkspace({
 
           <div className="card p-4">
             {markup != null && <p className="label">What the customer pays</p>}
-            <Row label="Items" value={money(order.items_total)} />
+            <Row label={order.wash_dry ? "Wash & dry (bulk)" : "Items"} value={money(order.items_total)} />
             {order.extras_total > 0 && <Row label="Premium extras" value={money(order.extras_total)} />}
             {order.premium_fee > 0 && <Row label="Premium service" value={money(order.premium_fee)} />}
             {order.express_fee > 0 && <Row label="Express" value={money(order.express_fee)} />}

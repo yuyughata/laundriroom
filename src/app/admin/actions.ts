@@ -222,6 +222,23 @@ export async function setPlatformRates(commissionPct: number, expressPct: number
 }
 
 /**
+ * Wash & dry only (bulk): the flat base price the laundry receives and the
+ * number of clothes that qualify (Admin → Services & extras). Price 0 turns
+ * the whole offering off. The customer pays the base plus commission (0049).
+ */
+export async function setWashDry(price: number, minItems: number) {
+  await requireRole(["platform_admin"]);
+  if (!Number.isFinite(price) || price < 0 || price > 10_000_000) return { error: "Enter a valid price." };
+  if (!Number.isInteger(minItems) || minItems < 0 || minItems > 1000) return { error: "Enter a whole number of clothes (0–1000)." };
+  const supabase = createClient();
+  const { error } = await supabase.from("platform_settings")
+    .update({ wash_dry_price: price, wash_dry_min_items: minItems, updated_at: new Date().toISOString() } as never).eq("id", true);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/services");
+  return { ok: true };
+}
+
+/**
  * How long to hold a vendor payout after the order is completed and paid.
  * 0 (the default) pays the vendor immediately.
  */

@@ -140,19 +140,33 @@ export async function createOrder(formData: FormData) {
   const entry_mode = String(formData.get("entry_mode") || "drop_off") as EntryMode;
   const return_mode = String(formData.get("return_mode") || "collection") as ReturnMode;
   const payment_timing = String(formData.get("payment_timing") || "online") as PaymentTiming;
-  const service_tier = String(formData.get("service_tier") || "standard") as ServiceTier;
+  const wantsWashDry = formData.get("wash_dry") === "1";
+  // Wash & dry only forces the standard tier (no premium extras).
+  const service_tier = (wantsWashDry ? "standard" : String(formData.get("service_tier") || "standard")) as ServiceTier;
   const turnaround = String(formData.get("turnaround") || "normal") as Turnaround;
   const delivered_by = (formData.get("delivered_by") as DeliveredBy | null) || null;
   const notes = String(formData.get("notes") || "") || null;
-  const extraIds = formData.getAll("extras").map(String).filter(Boolean);
+  const extraIds = wantsWashDry ? [] : formData.getAll("extras").map(String).filter(Boolean);
   // Placed from the vendor's own profile link (/v/<slug>)?
   const via_vendor_link = formData.get("via_vendor_link") === "1";
 
   if (!vendor_id) return { error: "Please choose a laundry." };
 
   const { data: vendor } = await supabase
-    .from("vendors").select("status, is_open, opens_at, closes_at").eq("id", vendor_id).maybeSingle();
+    .from("vendors").select("status, is_open, opens_at, closes_at, offers_wash_dry").eq("id", vendor_id).maybeSingle();
   if (!vendor || vendor.status !== "verified") return { error: "That laundry isn't available." };
+
+  // Wash & dry only: the laundry must offer it and the platform must have a price.
+  let wash_dry = false;
+  let wash_dry_price = 0;
+  if (wantsWashDry) {
+    const { data: ps } = await supabase.from("platform_settings").select("wash_dry_price").eq("id", true).maybeSingle();
+    wash_dry_price = Number((ps as { wash_dry_price?: number } | null)?.wash_dry_price ?? 0);
+    if (!vendor.offers_wash_dry || wash_dry_price <= 0) {
+      return { error: "That laundry isn't offering wash & dry only. Please choose the full service." };
+    }
+    wash_dry = true;
+  }
 
   // The branch, and its opening hours (drop-off and pickup follow them).
   const b = await resolveBranch(supabase, vendor_id, branchChoice);
@@ -201,10 +215,12 @@ export async function createOrder(formData: FormData) {
       turnaround,
       delivery_fee,
       pickup_fee,
+      wash_dry,
+      wash_dry_price,
       ...(distanceKm != null ? { delivery_distance_km: distanceKm } : {}),
       ...(pickupKm != null ? { pickup_distance_km: pickupKm } : {}),
       pickup_address_id: addressId,
-      total: delivery_fee, // items/extras/markups recompute via triggers
+      total: delivery_fee + pickup_fee, // items/extras/markups recompute via triggers (0049 reprices on insert)
       notes,
       via_vendor_link,
       status: entry_mode === "pickup" ? "pickup_requested" : "awaiting_dropoff",

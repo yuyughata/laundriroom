@@ -507,3 +507,18 @@ export async function respondQualityAction(actionId: string, response: string) {
   revalidatePath("/admin/quality");
   return { ok: true };
 }
+
+/**
+ * Vendor → My page (manager only): opt in or out of the flat-rate
+ * "wash & dry only" bulk service. The price and qualifying count are set by
+ * the admin (Services & extras); the vendor only chooses whether to offer it.
+ */
+export async function setOffersWashDry(on: boolean) {
+  const ctx = await getVendorContext();
+  if (!ctx.isManager) return { error: "Only a business-wide manager can change the services you offer." };
+  const supabase = createClient();
+  const { error } = await supabase.from("vendors").update({ offers_wash_dry: on } as never).eq("id", ctx.vendorId);
+  if (error) return { error: error.message };
+  revalidatePath("/vendor/profile");
+  return { ok: true };
+}

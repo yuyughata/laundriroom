@@ -14,11 +14,11 @@ export default async function NewOrderPage({ searchParams }: { searchParams: { v
 
   const { data: vendors } = await supabase
     .from("vendors")
-    .select("id, slug, name, area, city, delivery, is_open, opens_at, closes_at")
+    .select("id, slug, name, area, city, delivery, is_open, opens_at, closes_at, offers_wash_dry")
     .eq("status", "verified")
     .order("name");
 
-  const [pricing, { data: extras }, { data: ratings }, { data: branchRows, error: branchErr }, { data: addresses }] = await Promise.all([
+  const [pricing, { data: extras }, { data: ratings }, { data: branchRows, error: branchErr }, { data: addresses }, { data: pset }, { data: planRow }] = await Promise.all([
     loadPricing(supabase),
     supabase.from("service_extras").select("*").eq("active", true).order("price"),
     supabase.from("vendor_ratings").select("*"),
@@ -26,7 +26,15 @@ export default async function NewOrderPage({ searchParams }: { searchParams: { v
     user
       ? supabase.from("customer_addresses").select("*").eq("customer_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] }),
+    supabase.from("platform_settings").select("wash_dry_price, wash_dry_min_items").eq("id", true).maybeSingle(),
+    supabase.from("vendor_plans").select("commission_rate").eq("is_default", true).limit(1).maybeSingle(),
   ]);
+  const wdBase = Number((pset as { wash_dry_price?: number } | null)?.wash_dry_price ?? 0);
+  const wdCommission = Number((planRow as { commission_rate?: number } | null)?.commission_rate ?? 0);
+  const washDry = wdBase > 0
+    ? { price: wdBase, minItems: Number((pset as { wash_dry_min_items?: number } | null)?.wash_dry_min_items ?? 0),
+        customerPrice: Math.round(wdBase * (1 + wdCommission)) }
+    : null;
   // Active branches per vendor. On a database without branches (before
   // migration 0033) each vendor is its own single location.
   const branchesByVendor = new Map<string, Branch[]>();
@@ -39,7 +47,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: { v
       .map((r) => [r.vendor_id, r])
   );
 
-  const list: OrderVendor[] = ((vendors ?? []) as Pick<Vendor, "id" | "slug" | "name" | "area" | "city" | "delivery" | "is_open" | "opens_at" | "closes_at">[])
+  const list: OrderVendor[] = ((vendors ?? []) as Pick<Vendor, "id" | "slug" | "name" | "area" | "city" | "delivery" | "is_open" | "opens_at" | "closes_at" | "offers_wash_dry">[])
     .map((v) => {
       const bs = branchesByVendor.get(v.id) ?? [];
       const branches = !branchErr
@@ -51,6 +59,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: { v
              openNow: isVendorOpenNow(v), hours: hoursLabel(v.opens_at, v.closes_at) }];
       return {
         id: v.id, slug: v.slug, name: v.name, area: v.area, city: v.city, delivery: v.delivery,
+        offersWashDry: !!v.offers_wash_dry,
         branches,
         openNow: branches.some((b) => b.openNow),
         hours: hoursLabel(v.opens_at, v.closes_at),
@@ -84,6 +93,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: { v
         deliveryFeeLabel={money(pricing.flat)}
         pricedByDistance={pricing.mode === "distance"}
         nearestEnabled={mapsConfigured() && pricing.mode === "distance"}
+        washDry={washDry}
         extras={(extras ?? []) as ServiceExtra[]}
         linkedVendorId={linked?.id}
         linkedBranchId={linked && linked.branches.some((b) => b.id === searchParams?.branch) ? searchParams.branch : undefined}

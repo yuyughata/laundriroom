@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveExtra, toggleExtra, deleteExtra } from "../actions";
+import { saveExtra, toggleExtra, deleteExtra, setWashDry } from "../actions";
 import { money } from "@/lib/format";
 import type { ServiceExtra } from "@/lib/database.types";
 
@@ -76,6 +76,50 @@ export function ExtraCard({ extra }: { extra: ServiceExtra }) {
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+/** Admin: the flat wash-&-dry-only price + qualifying clothes count. */
+export function WashDryEditor({ price, minItems, commission }: { price: number; minItems: number; commission: number }) {
+  const [p, setP] = useState(String(price || ""));
+  const [n, setN] = useState(String(minItems || ""));
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const base = Number(p) || 0;
+  const customer = Math.round(base * (1 + (commission || 0)));
+  const on = base > 0;
+
+  return (
+    <div className="card mt-4 max-w-xl p-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label" htmlFor="wd-price">Price the laundry receives (₦)</label>
+          <input id="wd-price" className="field" inputMode="numeric" value={p}
+            onChange={(e) => { setP(e.target.value.replace(/[^\d.]/g, "")); setMsg(null); }} placeholder="e.g. 5000" />
+        </div>
+        <div>
+          <label className="label" htmlFor="wd-min">Clothes that qualify</label>
+          <input id="wd-min" className="field" inputMode="numeric" value={n}
+            onChange={(e) => { setN(e.target.value.replace(/[^\d]/g, "")); setMsg(null); }} placeholder="e.g. 20" />
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-slate">
+        {on
+          ? <>Customer pays <span className="font-medium text-ink">{money(customer)}</span> (your {Math.round((commission || 0) * 1000) / 10}% commission added on top){minItems || Number(n) ? <> · for {Number(n) || minItems}+ clothes</> : null}.</>
+          : "Set a price above ₦0 to offer wash & dry only."}
+      </p>
+      {err && <p className="mt-2 text-xs text-danger">{err}</p>}
+      {msg && <p className="mt-2 text-xs text-teal">{msg}</p>}
+      <button className="btn-primary mt-4 text-sm" disabled={pending}
+        onClick={() => { setErr(null); setMsg(null); start(async () => {
+          const r = await setWashDry(Number(p) || 0, Number(n) || 0);
+          if (r?.error) setErr(r.error); else setMsg(Number(p) > 0 ? "Saved." : "Saved — wash & dry only is now off.");
+        }); }}>
+        Save
+      </button>
     </div>
   );
 }
