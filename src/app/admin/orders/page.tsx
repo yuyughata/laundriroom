@@ -68,9 +68,9 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
           </thead>
           <tbody className="divide-y divide-ink/5">
             {orders.map((o) => (
-              <tr key={o.id}>
+              <tr key={o.id} className="hover:bg-ink/5">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-ink">{o.code}</p>
+                  <Link href={`/admin/orders/${o.id}`} className="font-medium text-ink underline decoration-ink/20 underline-offset-2 hover:decoration-ink">{o.code}</Link>
                   <p className="text-xs text-slate">
                     {o.service_tier === "premium" ? "Premium" : "Standard"}
                     {o.turnaround === "express" ? " · Express" : ""}

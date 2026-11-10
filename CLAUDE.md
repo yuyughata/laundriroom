@@ -348,6 +348,18 @@ promote an admin → deploy edge functions → wire Paystack).
   `site_url` to `send-notification` for links/logo when the `SITE_URL` secret
   isn't set. `process-payouts` checks the hourly job's secret with
   `cron_secret_ok` (Vault copy), so `CRON_SECRET` is optional.
+- **Order detail + customer contact (`0051`):** both backend dashboards open a
+  single order to follow up on it. Admin → Orders rows link to
+  `/admin/orders/[id]` (full detail: status, items, extras, payment breakdown,
+  timeline from order milestones + `stage_events`, delivery/rider, and a
+  prominent **Customer contact** card; an "in progress" banner flags open
+  orders). Vendor → Queue → an order (`/vendor/orders/[id]`) now shows the same
+  contact card. Vendor staff can't read customer `profiles` directly (RLS is
+  self/admin), so contact comes from `get_order_contact(order)` — a SECURITY
+  DEFINER accessor returning name/phone/email/pickup-address only to admins and
+  that order's vendor staff (branch-scoped via `can_staff_branch`), `execute`
+  revoked from anon. `components/orders/OrderContactCard.tsx` renders Call /
+  WhatsApp (order code prefilled) / Email actions (`src/lib/phone.ts`).
 - **Admin vendor/user tools:** Admin → Vendors (list + a vendor's page) has
   Reset password (emails the vendor's business-wide managers) and Delete
   (`admin_delete_vendor`: only a vendor with no orders — `HAS_ORDERS`
