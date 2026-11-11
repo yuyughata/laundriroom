@@ -42,6 +42,15 @@ export default function SignupPage({ searchParams }: { searchParams: { next?: st
           <label className="label" htmlFor="ref">Referral code (optional)</label>
           <input id="ref" name="ref" className="field uppercase" placeholder="e.g. LRAB12CD" />
         </div>
+        <label className="flex items-start gap-2 text-sm text-ink">
+          <input type="checkbox" name="accept" required className="mt-1" />
+          <span>
+            I agree to the{" "}
+            <Link href="/legal/terms" target="_blank" className="font-medium underline">Terms of Use</Link>{" "}
+            and{" "}
+            <Link href="/legal/privacy" target="_blank" className="font-medium underline">Privacy Policy</Link>.
+          </span>
+        </label>
         {state?.error && <p className="text-sm text-danger">{state.error}</p>}
         <SubmitButton className="btn-accent w-full">Create account</SubmitButton>
       </form>

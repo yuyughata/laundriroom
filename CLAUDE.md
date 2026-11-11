@@ -162,6 +162,17 @@ promote an admin → deploy edge functions → wire Paystack).
   asked to accept again. More than 3 paragraphs → scrollable box
   (`components/ui/AgreementText.tsx`). `src/lib/legal.ts` holds the title and
   the fallback clause.
+- **Legal pages (`0052`):** Privacy Policy, Terms of Use and Privacy Choices
+  (cookies) are public pages at `/legal/[doc]` (`doc` ∈ privacy/terms/cookies),
+  linked in the homepage footer. Each is a list of ordered clauses in
+  `legal_clauses` (doc-scoped), edited by platform admins at Admin → Legal pages
+  exactly like the Partner Agreement (add/edit/reorder/hide/delete per doc;
+  changes go live immediately, no re-accept bump). Public read (`active or
+  is_platform_admin`), admin-only write. `src/lib/legalDocs.ts` holds the doc
+  metadata + `getLegalDoc`; `src/app/legal/[doc]/page.tsx` renders them. Customer
+  sign-up now has a **required** "I agree to the Terms of Use and Privacy Policy"
+  checkbox (same pattern as `/apply`); `signUp` refuses without it and records
+  `profiles.terms_accepted_at` (best-effort, not a guarded column).
 - **Printable tags (`0036`):** Vendor → Tags and Admin → Tags (per vendor).
   `generate_tags(vendor, count)` (business-wide manager or platform admin,
   1–500) makes a `tag_batches` row + `free` tags coded `PREFIX-NNNN`

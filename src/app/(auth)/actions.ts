@@ -30,14 +30,18 @@ export async function signUp(_prev: unknown, formData: FormData) {
   const phone = String(formData.get("phone") || "");
   const password = String(formData.get("password") || "");
   const ref = String(formData.get("ref") || "").trim().toUpperCase();
+  const accepted = String(formData.get("accept") || "") === "on";
 
   if (!full_name || !email || !phone || password.length < 8) {
     return { error: "Enter your name, email, phone, and a password of at least 8 characters." };
   }
+  if (!accepted) {
+    return { error: "Please accept the Terms of Use and Privacy Policy to create an account." };
+  }
 
   const supabase = createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const { error } = await supabase.auth.signUp({
+  const { data: signed, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -47,6 +51,12 @@ export async function signUp(_prev: unknown, formData: FormData) {
     },
   });
   if (error) return { error: error.message };
+
+  // Record that they accepted the terms (best-effort; the profile row is created
+  // by the new-user trigger, and terms_accepted_at isn't a guarded column).
+  if (signed.user?.id) {
+    await supabase.from("profiles").update({ terms_accepted_at: new Date().toISOString() } as never).eq("id", signed.user.id);
+  }
 
   // signUp signs the user in (email confirmation pending) → straight to the
   // app, or back to where they were heading (e.g. a vendor's order form).
