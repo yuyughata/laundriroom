@@ -5,6 +5,7 @@ import { getVendorContext } from "@/lib/vendor";
 import { createClient } from "@/lib/supabase/server";
 import { OrderWorkspace } from "./OrderWorkspace";
 import { OrderActivity, type ActivityRow } from "@/components/orders/OrderActivity";
+import { OrderContactCard, type OrderContact } from "@/components/orders/OrderContactCard";
 import type { Order, OrderItem, ItemType, PriceListRow, Payment, OrderExtra, RiderContact } from "@/lib/database.types";
 
 export default async function VendorOrderDetail({ params }: { params: { id: string } }) {
@@ -15,13 +16,15 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
   if (!order || (order as Order).vendor_id !== ctx.vendorId) notFound();
   const o = order as Order;
 
-  const [{ data: items }, { data: itemTypes }, { data: prices }, { data: payments }, { data: customer }, { data: extras }, { data: activity }, { data: riders }, { data: stageRows }] =
+  const [{ data: items }, { data: itemTypes }, { data: prices }, { data: payments }, { data: contactRows }, { data: extras }, { data: activity }, { data: riders }, { data: stageRows }] =
     await Promise.all([
       supabase.from("order_items").select("*").eq("order_id", o.id).order("sub_code"),
       supabase.from("item_types").select("*").or(`is_global.eq.true,vendor_id.eq.${ctx.vendorId}`).eq("active", true).order("name"),
       supabase.from("price_list").select("*").eq("vendor_id", ctx.vendorId).eq("active", true),
       supabase.from("payments").select("*").eq("order_id", o.id),
-      supabase.from("profiles").select("full_name, phone").eq("id", o.customer_id).maybeSingle(),
+      // Customer contact for follow-up. Vendor staff can't read customer profiles
+      // directly (RLS), so go through the authorized accessor (0051).
+      supabase.rpc("get_order_contact" as never, { p_order: o.id } as never),
       supabase.from("order_extras").select("*").eq("order_id", o.id).order("created_at"),
       // Who did each step (0039); empty if the function isn't there yet.
       supabase.rpc("get_order_activity" as never, { p_order: o.id } as never),
@@ -30,6 +33,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
         .order("last_used_at", { ascending: false, nullsFirst: false }).order("name").limit(300),
       supabase.from("stage_events").select("stage").eq("order_id", o.id),
     ]);
+  const contact = (Array.isArray(contactRows) ? contactRows[0] : null) as OrderContact | null;
   const rows = (Array.isArray(activity) ? activity : []) as ActivityRow[];
   // Item sub-code → the staff member who checked it in.
   const checkedInBy: Record<string, string> = {};
@@ -46,7 +50,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
         itemTypes={(itemTypes ?? []) as ItemType[]}
         prices={(prices ?? []) as PriceListRow[]}
         paid={((payments ?? []) as Payment[]).some((p) => p.status === "succeeded")}
-        customerName={(customer as { full_name: string } | null)?.full_name ?? "Customer"}
+        customerName={contact?.full_name ?? "Customer"}
         extras={(extras ?? []) as OrderExtra[]}
         branchName={ctx.branches.length > 1 || !ctx.branchId
           ? ctx.branches.find((b) => b.id === o.branch_id)?.name ?? null : null}
@@ -54,6 +58,9 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
         riders={((riders ?? []) as RiderContact[]).filter((r) => !r.branch_id || r.branch_id === o.branch_id)}
         doneStages={((stageRows ?? []) as { stage: string }[]).map((r) => r.stage)}
       />
+      <div className="mt-5">
+        <OrderContactCard contact={contact} orderCode={o.code} />
+      </div>
       <OrderActivity rows={rows} />
     </VendorShell>
   );

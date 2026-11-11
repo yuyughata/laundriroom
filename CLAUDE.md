@@ -162,6 +162,17 @@ promote an admin → deploy edge functions → wire Paystack).
   asked to accept again. More than 3 paragraphs → scrollable box
   (`components/ui/AgreementText.tsx`). `src/lib/legal.ts` holds the title and
   the fallback clause.
+- **Legal pages (`0052`):** Privacy Policy, Terms of Use and Privacy Choices
+  (cookies) are public pages at `/legal/[doc]` (`doc` ∈ privacy/terms/cookies),
+  linked in the homepage footer. Each is a list of ordered clauses in
+  `legal_clauses` (doc-scoped), edited by platform admins at Admin → Legal pages
+  exactly like the Partner Agreement (add/edit/reorder/hide/delete per doc;
+  changes go live immediately, no re-accept bump). Public read (`active or
+  is_platform_admin`), admin-only write. `src/lib/legalDocs.ts` holds the doc
+  metadata + `getLegalDoc`; `src/app/legal/[doc]/page.tsx` renders them. Customer
+  sign-up now has a **required** "I agree to the Terms of Use and Privacy Policy"
+  checkbox (same pattern as `/apply`); `signUp` refuses without it and records
+  `profiles.terms_accepted_at` (best-effort, not a guarded column).
 - **Printable tags (`0036`):** Vendor → Tags and Admin → Tags (per vendor).
   `generate_tags(vendor, count)` (business-wide manager or platform admin,
   1–500) makes a `tag_batches` row + `free` tags coded `PREFIX-NNNN`
@@ -348,6 +359,18 @@ promote an admin → deploy edge functions → wire Paystack).
   `site_url` to `send-notification` for links/logo when the `SITE_URL` secret
   isn't set. `process-payouts` checks the hourly job's secret with
   `cron_secret_ok` (Vault copy), so `CRON_SECRET` is optional.
+- **Order detail + customer contact (`0051`):** both backend dashboards open a
+  single order to follow up on it. Admin → Orders rows link to
+  `/admin/orders/[id]` (full detail: status, items, extras, payment breakdown,
+  timeline from order milestones + `stage_events`, delivery/rider, and a
+  prominent **Customer contact** card; an "in progress" banner flags open
+  orders). Vendor → Queue → an order (`/vendor/orders/[id]`) now shows the same
+  contact card. Vendor staff can't read customer `profiles` directly (RLS is
+  self/admin), so contact comes from `get_order_contact(order)` — a SECURITY
+  DEFINER accessor returning name/phone/email/pickup-address only to admins and
+  that order's vendor staff (branch-scoped via `can_staff_branch`), `execute`
+  revoked from anon. `components/orders/OrderContactCard.tsx` renders Call /
+  WhatsApp (order code prefilled) / Email actions (`src/lib/phone.ts`).
 - **Admin vendor/user tools:** Admin → Vendors (list + a vendor's page) has
   Reset password (emails the vendor's business-wide managers) and Delete
   (`admin_delete_vendor`: only a vendor with no orders — `HAS_ORDERS`

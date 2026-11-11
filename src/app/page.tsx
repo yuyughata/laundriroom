@@ -773,7 +773,7 @@ const landingMarkup = `<header>
 </div>
 <div class="fcol"><h5>Customers</h5><a href="/signup">Book a pickup</a><a href="#how">How it works</a><a href="#quality">Our quality</a><a href="/login">Track an order</a></div>
 <div class="fcol"><h5>Laundries</h5><a href="/apply">Become a partner</a><a href="#vendors">Why partner</a><a href="/login">Vendor sign in</a></div>
-<div class="fcol"><h5>Company</h5><a href="#">About</a><a href="#">Support</a><a href="#">Contact</a><a href="#">Privacy</a></div>
+<div class="fcol"><h5>Legal</h5><a href="/legal/privacy">Privacy Policy</a><a href="/legal/terms">Terms of Use</a><a href="/legal/cookies">Privacy Choices</a><a href="mailto:hello@laundriroom.app">Contact</a></div>
 </div>
 <div class="fbot">
 <span>© 2026 laundriroom. All rights reserved.</span>
