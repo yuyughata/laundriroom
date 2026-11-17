@@ -1,9 +1,53 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateItemPrice, renameVendorItem, deleteVendorItem } from "../actions";
+import { updateItemPrice, renameVendorItem, deleteVendorItem, addVendorItem } from "../actions";
 import { SERVICE_LABEL } from "@/lib/format";
 import type { ServiceType } from "@/lib/database.types";
+
+const SERVICES: ServiceType[] = ["wash_and_fold", "dry_clean", "press_only"];
+
+export function NewItemForm({ vendorId }: { vendorId: string }) {
+  const [name, setName] = useState("");
+  const [service, setService] = useState<ServiceType>("wash_and_fold");
+  const [price, setPrice] = useState("");
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+
+  return (
+    <div className="card p-4">
+      <p className="label">Add an item</p>
+      <div className="grid gap-3 sm:grid-cols-[1fr_9rem_8rem_auto] sm:items-end">
+        <div>
+          <label className="label">Item</label>
+          <input className="field" placeholder="e.g. Kaftan" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Service</label>
+          <select className="field" value={service} onChange={(e) => setService(e.target.value as ServiceType)}>
+            {SERVICES.map((s) => <option key={s} value={s}>{SERVICE_LABEL[s]}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Price (₦)</label>
+          <input className="field" inputMode="numeric" value={price}
+            onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} placeholder="0" />
+        </div>
+        <button className="btn-primary px-4 py-2 text-sm" disabled={pending || !name || price === ""}
+          onClick={() => start(async () => {
+            setErr(null);
+            const r = await addVendorItem(vendorId, name, service, Number(price));
+            if (r && "error" in r && r.error) setErr(r.error);
+            else { setName(""); setPrice(""); setService("wash_and_fold"); }
+          })}>
+          {pending ? "Adding…" : "Add item"}
+        </button>
+      </div>
+      {err && <p className="mt-2 text-sm text-danger">{err}</p>}
+      <p className="mt-2 text-xs text-slate">Added straight to your price list — no approval needed.</p>
+    </div>
+  );
+}
 
 export type ManagedItem = {
   priceId: string;

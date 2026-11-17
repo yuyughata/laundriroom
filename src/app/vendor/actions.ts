@@ -573,3 +573,38 @@ export async function deleteVendorItem(priceId: string, vendorId: string) {
   revalidatePath("/vendor/items");
   return { ok: true };
 }
+
+/** Add a priced item to the catalogue directly (no request/approval needed). */
+export async function addVendorItem(vendorId: string, name: string, service: ServiceType, price: number) {
+  const g = await requireItemsManager(vendorId);
+  if ("error" in g) return g;
+  const nm = name.trim();
+  if (!nm) return { error: "Enter an item name." };
+  if (nm.length > 60) return { error: "Keep the name under 60 characters." };
+  if (!(["wash_and_fold", "dry_clean", "press_only"] as const).includes(service)) return { error: "Pick a service." };
+  if (!Number.isFinite(price) || price < 0) return { error: "Enter a valid price." };
+  const supabase = createClient();
+
+  // Reuse a matching item type (global, or this laundry's own); else create one
+  // owned by this laundry.
+  const { data: existingType } = await supabase.from("item_types")
+    .select("id").ilike("name", nm).or(`is_global.eq.true,vendor_id.eq.${vendorId}`).limit(1).maybeSingle();
+  let itemTypeId = (existingType as { id: string } | null)?.id ?? null;
+  if (!itemTypeId) {
+    const { data: created, error: tErr } = await supabase.from("item_types")
+      .insert({ name: nm, is_global: false, vendor_id: vendorId } as never).select("id").single();
+    if (tErr) return { error: tErr.message };
+    itemTypeId = (created as { id: string }).id;
+  }
+
+  // Don't duplicate an item+service the vendor already prices.
+  const { data: dupe } = await supabase.from("price_list")
+    .select("id").eq("vendor_id", vendorId).eq("item_type_id", itemTypeId).eq("service", service).limit(1).maybeSingle();
+  if (dupe) return { error: "You already price that item for this service — edit it below." };
+
+  const { error } = await supabase.from("price_list")
+    .insert({ vendor_id: vendorId, item_type_id: itemTypeId, service, price: Math.round(price) } as never);
+  if (error) return { error: error.message };
+  revalidatePath("/vendor/items");
+  return { ok: true };
+}
