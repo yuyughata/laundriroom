@@ -52,7 +52,9 @@ export function siteUrl(): string {
     const proto = h.get("x-forwarded-proto") ?? "https";
     if (host && !/^(localhost|127\.|\[::1\])/i.test(host)) return `${proto}://${host}`.replace(/\/$/, "");
   } catch { /* not in a request scope (e.g. build) — fall through */ }
-  return (env && /^https?:\/\//i.test(env) ? env : "http://localhost:3000").replace(/\/$/, "");
+  if (env && /^https?:\/\//i.test(env)) return env.replace(/\/$/, "");
+  // Never emit a localhost link in production.
+  return process.env.NODE_ENV === "production" ? "https://www.laundriroom.ng" : "http://localhost:3000";
 }
 
 /** The shareable profile link for a vendor. */
