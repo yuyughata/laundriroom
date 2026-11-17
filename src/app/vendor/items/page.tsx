@@ -3,7 +3,7 @@ import { VendorShell } from "@/components/shells/VendorShell";
 import { getVendorContext } from "@/lib/vendor";
 import { createClient } from "@/lib/supabase/server";
 import { NewRequestForm, RequestRow } from "../requests/RequestsClient";
-import { ItemsManager, type ManagedItem } from "./ItemsManager";
+import { ItemsManager, NewItemForm, type ManagedItem } from "./ItemsManager";
 import type { ItemTypeRequest, ServiceType } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -85,7 +85,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: { tab?
           <h2 className="font-display text-lg text-ink">Your items &amp; prices</h2>
           {ctx.isManager ? (
             <>
-              <p className="mt-1 text-sm text-slate">Edit a price (or an item&rsquo;s name), or remove an item from your list. Changes apply across all your branches.</p>
+              <p className="mt-1 text-sm text-slate">Add items, edit a price (or an item&rsquo;s name), or remove an item from your list. Changes apply across all your branches.</p>
+              <div className="mt-4"><NewItemForm vendorId={ctx.vendorId} /></div>
               <ItemsManager items={items} vendorId={ctx.vendorId} />
             </>
           ) : (
