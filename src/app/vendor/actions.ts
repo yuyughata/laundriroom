@@ -294,7 +294,7 @@ export async function requestItemType(formData: FormData) {
     vendor_id, requested_by: user!.id, item_name, price,
   } as never);
   if (error) return { error: error.message };
-  revalidatePath("/vendor/requests");
+  revalidatePath("/vendor/items");
   return { ok: true };
 }
 
@@ -322,7 +322,7 @@ export async function decideItemType(id: string, approve: boolean) {
     .update({ status: approve ? "approved" : "rejected", approved_by: user!.id, decided_at: new Date().toISOString() } as never)
     .eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/vendor/requests");
+  revalidatePath("/vendor/items");
   return { ok: true };
 }
 
@@ -520,5 +520,56 @@ export async function setOffersWashDry(on: boolean) {
   const { error } = await supabase.from("vendors").update({ offers_wash_dry: on } as never).eq("id", ctx.vendorId);
   if (error) return { error: error.message };
   revalidatePath("/vendor/profile");
+  return { ok: true };
+}
+
+// ─── Items manager (edit/delete the vendor's price-list items) ───────────────
+// Prices and the catalogue are business-wide, so only a business-wide manager
+// may change them (RLS on price_list / item_types enforces this too).
+async function requireItemsManager(vendorId: string) {
+  const ctx = await getVendorContext();
+  if (ctx.vendorId !== vendorId) return { error: "Wrong laundry." } as const;
+  if (!ctx.isManager) return { error: "Only a business-wide manager can edit items." } as const;
+  return { ok: true as const };
+}
+
+/** Change an item's price (whole naira). */
+export async function updateItemPrice(priceId: string, vendorId: string, price: number) {
+  const g = await requireItemsManager(vendorId);
+  if ("error" in g) return g;
+  if (!Number.isFinite(price) || price < 0) return { error: "Enter a valid price." };
+  const supabase = createClient();
+  const { error } = await supabase.from("price_list")
+    .update({ price: Math.round(price) } as never).eq("id", priceId).eq("vendor_id", vendorId);
+  if (error) return { error: error.message };
+  revalidatePath("/vendor/items");
+  return { ok: true };
+}
+
+/** Rename one of the vendor's own item types (global catalogue names are admin-only). */
+export async function renameVendorItem(itemTypeId: string, vendorId: string, name: string) {
+  const g = await requireItemsManager(vendorId);
+  if ("error" in g) return g;
+  const nm = name.trim();
+  if (!nm) return { error: "Enter an item name." };
+  if (nm.length > 60) return { error: "Keep the name under 60 characters." };
+  const supabase = createClient();
+  // The eq on vendor_id means only this laundry's own item types can be renamed;
+  // RLS blocks it otherwise.
+  const { error } = await supabase.from("item_types")
+    .update({ name: nm } as never).eq("id", itemTypeId).eq("vendor_id", vendorId);
+  if (error) return { error: error.message };
+  revalidatePath("/vendor/items");
+  return { ok: true };
+}
+
+/** Remove an item from the vendor's price list (doesn't affect past orders). */
+export async function deleteVendorItem(priceId: string, vendorId: string) {
+  const g = await requireItemsManager(vendorId);
+  if ("error" in g) return g;
+  const supabase = createClient();
+  const { error } = await supabase.from("price_list").delete().eq("id", priceId).eq("vendor_id", vendorId);
+  if (error) return { error: error.message };
+  revalidatePath("/vendor/items");
   return { ok: true };
 }
