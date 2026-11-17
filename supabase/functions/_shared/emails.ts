@@ -314,6 +314,17 @@ export const EMAIL_TEMPLATES: Record<string, (ctx: EmailContext) => { subject: s
     button: { label: "Sign in", url: String(ctx.signin_url ?? "#"), tone: "ink" },
   }),
 
+  account_welcome: (ctx) => build(`Welcome to laundriroom`, {
+    preheader: "Your account is ready — let's get your laundry sorted.",
+    heading: `Welcome to laundriroom${ctx.customer_name ? `, ${c(ctx, "customer_name")}` : ""}`,
+    accent: CHAMP,
+    paragraphs: [
+      `Hi ${c(ctx, "customer_name", "there")}, your account is all set. laundriroom handles the whole chore — pickup, professional cleaning and doorstep delivery, tracked from check-in to handover.`,
+      `Place your first order in a couple of taps, pay securely online or on delivery, and we'll take it from there.`,
+    ],
+    button: { label: "Start your first order", url: String(ctx.order_url ?? ctx.signin_url ?? "#"), tone: "ink" },
+  }),
+
   // ── Support alerts (to admins & support agents) ─────────────────────────
   ticket_opened: (ctx) => build(`New ticket #${c(ctx, "ticket_number")} — ${c(ctx, "subject")}`, {
     preheader: `${c(ctx, "customer_name", "A customer")} needs help`,
