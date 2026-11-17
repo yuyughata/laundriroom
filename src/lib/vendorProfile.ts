@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import type { DeliveryMode, ServiceType, VendorStatus } from "@/lib/database.types";
 
@@ -36,9 +37,22 @@ export const getVendorProfile = cache(async (slug: string): Promise<VendorProfil
   return (data as VendorProfile | null) ?? null;
 });
 
-/** The app's public base URL, for links vendors share. */
+/**
+ * The app's public base URL, for the links and QR codes shared from the app.
+ * Prefers NEXT_PUBLIC_SITE_URL when it's a real https URL; otherwise falls back
+ * to the domain the request actually arrived on (so QRs/links match the live
+ * site even if the build-time env var was missing), then localhost in dev.
+ */
 export function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  const env = process.env.NEXT_PUBLIC_SITE_URL;
+  if (env && /^https:\/\//i.test(env)) return env.replace(/\/$/, "");
+  try {
+    const h = headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    if (host && !/^(localhost|127\.|\[::1\])/i.test(host)) return `${proto}://${host}`.replace(/\/$/, "");
+  } catch { /* not in a request scope (e.g. build) — fall through */ }
+  return (env && /^https?:\/\//i.test(env) ? env : "http://localhost:3000").replace(/\/$/, "");
 }
 
 /** The shareable profile link for a vendor. */
