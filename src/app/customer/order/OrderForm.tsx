@@ -211,10 +211,10 @@ export function OrderForm({
         )}
         <div className="space-y-2">
           {ordered.map((v) => (
-            <button type="button" key={v.id} onClick={() => chooseVendor(v)}
-              className={`card flex w-full items-center justify-between p-4 text-left ${
+            <div key={v.id}
+              className={`card flex w-full items-center justify-between p-4 ${
                 vendorId === v.id ? "ring-2 ring-ink" : ""} ${v.openNow ? "" : "opacity-70"}`}>
-              <div>
+              <button type="button" onClick={() => chooseVendor(v)} className="min-w-0 flex-1 text-left">
                 <p className="font-medium text-ink">{v.name}</p>
                 <p className="text-xs text-slate">
                   {v.branches.length > 1
@@ -226,12 +226,13 @@ export function OrderForm({
                     ? <Stars value={v.rating} size={13} showValue count={v.reviewCount} />
                     : <span className="text-xs text-slate">No reviews yet</span>}
                 </div>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
+              </button>
+              <div className="flex shrink-0 flex-col items-end gap-1.5 pl-3">
                 <span className={v.openNow ? "chip-ok" : "chip-muted"}>{v.openNow ? "Open" : "Closed"}</span>
                 {vendorKm(v) != null && <span className="text-xs font-medium text-ink">{fmtKm(vendorKm(v)!)}</span>}
+                <a href={`/v/${v.slug}`} className="btn-ghost whitespace-nowrap px-2.5 py-1 text-xs">View prices</a>
               </div>
-            </button>
+            </div>
           ))}
         </div>
         {!showAll && vendors.length > 1 && (
