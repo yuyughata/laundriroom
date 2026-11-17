@@ -8,7 +8,7 @@
 /** The app's public address, so emails link back here and load its logo. */
 const SITE = () => process.env.NEXT_PUBLIC_SITE_URL || "";
 
-export type AccountEvent = "password_changed" | "account_updated" | "account_suspended" | "account_reactivated";
+export type AccountEvent = "account_welcome" | "password_changed" | "account_updated" | "account_suspended" | "account_reactivated";
 
 export async function notifyUser(event: AccountEvent, userId: string, context: Record<string, string> = {}) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,6 +24,7 @@ export async function notifyUser(event: AccountEvent, userId: string, context: R
         user_id: userId,
         context: {
           signin_url: `${site}/login`,
+          order_url: `${site}/customer/order`,
           account_url: `${site}/account/password`,
           support_url: `${site}/customer/support`,
           changed_at: new Date().toLocaleString("en-GB", { timeZone: "Africa/Lagos", dateStyle: "medium", timeStyle: "short" }),

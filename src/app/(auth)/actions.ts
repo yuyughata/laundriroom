@@ -56,6 +56,8 @@ export async function signUp(_prev: unknown, formData: FormData) {
   // by the new-user trigger, and terms_accepted_at isn't a guarded column).
   if (signed.user?.id) {
     await supabase.from("profiles").update({ terms_accepted_at: new Date().toISOString() } as never).eq("id", signed.user.id);
+    // Branded welcome email via Resend (best-effort — never blocks sign-up).
+    await notifyUser("account_welcome", signed.user.id);
   }
 
   // signUp signs the user in (email confirmation pending) → straight to the
