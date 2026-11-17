@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { sendWelcomeEmail } from "@/lib/resend";
 import type { DeliveryMode } from "@/lib/database.types";
 
 /**
@@ -68,5 +69,9 @@ export async function submitApplication(formData: FormData) {
     applicant_id: applicantId,
   } as never);
   if (error) return { error: error.message };
+
+  // Welcome the new account holder (only when we just created the account here;
+  // best-effort, never blocks the application).
+  if (!current) await sendWelcomeEmail(email, contact_name);
   return { ok: true };
 }
