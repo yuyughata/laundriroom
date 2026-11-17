@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { homeFor } from "@/lib/auth";
 import { notifyUser } from "@/lib/notify";
+import { sendWelcomeEmail } from "@/lib/resend";
 import { safeNext } from "@/lib/nav";
 
 export async function signIn(_prev: unknown, formData: FormData) {
@@ -56,9 +57,10 @@ export async function signUp(_prev: unknown, formData: FormData) {
   // by the new-user trigger, and terms_accepted_at isn't a guarded column).
   if (signed.user?.id) {
     await supabase.from("profiles").update({ terms_accepted_at: new Date().toISOString() } as never).eq("id", signed.user.id);
-    // Branded welcome email via Resend (best-effort — never blocks sign-up).
-    await notifyUser("account_welcome", signed.user.id);
   }
+  // Branded welcome email, sent straight from the app via Resend (best-effort —
+  // never blocks sign-up). Direct, so it doesn't depend on the edge function.
+  await sendWelcomeEmail(email, full_name);
 
   // signUp signs the user in (email confirmation pending) → straight to the
   // app, or back to where they were heading (e.g. a vendor's order form).
