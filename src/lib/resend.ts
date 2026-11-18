@@ -1,5 +1,6 @@
 import "server-only";
 import { EMAIL_TEMPLATES, setEmailAssetBase, type EmailContext } from "@/lib/emails";
+import { siteUrl } from "@/lib/vendorProfile";
 
 /**
  * Direct transactional email via Resend's HTTP API, for the few emails the app
@@ -34,14 +35,17 @@ async function send(to: string, subject: string, html: string, text: string): Pr
 
 /** "Welcome to laundriroom" — sent to a new customer right after sign-up. */
 export async function sendWelcomeEmail(to: string, fullName: string): Promise<boolean> {
-  const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  // Always an absolute base: prefers NEXT_PUBLIC_SITE_URL, else the request's
+  // host, else the production domain — never a host-less link like
+  // "http:///customer/order" (which happened when the env var was unset).
+  const site = siteUrl().replace(/\/$/, "");
   setEmailAssetBase(site);
   const ctx: EmailContext = {
     customer_name: fullName,
     email: to,
-    order_url: `${site || ""}/customer/order`,
-    signin_url: `${site || ""}/login`,
-    support_url: `${site || ""}/customer/support`,
+    order_url: `${site}/customer/order`,
+    signin_url: `${site}/login`,
+    support_url: `${site}/customer/support`,
   };
   const { subject, html, text } = EMAIL_TEMPLATES.account_welcome(ctx);
   return send(to, subject, html, text);
