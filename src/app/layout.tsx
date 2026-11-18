@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ui/ServiceWorker";
+import { InstallPrompt } from "@/components/ui/InstallPrompt";
 
 export const metadata: Metadata = {
   title: "laundriroom — Laundry, handled",
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <ServiceWorker />
+        <InstallPrompt />
       </body>
     </html>
   );
