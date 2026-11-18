@@ -146,6 +146,8 @@ export type Order = {
   promo_code: string | null; discount: number;
   discount_type: "percent" | "fixed" | null; discount_value: number | null; discount_max: number | null;
   discount_vendor_funded?: boolean;
+  /** Minimum order value for the applied promo (0054); the discount is 0 below it. */
+  discount_min_order?: number;
   pickup_address_id: string | null; notes: string | null;
   created_at: string; checked_in_at: string | null; ready_at: string | null;
   completed_at: string | null; closed_at: string | null;
