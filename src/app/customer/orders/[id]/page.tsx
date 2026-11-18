@@ -11,7 +11,11 @@ import { Stars } from "@/components/ui/Stars";
 import { PromoInput } from "@/components/ui/PromoInput";
 import { ReviewCard } from "./ReviewCard";
 import { ClaimCard } from "./ClaimCard";
+import { OrderLive } from "@/components/ui/OrderLive";
 import type { Order, OrderItem, StageEvent, Payment, Vendor, OrderExtra, Review, Claim } from "@/lib/database.types";
+
+// Live order status: never cache this route, so router.refresh() always re-reads.
+export const dynamic = "force-dynamic";
 
 const TIMELINE: { key: string; label: string }[] = [
   { key: "checked_in", label: "Checked in" },
@@ -61,6 +65,7 @@ export default async function TrackOrder({
 
   return (
     <CustomerShell>
+      <OrderLive orderId={o.id} signature={`${o.status}|${sts.length}|${its.length}|${isPaid ? 1 : 0}`} />
       <Link href="/customer" className="text-sm text-slate">← Orders</Link>
 
       <div className="mt-3 flex items-center justify-between">
