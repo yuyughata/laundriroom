@@ -1,10 +1,29 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createVendorPromo, toggleVendorPromo } from "../actions";
+import { createVendorPromo, toggleVendorPromo, updateVendorPromo, deleteVendorPromo } from "../actions";
 import { money, dateShort } from "@/lib/format";
 import { QrCard } from "@/components/promo/QrCard";
 import type { PromoCode } from "@/lib/database.types";
+
+/** Shared vendor promo field grid, prefilled for editing. */
+function VendorPromoFields({ p }: { p?: PromoCode }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div><label className="label">Code</label><input name="code" className="field uppercase" placeholder="FOLD10" defaultValue={p?.code} /></div>
+      <div><label className="label">Type</label>
+        <select name="discount_type" className="field" defaultValue={p?.discount_type ?? "percent"}>
+          <option value="percent">Percent (%)</option><option value="fixed">Fixed (₦)</option>
+        </select>
+      </div>
+      <div><label className="label">Value</label><input name="value" className="field" inputMode="numeric" placeholder="10 or 500" defaultValue={p?.value} /></div>
+      <div><label className="label">Max discount (₦, percent)</label><input name="max_discount" className="field" inputMode="numeric" placeholder="optional" defaultValue={p?.max_discount ?? ""} /></div>
+      <div><label className="label">Usage limit</label><input name="usage_limit" className="field" inputMode="numeric" placeholder="blank = unlimited" defaultValue={p?.usage_limit ?? ""} /></div>
+      <div><label className="label">Per customer</label><input name="per_customer_limit" className="field" inputMode="numeric" defaultValue={p?.per_customer_limit ?? 1} /></div>
+      <div><label className="label">Expires</label><input name="expires_at" type="date" className="field" defaultValue={p?.expires_at ? p.expires_at.slice(0, 10) : ""} /></div>
+    </div>
+  );
+}
 
 export function NewVendorPromo({ vendorId, canManage }: { vendorId: string; canManage: boolean }) {
   const [open, setOpen] = useState(false);
@@ -22,17 +41,7 @@ export function NewVendorPromo({ vendorId, canManage }: { vendorId: string; canM
     })}>
       <input type="hidden" name="vendor_id" value={vendorId} />
       <p className="font-medium text-ink">New promo (vendor-funded)</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div><label className="label">Code</label><input name="code" className="field uppercase" placeholder="FOLD10" /></div>
-        <div><label className="label">Type</label>
-          <select name="discount_type" className="field"><option value="percent">Percent (%)</option><option value="fixed">Fixed (₦)</option></select>
-        </div>
-        <div><label className="label">Value</label><input name="value" className="field" inputMode="numeric" placeholder="10 or 500" /></div>
-        <div><label className="label">Max discount (₦, percent)</label><input name="max_discount" className="field" inputMode="numeric" placeholder="optional" /></div>
-        <div><label className="label">Usage limit</label><input name="usage_limit" className="field" inputMode="numeric" placeholder="blank = unlimited" /></div>
-        <div><label className="label">Per customer</label><input name="per_customer_limit" className="field" inputMode="numeric" defaultValue="1" /></div>
-        <div><label className="label">Expires</label><input name="expires_at" type="date" className="field" /></div>
-      </div>
+      <VendorPromoFields />
       <p className="text-xs text-warn">This discount comes out of your payout, not the platform.</p>
       {err && <p className="text-sm text-danger">{err}</p>}
       <div className="flex gap-2">
@@ -46,9 +55,21 @@ export function NewVendorPromo({ vendorId, canManage }: { vendorId: string; canM
 export function VendorPromoRow({ promo, canManage, qrUrl }: { promo: PromoCode; canManage: boolean; qrUrl: string }) {
   const [pending, start] = useTransition();
   const [showQr, setShowQr] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const discount = promo.discount_type === "percent"
     ? `${promo.value}%${promo.max_discount ? ` (max ${money(promo.max_discount)})` : ""}`
     : money(promo.value);
+
+  function remove() {
+    if (!window.confirm(`Delete promo code ${promo.code}? This can’t be undone.`)) return;
+    setErr(null);
+    start(async () => {
+      const r = await deleteVendorPromo(promo.id);
+      if (r?.error) setErr(r.error);
+    });
+  }
+
   return (
     <>
     <tr className={promo.active ? "" : "opacity-60"}>
@@ -64,12 +85,46 @@ export function VendorPromoRow({ promo, canManage, qrUrl }: { promo: PromoCode; 
           </button>
         ) : <span className={promo.active ? "chip-ok" : "chip-muted"}>{promo.active ? "Active" : "Off"}</span>}
       </td>
-      <td className="px-4 py-3 text-right">
-        <button type="button" className="btn-ghost px-3 py-1 text-xs" aria-expanded={showQr} onClick={() => setShowQr((v) => !v)}>
-          {showQr ? "Hide QR" : "QR code"}
-        </button>
+      <td className="px-4 py-3">
+        <div className="flex flex-wrap justify-end gap-1">
+          {canManage && (
+            <button type="button" className="btn-ghost px-3 py-1 text-xs" onClick={() => { setEditing((v) => !v); setErr(null); }}>
+              {editing ? "Close" : "Edit"}
+            </button>
+          )}
+          <button type="button" className="btn-ghost px-3 py-1 text-xs" aria-expanded={showQr} onClick={() => setShowQr((v) => !v)}>
+            {showQr ? "Hide QR" : "QR code"}
+          </button>
+          {canManage && (
+            <button type="button" className="btn-ghost px-3 py-1 text-xs text-danger" disabled={pending} onClick={remove}>
+              Delete
+            </button>
+          )}
+        </div>
       </td>
     </tr>
+    {err && (
+      <tr><td colSpan={6} className="px-4 pb-3 text-sm text-danger">{err}</td></tr>
+    )}
+    {editing && canManage && (
+      <tr className="bg-ivory/60">
+        <td colSpan={6} className="px-4 py-4">
+          <form className="space-y-3" action={(fd) => start(async () => {
+            setErr(null);
+            const r = await updateVendorPromo(promo.id, fd);
+            if (r?.error) setErr(r.error); else setEditing(false);
+          })}>
+            <p className="font-medium text-ink">Edit {promo.code}</p>
+            <VendorPromoFields p={promo} />
+            <p className="text-xs text-warn">This discount comes out of your payout, not the platform.</p>
+            <div className="flex gap-2">
+              <button className="btn-primary text-sm" disabled={pending}>Save changes</button>
+              <button type="button" className="btn-ghost text-sm" onClick={() => { setEditing(false); setErr(null); }}>Cancel</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+    )}
     {showQr && (
       <tr className="bg-ivory/60">
         <td colSpan={6} className="px-4 py-3">
