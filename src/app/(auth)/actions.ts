@@ -6,6 +6,7 @@ import { homeFor } from "@/lib/auth";
 import { notifyUser } from "@/lib/notify";
 import { sendWelcomeEmail } from "@/lib/resend";
 import { safeNext } from "@/lib/nav";
+import { siteUrl as resolveSiteUrl } from "@/lib/vendorProfile";
 
 export async function signIn(_prev: unknown, formData: FormData) {
   const email = String(formData.get("email") || "");
@@ -41,7 +42,9 @@ export async function signUp(_prev: unknown, formData: FormData) {
   }
 
   const supabase = createClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  // Request-aware absolute base (env → request host → production domain), so the
+  // confirmation link is never a localhost URL in production.
+  const siteUrl = resolveSiteUrl();
   const { data: signed, error } = await supabase.auth.signUp({
     email,
     password,
