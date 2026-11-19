@@ -2,6 +2,8 @@ import { AdminShell } from "@/components/shells/AdminShell";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { HomepageEditor } from "./HomepageEditor";
+import { SectionsManager } from "./SectionsManager";
+import type { HomeSectionRow } from "@/lib/homepageSections";
 
 /** Admin → Homepage: edit the public landing-page copy. */
 export default async function AdminHomepage() {
@@ -11,6 +13,9 @@ export default async function AdminHomepage() {
   const values = Object.fromEntries(
     ((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]),
   ) as Record<string, string>;
+  const { data: sectionRows } = await supabase.from("homepage_sections" as never)
+    .select("*").order("position");
+  const sections = (sectionRows ?? []) as HomeSectionRow[];
 
   return (
     <AdminShell active="/admin/homepage" name={profile.full_name} role={profile.role}>
@@ -28,7 +33,10 @@ export default async function AdminHomepage() {
           Homepage content can&apos;t be edited until database migration 0055 is applied.
         </p>
       ) : (
-        <HomepageEditor values={values} />
+        <>
+          <HomepageEditor values={values} />
+          <SectionsManager sections={sections} />
+        </>
       )}
     </AdminShell>
   );
