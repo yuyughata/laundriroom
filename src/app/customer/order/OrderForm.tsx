@@ -70,6 +70,10 @@ export function OrderForm({
 
   const vendor = vendors.find((v) => v.id === vendorId);
   const branch = vendor?.branches.find((b) => b.id === branchId) ?? vendor?.branches[0];
+  // Premium extras belong to the chosen laundry (0060).
+  const vendorExtras = extras.filter((e) => e.vendor_id === vendor?.id);
+  // Clear extra picks when the laundry changes — they're vendor-specific.
+  useEffect(() => { setChosenExtras([]); }, [vendorId]);
   const canDispatch = vendor && (vendor.delivery === "both" || vendor.delivery === "dispatch_partner");
   const needsAddress = entry === "pickup" || ret === "delivery";
 
@@ -150,11 +154,11 @@ export function OrderForm({
   }, [pricedByDistance, needsAddress, vendor?.id, branch?.id, addrKey]);
 
   const extrasTotal = tier === "premium"
-    ? extras.filter((e) => chosenExtras.includes(e.id) && e.price_type !== "percent").reduce((s, e) => s + Number(e.price), 0)
+    ? vendorExtras.filter((e) => chosenExtras.includes(e.id) && e.price_type !== "percent").reduce((s, e) => s + Number(e.price), 0)
     : 0;
   // Percentage extras are resolved to ₦ after check-in, so show them as a rate.
   const percentExtras = tier === "premium"
-    ? extras.filter((e) => chosenExtras.includes(e.id) && e.price_type === "percent")
+    ? vendorExtras.filter((e) => chosenExtras.includes(e.id) && e.price_type === "percent")
     : [];
   const vendorOpen = branch?.openNow ?? false;
 
@@ -318,11 +322,11 @@ export function OrderForm({
       {!washDryMode && tier === "premium" && (
         <section>
           <p className="label">Premium extras</p>
-          {extras.length === 0 ? (
+          {vendorExtras.length === 0 ? (
             <p className="text-xs text-slate">No extras available yet.</p>
           ) : (
             <div className="space-y-2">
-              {extras.map((e) => {
+              {vendorExtras.map((e) => {
                 const on = chosenExtras.includes(e.id);
                 return (
                   <button type="button" key={e.id} onClick={() => toggleExtra(e.id)}

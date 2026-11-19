@@ -215,6 +215,8 @@ export type ServiceExtra = {
   price: number; active: boolean; created_at: string;
   /** 'fixed' = flat ₦ price; 'percent' = % of items subtotal after check-in (0058). */
   price_type?: "fixed" | "percent"; percent?: number;
+  /** Owning vendor (0060); NULL = retired legacy global. */
+  vendor_id?: string | null;
 };
 export type OrderExtra = {
   id: string; order_id: string; extra_id: string | null;

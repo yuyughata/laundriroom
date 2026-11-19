@@ -234,7 +234,8 @@ export async function createOrder(formData: FormData) {
   // Snapshot chosen premium extras onto the order (premium tier only).
   if (service_tier === "premium" && extraIds.length > 0) {
     const { data: extras } = await supabase
-      .from("service_extras").select("id, name, price, price_type, percent").in("id", extraIds).eq("active", true);
+      .from("service_extras").select("id, name, price, price_type, percent")
+      .in("id", extraIds).eq("active", true).eq("vendor_id", vendor_id);
     const rows = (extras ?? []).map((e) => {
       const pct = (e as { price_type?: string }).price_type === "percent";
       return {

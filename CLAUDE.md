@@ -64,8 +64,8 @@ promote an admin → deploy edge functions → wire Paystack).
   the old values for history, but nothing creates them.
 - **Three orthogonal order dimensions:** service *kind* per item
   (`service_type`: wash & fold / dry clean / press), quality *tier* per order
-  (`service_tier`: standard / premium — premium unlocks admin-defined
-  `service_extras`), and *turnaround* per order (`turnaround`: normal / express,
+  (`service_tier`: standard / premium — premium unlocks vendor-defined
+  `service_extras`, see 0060), and *turnaround* per order (`turnaround`: normal / express,
   with admin percentages in `platform_settings`). Order total =
   items + extras + delivery + express markup + premium markup + any reschedule
   penalty, all recomputed by DB triggers.
@@ -80,6 +80,17 @@ promote an admin → deploy edge functions → wire Paystack).
   `price_type`/`percent`; the price is 0 until check-in. Admin sets the type at
   Admin → Services & extras; the order forms show percent extras as "+X%" and
   the customer order page shows "X% of items / After check-in" until priced.
+- **Per-vendor premium extras (`0060`):** `service_extras.vendor_id` — each
+  laundry defines and prices its own premium extras (fixed ₦ or %) at
+  **Vendor → Items → Premium extras** (`ExtrasManager.tsx` +
+  `src/lib/vendorExtrasActions.ts`, business-wide manager only). RLS mirrors
+  branches: active extras are publicly readable, a vendor's manager (or admin)
+  writes its own (`is_vendor_manager(vendor_id)`). The order forms load/show
+  only the **chosen laundry's** active extras; `createOrder`/`createVendorOrder`
+  snapshot only extras belonging to that vendor. The old global admin list is
+  retired (existing active globals were copied to every vendor by 0060); the
+  Admin → Services & extras page now just keeps wash & dry and points to the
+  per-vendor model.
 - **Who earns what (`0041`/`0042`):** `orders.commission_markup` is the rate
   added to item prices — the global commission on a normal order, 0 on an
   express order — set on insert by trigger and only changed by a turnaround
