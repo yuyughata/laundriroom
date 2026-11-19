@@ -91,6 +91,18 @@ promote an admin → deploy edge functions → wire Paystack).
   retired (existing active globals were copied to every vendor by 0060); the
   Admin → Services & extras page now just keeps wash & dry and points to the
   per-vendor model.
+- **Vendor services + price search (`0061`):** the three services stay the
+  system-wide `service_type`, but each vendor chooses which it offers and
+  renames the customer-facing label (`vendor_services(vendor_id, service,
+  enabled, label)`; no row = offered + default label; public read, manager
+  write; `src/lib/vendorServices.ts` resolves rows → labels/enabled). Managed at
+  **Vendor → Items → Services** (`ServicesManager.tsx`, `saveVendorService`).
+  Labels + the offered set flow to the public `/v/<slug>` Prices box and the
+  check-in service dropdown (`OrderWorkspace` `serviceOptions`/`svcLabels`);
+  internal/admin views still use the default `SERVICE_LABEL`. The public Prices
+  box also has a responsive **search box** (`v/[slug]/PriceList.tsx`) to filter
+  100+ items, and an item's **service is editable** in the Items manager
+  (`updateItemService`, guarded against a duplicate item+service).
 - **Who earns what (`0041`/`0042`):** `orders.commission_markup` is the rate
   added to item prices — the global commission on a normal order, 0 on an
   express order — set on insert by trigger and only changed by a turnaround

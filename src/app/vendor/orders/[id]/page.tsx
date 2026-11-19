@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { VendorShell } from "@/components/shells/VendorShell";
 import { getVendorContext } from "@/lib/vendor";
 import { createClient } from "@/lib/supabase/server";
+import { enabledServices, serviceLabels, type VendorServiceRow } from "@/lib/vendorServices";
 import { OrderWorkspace } from "./OrderWorkspace";
 import { OrderActivity, type ActivityRow } from "@/components/orders/OrderActivity";
 import { OrderContactCard, type OrderContact } from "@/components/orders/OrderContactCard";
@@ -16,7 +17,7 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
   if (!order || (order as Order).vendor_id !== ctx.vendorId) notFound();
   const o = order as Order;
 
-  const [{ data: items }, { data: itemTypes }, { data: prices }, { data: payments }, { data: contactRows }, { data: extras }, { data: activity }, { data: riders }, { data: stageRows }] =
+  const [{ data: items }, { data: itemTypes }, { data: prices }, { data: payments }, { data: contactRows }, { data: extras }, { data: activity }, { data: riders }, { data: stageRows }, { data: svcData }] =
     await Promise.all([
       supabase.from("order_items").select("*").eq("order_id", o.id).order("sub_code"),
       supabase.from("item_types").select("*").or(`is_global.eq.true,vendor_id.eq.${ctx.vendorId}`).eq("active", true).order("name"),
@@ -32,7 +33,11 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
       supabase.from("rider_contacts").select("*").eq("vendor_id", ctx.vendorId).eq("active", true)
         .order("last_used_at", { ascending: false, nullsFirst: false }).order("name").limit(300),
       supabase.from("stage_events").select("stage").eq("order_id", o.id),
+      supabase.from("vendor_services").select("service, enabled, label").eq("vendor_id", ctx.vendorId),
     ]);
+  const svcRows = (svcData ?? []) as VendorServiceRow[];
+  const serviceOptions = enabledServices(svcRows);
+  const svcLabels = serviceLabels(svcRows);
   const contact = (Array.isArray(contactRows) ? contactRows[0] : null) as OrderContact | null;
   const rows = (Array.isArray(activity) ? activity : []) as ActivityRow[];
   // Item sub-code → the staff member who checked it in.
@@ -57,6 +62,8 @@ export default async function VendorOrderDetail({ params }: { params: { id: stri
         checkedInBy={checkedInBy}
         riders={((riders ?? []) as RiderContact[]).filter((r) => !r.branch_id || r.branch_id === o.branch_id)}
         doneStages={((stageRows ?? []) as { stage: string }[]).map((r) => r.stage)}
+        serviceOptions={serviceOptions.length ? serviceOptions : undefined}
+        svcLabels={svcLabels}
       />
       <div className="mt-5">
         <OrderContactCard contact={contact} orderCode={o.code} />
