@@ -5,7 +5,8 @@ import { Logo } from "@/components/ui/Logo";
 import { Stars } from "@/components/ui/Stars";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { getProfile } from "@/lib/auth";
-import { money, dateShort, SERVICE_LABEL } from "@/lib/format";
+import { dateShort } from "@/lib/format";
+import { PriceList } from "./PriceList";
 import { hoursLabel, isVendorOpenNow } from "@/lib/hours";
 import {
   getVendorProfile, siteUrl, vendorOrderPath, vendorProfileUrl, type VendorProfile,
@@ -83,7 +84,6 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
   }
   const priceRows = Array.from(items.entries());
   const services = SERVICES.filter((s) => priceRows.some(([, r]) => r[s] != null));
-  const FIRST = 10;
 
   const orderCta = (big = false) => {
     const cls = `btn-accent ${big ? "w-full sm:w-auto sm:px-8" : "w-full sm:w-auto"}`;
@@ -243,15 +243,7 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
               <h2 className="font-display text-lg text-ink">Prices</h2>
               <p className="text-xs text-slate">Per item · standard turnaround</p>
             </div>
-            <PriceTable rows={priceRows.slice(0, FIRST)} services={services} />
-            {priceRows.length > FIRST && (
-              <details className="group">
-                <summary className="mt-2 cursor-pointer list-none text-sm font-medium text-ink underline group-open:hidden">
-                  Show all {priceRows.length} items
-                </summary>
-                <PriceTable rows={priceRows.slice(FIRST)} services={services} hideHead />
-              </details>
-            )}
+            <PriceList rows={priceRows} services={services} />
             <p className="mt-3 text-xs text-slate">
               Prices are confirmed when your items are checked in. Express and Premium cost a little more; delivery is added if you choose it.
             </p>
@@ -322,39 +314,5 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
         </footer>
       </div>
     </main>
-  );
-}
-
-function PriceTable({ rows, services, hideHead = false }: {
-  rows: [string, Partial<Record<ServiceType, number>>][]; services: ServiceType[]; hideHead?: boolean;
-}) {
-  return (
-    <table className="mt-3 w-full table-fixed text-sm">
-      {/* Fixed column widths so the "show all" table lines up with the first. */}
-      <colgroup>
-        <col />
-        {services.map((s) => <col key={s} className="w-[4.6rem] sm:w-28" />)}
-      </colgroup>
-      {!hideHead && (
-        <thead>
-          <tr className="text-left text-xs text-slate">
-            <th className="py-2 pr-2 font-medium">Item</th>
-            {services.map((s) => <th key={s} className="py-2 pl-2 text-right font-medium">{SERVICE_LABEL[s]}</th>)}
-          </tr>
-        </thead>
-      )}
-      <tbody className="divide-y divide-ink/5">
-        {rows.map(([item, r]) => (
-          <tr key={item}>
-            <td className="py-2.5 pr-2 text-ink">{item}</td>
-            {services.map((s) => (
-              <td key={s} className="whitespace-nowrap py-2.5 pl-2 text-right text-ink">
-                {r[s] != null ? money(r[s]) : <span className="text-slate">—</span>}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateItemPrice, renameVendorItem, deleteVendorItem, addVendorItem } from "../actions";
+import { updateItemPrice, updateItemService, renameVendorItem, deleteVendorItem, addVendorItem } from "../actions";
 import { SERVICE_LABEL } from "@/lib/format";
 import type { ServiceType } from "@/lib/database.types";
 
@@ -77,17 +77,22 @@ export function ItemsManager({ items, vendorId }: { items: ManagedItem[]; vendor
 function ItemRow({ item, vendorId }: { item: ManagedItem; vendorId: string }) {
   const [name, setName] = useState(item.name);
   const [price, setPrice] = useState(String(item.price));
+  const [service, setService] = useState<ServiceType>(item.service);
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const dirty = name.trim() !== item.name || price !== String(item.price);
+  const dirty = name.trim() !== item.name || price !== String(item.price) || service !== item.service;
 
   function save() {
     setErr(null); setSaved(false);
     start(async () => {
       if (item.vendorOwned && name.trim() !== item.name) {
         const r = await renameVendorItem(item.itemTypeId, vendorId, name);
+        if (r && "error" in r && r.error) { setErr(r.error); return; }
+      }
+      if (service !== item.service) {
+        const r = await updateItemService(item.priceId, vendorId, service);
         if (r && "error" in r && r.error) { setErr(r.error); return; }
       }
       if (price !== String(item.price)) {
@@ -116,9 +121,12 @@ function ItemRow({ item, vendorId }: { item: ManagedItem; vendorId: string }) {
             onChange={(e) => setName(e.target.value)} />
           {!item.vendorOwned && <p className="mt-1 text-[11px] text-slate">Shared catalogue name — ask laundriroom to rename.</p>}
         </div>
-        <div className="w-28">
+        <div className="w-36">
           <label className="label">Service</label>
-          <input className="field bg-ink/5" value={SERVICE_LABEL[item.service]} disabled readOnly />
+          <select className="field" value={service} disabled={pending}
+            onChange={(e) => setService(e.target.value as ServiceType)}>
+            {SERVICES.map((s) => <option key={s} value={s}>{SERVICE_LABEL[s]}</option>)}
+          </select>
         </div>
         <div className="w-32">
           <label className="label">Price (₦)</label>

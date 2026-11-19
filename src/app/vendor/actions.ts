@@ -588,6 +588,22 @@ export async function updateItemPrice(priceId: string, vendorId: string, price: 
   return { ok: true };
 }
 
+/** Change which service a priced item is for (e.g. Wash & fold → Dry clean). */
+export async function updateItemService(priceId: string, vendorId: string, service: ServiceType) {
+  const g = await requireItemsManager(vendorId);
+  if ("error" in g) return g;
+  if (!["wash_and_fold", "dry_clean", "press_only"].includes(service)) return { error: "Pick a valid service." };
+  const supabase = createClient();
+  const { error } = await supabase.from("price_list")
+    .update({ service } as never).eq("id", priceId).eq("vendor_id", vendorId);
+  if (error) {
+    if (error.code === "23505") return { error: "This item already has a price for that service." };
+    return { error: error.message };
+  }
+  revalidatePath("/vendor/items");
+  return { ok: true };
+}
+
 /** Rename one of the vendor's own item types (global catalogue names are admin-only). */
 export async function renameVendorItem(itemTypeId: string, vendorId: string, name: string) {
   const g = await requireItemsManager(vendorId);
