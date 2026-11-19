@@ -69,6 +69,17 @@ promote an admin → deploy edge functions → wire Paystack).
   with admin percentages in `platform_settings`). Order total =
   items + extras + delivery + express markup + premium markup + any reschedule
   penalty, all recomputed by DB triggers.
+- **Percentage premium extras (`0058`):** a `service_extras` row is priced as a
+  flat ₦ amount (`price_type='fixed'`, `price`) **or** a percentage
+  (`price_type='percent'`, `percent`). A percentage extra's amount is
+  `percent%` of the order's **items subtotal (customer prices)**, resolved
+  **after check-in** by `recompute_order` (it updates the `order_extras.price`
+  of percent rows, guarded by `price is distinct from` to avoid re-triggering
+  itself). Like fixed extras the money goes to the **vendor** (it sits in
+  `extras_total`/`v_sub`/`vendor_earnings`). `order_extras` snapshots
+  `price_type`/`percent`; the price is 0 until check-in. Admin sets the type at
+  Admin → Services & extras; the order forms show percent extras as "+X%" and
+  the customer order page shows "X% of items / After check-in" until priced.
 - **Who earns what (`0041`/`0042`):** `orders.commission_markup` is the rate
   added to item prices — the global commission on a normal order, 0 on an
   express order — set on insert by trigger and only changed by a turnaround

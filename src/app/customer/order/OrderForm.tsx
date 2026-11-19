@@ -150,8 +150,12 @@ export function OrderForm({
   }, [pricedByDistance, needsAddress, vendor?.id, branch?.id, addrKey]);
 
   const extrasTotal = tier === "premium"
-    ? extras.filter((e) => chosenExtras.includes(e.id)).reduce((s, e) => s + Number(e.price), 0)
+    ? extras.filter((e) => chosenExtras.includes(e.id) && e.price_type !== "percent").reduce((s, e) => s + Number(e.price), 0)
     : 0;
+  // Percentage extras are resolved to ₦ after check-in, so show them as a rate.
+  const percentExtras = tier === "premium"
+    ? extras.filter((e) => chosenExtras.includes(e.id) && e.price_type === "percent")
+    : [];
   const vendorOpen = branch?.openNow ?? false;
 
   function toggleExtra(id: string) {
@@ -328,7 +332,9 @@ export function OrderForm({
                       {e.description && <p className="text-xs text-slate">{e.description}</p>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-ink">{money(e.price)}</span>
+                      <span className="text-sm text-ink">
+                        {e.price_type === "percent" ? `+${Number(e.percent ?? 0)}%` : money(e.price)}
+                      </span>
                       <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${
                         on ? "bg-champagne text-ink" : "bg-ink/10 text-slate"}`}>{on ? "✓" : "+"}</span>
                     </div>
@@ -439,6 +445,9 @@ export function OrderForm({
           )}
           {needsAddress && pricedByDistance && quote?.note && <p className="text-xs text-slate">{quote.note}</p>}
           {!washDryMode && extrasTotal > 0 && <Line label="Premium extras" value={money(extrasTotal)} />}
+          {!washDryMode && percentExtras.map((e) => (
+            <Line key={e.id} label={e.name} value={`+${Number(e.percent ?? 0)}% of items`} />
+          ))}
         </div>
         <p className="mt-2 text-xs text-slate">
           {washDryMode

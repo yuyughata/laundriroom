@@ -213,10 +213,13 @@ export type IntegrationSetting = {
 export type ServiceExtra = {
   id: string; name: string; description: string | null;
   price: number; active: boolean; created_at: string;
+  /** 'fixed' = flat ₦ price; 'percent' = % of items subtotal after check-in (0058). */
+  price_type?: "fixed" | "percent"; percent?: number;
 };
 export type OrderExtra = {
   id: string; order_id: string; extra_id: string | null;
   name: string; price: number; created_at: string;
+  price_type?: "fixed" | "percent"; percent?: number;
 };
 export type PlatformSettings = {
   id: boolean; express_pct: number; premium_pct: number;

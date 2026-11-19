@@ -166,12 +166,19 @@ export async function updateNotificationRule(
 export async function saveExtra(formData: FormData) {
   const supabase = createClient();
   const id = String(formData.get("id") || "");
+  const priceType = String(formData.get("price_type") || "fixed") === "percent" ? "percent" : "fixed";
+  const percent = Math.max(0, Math.min(100, Number(formData.get("percent") || 0)));
+  const fixed = Math.max(0, Number(formData.get("price") || 0));
   const payload = {
     name: String(formData.get("name") || "").trim(),
     description: String(formData.get("description") || "") || null,
-    price: Number(formData.get("price") || 0),
+    price_type: priceType,
+    price: priceType === "fixed" ? fixed : 0,
+    percent: priceType === "percent" ? percent : 0,
   };
   if (!payload.name) return { error: "Enter a name." };
+  if (priceType === "percent" && !(percent > 0)) return { error: "Enter a percentage greater than 0." };
+  if (priceType === "fixed" && !(fixed > 0)) return { error: "Enter a price greater than 0." };
   const { error } = id
     ? await supabase.from("service_extras").update(payload as never).eq("id", id)
     : await supabase.from("service_extras").insert({ ...payload, active: true } as never);
