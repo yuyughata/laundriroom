@@ -45,6 +45,10 @@ export type Profile = {
   referral_code: string | null; referred_by: string | null;
   /** Doesn't want newsletters (0043). */
   newsletter_opt_out?: boolean;
+  /** When the customer accepted the Terms/Privacy at sign-up (0052). */
+  terms_accepted_at?: string | null;
+  /** Set when the account was erased; PII stripped, login disabled (0057). */
+  deleted_at?: string | null;
   created_at: string; updated_at: string;
 }
 
