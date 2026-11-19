@@ -12,6 +12,8 @@ import {
   getVendorProfile, siteUrl, vendorOrderPath, vendorProfileUrl, type VendorProfile,
 } from "@/lib/vendorProfile";
 import type { ServiceType } from "@/lib/database.types";
+import { createClient } from "@/lib/supabase/server";
+import { serviceLabels, enabledServices, type VendorServiceRow } from "@/lib/vendorServices";
 
 /**
  * A vendor's public profile — the link vendors share with their own customers
@@ -83,7 +85,12 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
     items.set(p.item, row);
   }
   const priceRows = Array.from(items.entries());
-  const services = SERVICES.filter((s) => priceRows.some(([, r]) => r[s] != null));
+  // Per-vendor service settings (0061): which services are offered + labels.
+  const { data: svcRows } = await createClient()
+    .from("vendor_services").select("service, enabled, label").eq("vendor_id", v.id);
+  const labels = serviceLabels((svcRows ?? []) as VendorServiceRow[]);
+  const offered = new Set(enabledServices((svcRows ?? []) as VendorServiceRow[]));
+  const services = SERVICES.filter((s) => offered.has(s) && priceRows.some(([, r]) => r[s] != null));
 
   const orderCta = (big = false) => {
     const cls = `btn-accent ${big ? "w-full sm:w-auto sm:px-8" : "w-full sm:w-auto"}`;
@@ -237,13 +244,13 @@ export default async function VendorProfilePage({ params }: { params: { slug: st
         </section>
 
         {/* Prices */}
-        {priceRows.length > 0 && (
+        {services.length > 0 && (
           <section className="card p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-display text-lg text-ink">Prices</h2>
               <p className="text-xs text-slate">Per item · standard turnaround</p>
             </div>
-            <PriceList rows={priceRows} services={services} />
+            <PriceList rows={priceRows.filter(([, r]) => services.some((s) => r[s] != null))} services={services} labels={labels} />
             <p className="mt-3 text-xs text-slate">
               Prices are confirmed when your items are checked in. Express and Premium cost a little more; delivery is added if you choose it.
             </p>

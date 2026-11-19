@@ -223,6 +223,11 @@ export type OrderExtra = {
   name: string; price: number; created_at: string;
   price_type?: "fixed" | "percent"; percent?: number;
 };
+/** Per-vendor service settings (0061): which services offered + custom label. */
+export type VendorService = {
+  vendor_id: string; service: ServiceType; enabled: boolean;
+  label: string | null; updated_at: string;
+};
 export type PlatformSettings = {
   id: boolean; express_pct: number; premium_pct: number;
   noncollection_penalty_pct: number; payment_provider: "paystack" | "flutterwave";
@@ -339,6 +344,7 @@ export type Database = {
       branches: Table<Branch>;
       customer_addresses: Table<CustomerAddress>;
       service_extras: Table<ServiceExtra>;
+      vendor_services: Table<VendorService>;
       order_extras: Table<OrderExtra>;
       platform_settings: Table<PlatformSettings>;
       support_tickets: Table<SupportTicket>;

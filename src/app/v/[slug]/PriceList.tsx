@@ -8,12 +8,18 @@ type Row = [string, Partial<Record<ServiceType, number>>];
 
 const FIRST = 12;
 
+function label(labels: Partial<Record<ServiceType, string>> | undefined, s: ServiceType) {
+  return labels?.[s] ?? SERVICE_LABEL[s];
+}
+
 /**
  * Public price list with a responsive search box — lets a customer find an item
  * among 100+ without scrolling the whole list. Server passes every row; this
  * filters client-side by item name.
  */
-export function PriceList({ rows, services }: { rows: Row[]; services: ServiceType[] }) {
+export function PriceList({ rows, services, labels }: {
+  rows: Row[]; services: ServiceType[]; labels?: Partial<Record<ServiceType, string>>;
+}) {
   const [q, setQ] = useState("");
   const [showAll, setShowAll] = useState(false);
 
@@ -63,7 +69,7 @@ export function PriceList({ rows, services }: { rows: Row[]; services: ServiceTy
             <thead>
               <tr className="text-left text-xs text-slate">
                 <th className="py-2 pr-2 font-medium">Item</th>
-                {services.map((s) => <th key={s} className="py-2 pl-2 text-right font-medium">{SERVICE_LABEL[s]}</th>)}
+                {services.map((s) => <th key={s} className="py-2 pl-2 text-right font-medium">{label(labels, s)}</th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-ink/5">

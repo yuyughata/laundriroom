@@ -15,9 +15,12 @@ const SERVICES: ServiceType[] = ["wash_and_fold", "dry_clean", "press_only"];
 
 export function OrderWorkspace({
   order, items, itemTypes, prices, paid, customerName, extras, branchName, checkedInBy = {}, showEarnings = false, riders = [], doneStages = [],
+  serviceOptions = SERVICES, svcLabels = SERVICE_LABEL,
 }: {
   order: Order; items: OrderItem[]; itemTypes: ItemType[];
   prices: PriceListRow[]; paid: boolean; customerName: string; extras: OrderExtra[];
+  /** Services this vendor offers + their labels (0061). */
+  serviceOptions?: ServiceType[]; svcLabels?: Record<ServiceType, string>;
   /** Shown for business-wide staff of a multi-branch business. */
   branchName?: string | null;
   /** Item sub-code → name of the staff member who checked it in. */
@@ -32,7 +35,7 @@ export function OrderWorkspace({
 
   // check-in form state
   const [typeId, setTypeId] = useState(itemTypes[0]?.id ?? "");
-  const [service, setService] = useState<ServiceType>("wash_and_fold");
+  const [service, setService] = useState<ServiceType>(serviceOptions[0] ?? "wash_and_fold");
   const [tag, setTag] = useState("");
   const [comment, setComment] = useState("");
   const [condNotes, setCondNotes] = useState("");
@@ -138,7 +141,7 @@ export function OrderWorkspace({
                   <div>
                     <p className="text-sm font-medium text-ink">{it.sub_code} · {t?.name ?? "Item"}</p>
                     <p className="text-xs text-slate">
-                      {SERVICE_LABEL[it.service]}{it.tag_code ? ` · tag ${it.tag_code}` : " · no tag"}
+                      {svcLabels[it.service]}{it.tag_code ? ` · tag ${it.tag_code}` : " · no tag"}
                       {checkedInBy[it.sub_code] ? ` · checked in by ${checkedInBy[it.sub_code]}` : ""}
                     </p>
                     {it.customer_comment && <p className="text-xs text-slate">“{it.customer_comment}”</p>}
@@ -164,8 +167,8 @@ export function OrderWorkspace({
                   {itemTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
                 <select className="field" value={service} onChange={(e) => setService(e.target.value as ServiceType)}>
-                  {SERVICES.map((s) => (
-                    <option key={s} value={s}>{SERVICE_LABEL[s]} · {money(priceFor(typeId, s))}</option>
+                  {serviceOptions.map((s) => (
+                    <option key={s} value={s}>{svcLabels[s]} · {money(priceFor(typeId, s))}</option>
                   ))}
                 </select>
                 <div className="flex items-center gap-2">
