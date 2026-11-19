@@ -173,6 +173,19 @@ promote an admin → deploy edge functions → wire Paystack).
   sign-up now has a **required** "I agree to the Terms of Use and Privacy Policy"
   checkbox (same pattern as `/apply`); `signUp` refuses without it and records
   `profiles.terms_accepted_at` (best-effort, not a guarded column).
+- **NDPR data rights (`0057`):** the Privacy Policy is a full NDPR policy
+  (processors, EU hosting + international transfer, retention, data-subject
+  rights, DPO contact — still admin-editable). Customer → Account has a "Your
+  data & privacy" section: **Download my data** (`/api/account/export`, a
+  JSON copy of the signed-in user's profile/addresses/orders/reviews/tickets,
+  read RLS-scoped) and **Delete my account** (`deleteMyAccount` in
+  `customer/account/actions.ts`): customers only, refused while an order is
+  open (not closed/cancelled); anonymises the profile (PII nulled,
+  `status=suspended`, `deleted_at` set — `0057`), deletes saved addresses,
+  scrubs + soft-deletes the auth user (keeps order FKs intact, blocks login),
+  audit-logged. Order/payment records are retained for legal/accounting
+  obligations. Uses the service key (`guard_profile_columns` only gates
+  anon/authenticated, so the service role may set these columns).
 - **Printable tags (`0036`):** Vendor → Tags and Admin → Tags (per vendor).
   `generate_tags(vendor, count)` (business-wide manager or platform admin,
   1–500) makes a `tag_batches` row + `free` tags coded `PREFIX-NNNN`

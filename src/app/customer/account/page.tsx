@@ -3,6 +3,7 @@ import { requireProfile } from "@/lib/auth";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { AccountDetails } from "./AccountDetails";
 import { NewsletterToggle } from "./NewsletterToggle";
+import { DeleteAccount } from "./DeleteAccount";
 
 export default async function AccountPage() {
   const profile = await requireProfile();
@@ -49,6 +50,21 @@ export default async function AccountPage() {
           </a>
         </div>
       </section>
+
+      <section className="mt-8">
+        <h2 className="font-display text-lg text-ink">Your data &amp; privacy</h2>
+        <p className="text-xs text-slate">
+          Under the Nigeria Data Protection Regulation (NDPR) you can get a copy of your data or delete
+          your account. See our <a className="underline" href="/legal/privacy">Privacy Policy</a>.
+        </p>
+        <div className="mt-3 grid gap-2">
+          <a className="btn-ghost justify-between" href="/api/account/export" download>
+            Download my data <span className="text-xs text-slate">JSON</span>
+          </a>
+        </div>
+      </section>
+
+      <DeleteAccount />
 
       <div className="mt-8">
         <SignOutButton className="btn-ghost w-full" />
