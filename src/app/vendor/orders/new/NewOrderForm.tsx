@@ -220,7 +220,9 @@ export function NewOrderForm({
                     onClick={() => setChosen((c) => (on ? c.filter((x) => x !== e.id) : [...c, e.id]))}
                     className={`card flex w-full items-center justify-between p-3 text-left ${on ? "ring-2 ring-champagne" : ""}`}>
                     <span className="text-sm text-ink">{e.name}</span>
-                    <span className="text-sm text-ink">{money(e.price)} {on ? "✓" : "+"}</span>
+                    <span className="text-sm text-ink">
+                      {e.price_type === "percent" ? `+${Number(e.percent ?? 0)}%` : money(e.price)} {on ? "✓" : "+"}
+                    </span>
                   </button>
                 );
               })}

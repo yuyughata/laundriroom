@@ -5,6 +5,46 @@ import { saveExtra, toggleExtra, deleteExtra, setWashDry } from "../actions";
 import { money } from "@/lib/format";
 import type { ServiceExtra } from "@/lib/database.types";
 
+/** How an extra's price reads in lists: "10% of items" or a fixed ₦ amount. */
+function extraPriceLabel(e: Pick<ServiceExtra, "price" | "price_type" | "percent">) {
+  return e.price_type === "percent"
+    ? `${Number(e.percent ?? 0)}% of items`
+    : money(e.price);
+}
+
+/** Shared Fixed-₦ / Percentage price control for the new + edit extra forms. */
+function PriceFields({ extra }: { extra?: ServiceExtra }) {
+  const [type, setType] = useState<"fixed" | "percent">(extra?.price_type === "percent" ? "percent" : "fixed");
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => setType("fixed")}
+          className={`rounded-card border p-2 text-xs ${type === "fixed" ? "border-ink bg-ink text-ivory" : "border-ink/15 bg-white text-ink"}`}>
+          Fixed ₦ price
+        </button>
+        <button type="button" onClick={() => setType("percent")}
+          className={`rounded-card border p-2 text-xs ${type === "percent" ? "border-ink bg-ink text-ivory" : "border-ink/15 bg-white text-ink"}`}>
+          Percentage of order
+        </button>
+      </div>
+      <input type="hidden" name="price_type" value={type} />
+      {type === "fixed" ? (
+        <input className="field" name="price" inputMode="numeric" placeholder="Price (₦)"
+          defaultValue={extra && extra.price_type !== "percent" ? String(extra.price) : ""} />
+      ) : (
+        <>
+          <div className="flex items-center gap-2">
+            <input className="field" name="percent" inputMode="decimal" placeholder="e.g. 10"
+              defaultValue={extra?.price_type === "percent" ? String(extra.percent ?? "") : ""} />
+            <span className="text-sm text-slate">%</span>
+          </div>
+          <p className="text-xs text-slate">Charged as this % of the order&apos;s items total, worked out after check-in.</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function NewExtra() {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -21,7 +61,7 @@ export function NewExtra() {
       <p className="font-medium text-ink">New premium extra</p>
       <input className="field" name="name" placeholder="Name (e.g. Premium detergent)" />
       <input className="field" name="description" placeholder="Short description (optional)" />
-      <input className="field" name="price" inputMode="numeric" placeholder="Price (₦)" />
+      <PriceFields />
       {err && <p className="text-xs text-danger">{err}</p>}
       <div className="flex gap-2">
         <button className="btn-primary text-sm" disabled={pending}>Save</button>
@@ -45,7 +85,7 @@ export function ExtraCard({ extra }: { extra: ServiceExtra }) {
               <p className="font-medium text-ink">{extra.name}</p>
               {extra.description && <p className="text-xs text-slate">{extra.description}</p>}
             </div>
-            <p className="font-display text-lg text-ink">{money(extra.price)}</p>
+            <p className="font-display text-lg text-ink">{extraPriceLabel(extra)}</p>
           </div>
           <div className="mt-3 flex items-center gap-2">
             <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => setEdit(true)}>Edit</button>
@@ -68,7 +108,7 @@ export function ExtraCard({ extra }: { extra: ServiceExtra }) {
           <input type="hidden" name="id" value={extra.id} />
           <input className="field" name="name" defaultValue={extra.name} />
           <input className="field" name="description" defaultValue={extra.description ?? ""} placeholder="Description" />
-          <input className="field" name="price" defaultValue={String(extra.price)} inputMode="numeric" />
+          <PriceFields extra={extra} />
           {err && <p className="text-xs text-danger">{err}</p>}
           <div className="flex gap-2">
             <button className="btn-primary text-xs" disabled={pending}>Save</button>

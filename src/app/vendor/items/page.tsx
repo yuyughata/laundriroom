@@ -4,23 +4,26 @@ import { getVendorContext } from "@/lib/vendor";
 import { createClient } from "@/lib/supabase/server";
 import { NewRequestForm, RequestRow } from "../requests/RequestsClient";
 import { ItemsManager, NewItemForm, type ManagedItem } from "./ItemsManager";
-import type { ItemTypeRequest, ServiceType } from "@/lib/database.types";
+import { ExtrasManager } from "./ExtrasManager";
+import type { ItemTypeRequest, ServiceType, ServiceExtra } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
-type Tab = "requests" | "manage";
+type Tab = "requests" | "manage" | "extras";
 
 export default async function ItemsPage({ searchParams }: { searchParams: { tab?: string } }) {
   const ctx = await getVendorContext();
-  const tab: Tab = searchParams.tab === "manage" ? "manage" : "requests";
+  const tab: Tab = searchParams.tab === "manage" ? "manage" : searchParams.tab === "extras" ? "extras" : "requests";
   const supabase = createClient();
 
-  const [{ data: reqData }, { data: priceData }] = await Promise.all([
+  const [{ data: reqData }, { data: priceData }, { data: extraData }] = await Promise.all([
     supabase.from("item_type_requests").select("*").eq("vendor_id", ctx.vendorId).order("created_at", { ascending: false }),
     supabase.from("price_list")
       .select("id, item_type_id, service, price, active, item_types(name, vendor_id)")
       .eq("vendor_id", ctx.vendorId).eq("active", true),
+    supabase.from("service_extras").select("*").eq("vendor_id", ctx.vendorId).order("created_at"),
   ]);
+  const extras = (extraData ?? []) as ServiceExtra[];
 
   const reqs = (reqData ?? []) as ItemTypeRequest[];
   const pending = reqs.filter((r) => r.status === "pending");
@@ -56,9 +59,20 @@ export default async function ItemsPage({ searchParams }: { searchParams: { tab?
       <div className="mt-5 flex flex-wrap gap-2">
         <Link href="/vendor/items?tab=requests" className={tabCls("requests")}>Requests</Link>
         <Link href="/vendor/items?tab=manage" className={tabCls("manage")}>Items manager</Link>
+        <Link href="/vendor/items?tab=extras" className={tabCls("extras")}>Premium extras</Link>
       </div>
 
-      {tab === "requests" ? (
+      {tab === "extras" ? (
+        <div className="mt-6 max-w-3xl">
+          {ctx.isManager ? (
+            <ExtrasManager extras={extras} />
+          ) : (
+            <p className="mt-3 rounded-card bg-warn/10 px-4 py-3 text-sm text-warn">
+              Only a business-wide manager can set your premium extras.
+            </p>
+          )}
+        </div>
+      ) : tab === "requests" ? (
         <div className="mt-6">
           <div className="max-w-xl"><NewRequestForm vendorId={ctx.vendorId} /></div>
           <section className="mt-8">

@@ -214,8 +214,13 @@ export default async function TrackOrder({
           <div className="mt-3 space-y-2">
             {exs.map((e) => (
               <div key={e.id} className="card flex items-center justify-between p-3">
-                <p className="text-sm text-ink">{e.name}</p>
-                <p className="text-sm text-ink">{money(e.price)}</p>
+                <p className="text-sm text-ink">
+                  {e.name}
+                  {e.price_type === "percent" && <span className="text-xs text-slate"> · {Number(e.percent ?? 0)}% of items</span>}
+                </p>
+                <p className="text-sm text-ink">
+                  {e.price_type === "percent" && Number(e.price) === 0 ? "After check-in" : money(e.price)}
+                </p>
               </div>
             ))}
           </div>

@@ -15,7 +15,7 @@ export default async function VendorNewOrder() {
 
   const [{ data: vendor }, { data: extras }, pricing] = await Promise.all([
     supabase.from("vendors").select("delivery").eq("id", ctx.vendorId).maybeSingle(),
-    supabase.from("service_extras").select("*").eq("active", true).order("name"),
+    supabase.from("service_extras").select("*").eq("active", true).eq("vendor_id", ctx.vendorId).order("name"),
     loadPricing(supabase),
   ]);
 

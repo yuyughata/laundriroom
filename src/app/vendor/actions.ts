@@ -516,8 +516,16 @@ export async function createVendorOrder(_prev: unknown, formData: FormData) {
 
   if (service_tier === "premium" && extraIds.length > 0) {
     const { data: extras } = await supabase
-      .from("service_extras").select("id, name, price").in("id", extraIds).eq("active", true);
-    const rows = (extras ?? []).map((e) => ({ order_id: orderId, extra_id: e.id, name: e.name, price: e.price }));
+      .from("service_extras").select("id, name, price, price_type, percent").in("id", extraIds).eq("active", true).eq("vendor_id", ctx.vendorId);
+    const rows = (extras ?? []).map((e) => {
+      const pct = (e as { price_type?: string }).price_type === "percent";
+      return {
+        order_id: orderId, extra_id: e.id, name: e.name,
+        price: pct ? 0 : e.price,
+        price_type: pct ? "percent" : "fixed",
+        percent: pct ? (e as { percent?: number }).percent ?? 0 : 0,
+      };
+    });
     if (rows.length > 0) await supabase.from("order_extras").insert(rows as never);
   }
 

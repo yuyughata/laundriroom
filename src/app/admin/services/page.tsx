@@ -1,19 +1,16 @@
 import { AdminShell } from "@/components/shells/AdminShell";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { NewExtra, ExtraCard, WashDryEditor } from "./ServicesClient";
-import type { ServiceExtra } from "@/lib/database.types";
+import { WashDryEditor } from "./ServicesClient";
 
 export default async function AdminServices() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  const [{ data: extras }, { data: settings }, { data: plan }] = await Promise.all([
-    supabase.from("service_extras").select("*").order("price"),
+  const [{ data: settings }, { data: plan }] = await Promise.all([
     supabase.from("platform_settings").select("wash_dry_price, wash_dry_min_items").eq("id", true).maybeSingle(),
     supabase.from("vendor_plans").select("commission_rate").eq("is_default", true).limit(1).maybeSingle(),
   ]);
-  const list = (extras ?? []) as ServiceExtra[];
   const wd = (settings ?? { wash_dry_price: 0, wash_dry_min_items: 0 }) as { wash_dry_price: number; wash_dry_min_items: number };
   const commission = Number((plan as { commission_rate?: number } | null)?.commission_rate ?? 0);
 
@@ -35,21 +32,15 @@ export default async function AdminServices() {
         <WashDryEditor price={wd.wash_dry_price} minItems={wd.wash_dry_min_items} commission={commission} />
       </div>
 
-      <div className="mt-8 flex items-center justify-between">
-        <div>
-          <h2 className="font-display text-lg text-ink">Premium extras</h2>
-          <p className="text-xs text-slate">High-end add-ons offered on premium orders.</p>
-        </div>
-        <NewExtra />
+      <div className="mt-8">
+        <h2 className="font-display text-lg text-ink">Premium extras</h2>
+        <p className="mt-1 max-w-2xl text-sm text-slate">
+          Premium extras are now set by each laundry in their own dashboard
+          (Vendor → Items → Premium extras), so they can offer and price the
+          high-end add-ons they actually provide — as a flat price or a
+          percentage of the order. There&apos;s no global list to manage here.
+        </p>
       </div>
-
-      {list.length === 0 ? (
-        <p className="mt-4 text-sm text-slate">No extras yet. Add the first one above.</p>
-      ) : (
-        <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {list.map((e) => <ExtraCard key={e.id} extra={e} />)}
-        </div>
-      )}
     </AdminShell>
   );
 }
