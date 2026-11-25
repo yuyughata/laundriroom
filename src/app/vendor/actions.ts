@@ -145,22 +145,48 @@ export async function rescheduleDelivery(order_id: string, customerFault: boolea
 }
 
 /** Create a vendor-funded promo (manager only; the discount comes out of the vendor's pay). */
+type PromoCore =
+  | { error: string }
+  | { discount_type: "percent" | "fixed"; value: number; max_discount: number | null; tiers: { min: number; pct: number }[] | null };
+
+/** Read the discount part of a promo form — a flat % / ₦, or tiers by order value (0062). */
+function parsePromoFields(formData: FormData): PromoCore {
+  const max_discount = formData.get("max_discount") ? Number(formData.get("max_discount")) : null;
+  if (max_discount !== null && !(max_discount > 0)) return { error: "Max discount must be greater than 0 (or leave it blank)." };
+
+  if (String(formData.get("mode") || "flat") === "tiered") {
+    let raw: unknown;
+    try { raw = JSON.parse(String(formData.get("tiers") || "[]")); } catch { return { error: "Couldn't read the tiers." }; }
+    const tiers = (Array.isArray(raw) ? raw : [])
+      .map((t) => ({ min: Math.round(Number((t as { min?: unknown }).min)), pct: Number((t as { pct?: unknown }).pct) }))
+      .filter((t) => Number.isFinite(t.min) && t.min >= 0 && Number.isFinite(t.pct) && t.pct > 0 && t.pct <= 100)
+      .map((t) => ({ min: t.min, pct: Math.round(t.pct * 100) / 100 }))
+      .sort((a, b) => a.min - b.min);
+    if (tiers.length === 0) return { error: "Add at least one tier (a minimum order and a %)." };
+    for (let i = 1; i < tiers.length; i++) if (tiers[i].min === tiers[i - 1].min) return { error: "Each tier needs a different minimum order." };
+    return { discount_type: "percent", value: 0, max_discount, tiers };
+  }
+
+  const discount_type = String(formData.get("discount_type") || "percent") === "fixed" ? "fixed" : "percent";
+  const value = Number(formData.get("value") || 0);
+  if (!(value > 0)) return { error: "Enter a discount value." };
+  if (discount_type === "percent" && value > 100) return { error: "A percentage can't be more than 100." };
+  return { discount_type, value, max_discount, tiers: null };
+}
+
 export async function createVendorPromo(formData: FormData) {
   const supabase = createClient();
   const vendor_id = String(formData.get("vendor_id"));
   const code = String(formData.get("code") || "").trim().toUpperCase();
-  const discount_type = String(formData.get("discount_type") || "percent");
-  const value = Number(formData.get("value") || 0);
-  const max_discount = formData.get("max_discount") ? Number(formData.get("max_discount")) : null;
   const usage_limit = formData.get("usage_limit") ? Number(formData.get("usage_limit")) : null;
   const per_customer_limit = Number(formData.get("per_customer_limit") || 1);
   const expires_at = String(formData.get("expires_at") || "") || null;
   if (!code) return { error: "Enter a code." };
-  if (!(value > 0)) return { error: "Enter a discount value." };
+  const core = parsePromoFields(formData);
+  if ("error" in core) return core;
 
   const { error } = await supabase.from("promo_codes").insert({
-    code, discount_type, value, max_discount, usage_limit, per_customer_limit, expires_at,
-    vendor_id, active: true,
+    code, ...core, usage_limit, per_customer_limit, expires_at, vendor_id, active: true,
   } as never);
   if (error) return { error: error.code === "23505" ? "That code already exists." : error.message };
   revalidatePath("/vendor/promos");
@@ -179,17 +205,15 @@ export async function toggleVendorPromo(id: string, active: boolean) {
 export async function updateVendorPromo(id: string, formData: FormData) {
   const supabase = createClient();
   const code = String(formData.get("code") || "").trim().toUpperCase();
-  const discount_type = String(formData.get("discount_type") || "percent");
-  const value = Number(formData.get("value") || 0);
-  const max_discount = formData.get("max_discount") ? Number(formData.get("max_discount")) : null;
   const usage_limit = formData.get("usage_limit") ? Number(formData.get("usage_limit")) : null;
   const per_customer_limit = Number(formData.get("per_customer_limit") || 1);
   const expires_at = String(formData.get("expires_at") || "") || null;
   if (!code) return { error: "Enter a code." };
-  if (!(value > 0)) return { error: "Enter a discount value." };
+  const core = parsePromoFields(formData);
+  if ("error" in core) return core;
 
   const { error } = await supabase.from("promo_codes").update({
-    code, discount_type, value, max_discount, usage_limit, per_customer_limit, expires_at,
+    code, ...core, usage_limit, per_customer_limit, expires_at,
   } as never).eq("id", id);
   if (error) return { error: error.code === "23505" ? "That code already exists." : error.message };
   revalidatePath("/vendor/promos");
