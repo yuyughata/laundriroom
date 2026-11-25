@@ -103,6 +103,16 @@ promote an admin → deploy edge functions → wire Paystack).
   box also has a responsive **search box** (`v/[slug]/PriceList.tsx`) to filter
   100+ items, and an item's **service is editable** in the Items manager
   (`updateItemService`, guarded against a duplicate item+service).
+- **Tiered promo codes (`0062`):** a vendor promo can be a flat % / ₦ **or**
+  tiered by order value — one code whose % depends on the subtotal
+  (`promo_codes.tiers` jsonb `[{min,pct}]`; e.g. 10% ≥ ₦3,000, 15% ≥ ₦10,000,
+  20% ≥ ₦20,000). `redeem_promo` snapshots the tiers onto
+  `orders.discount_tiers`; `recompute_order` picks the **highest tier the
+  current subtotal reaches** (so it follows the total through check-in) and
+  gives **no discount below the lowest minimum**. The optional max-discount cap
+  still applies. Set at Vendor → Promos (a Flat/Tiered toggle + tier rows,
+  `parsePromoFields` in `vendor/actions.ts`, `VendorPromos.tsx`). Flat codes are
+  unchanged (`discount_tiers` null).
 - **Who earns what (`0041`/`0042`):** `orders.commission_markup` is the rate
   added to item prices — the global commission on a normal order, 0 on an
   express order — set on insert by trigger and only changed by a turnaround

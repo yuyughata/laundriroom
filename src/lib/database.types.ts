@@ -86,11 +86,15 @@ export type Claim = {
   status: ClaimStatus; resolution_note: string | null; compensation: number;
   resolved_by: string | null; created_at: string; updated_at: string;
 };
+/** One tier of a tiered promo: pct% off once the order reaches min (0062). */
+export type PromoTier = { min: number; pct: number };
 export type PromoCode = {
   id: string; code: string; discount_type: "percent" | "fixed"; value: number;
   max_discount: number | null; min_order: number; usage_limit: number | null;
   used_count: number; per_customer_limit: number; owner_id: string | null;
   vendor_id: string | null;
+  /** Tiered % by order value; null/empty = flat code (0062). */
+  tiers?: PromoTier[] | null;
   active: boolean; starts_at: string | null; expires_at: string | null; created_at: string;
 };
 export type Referral = {
@@ -152,6 +156,8 @@ export type Order = {
   discount_vendor_funded?: boolean;
   /** Minimum order value for the applied promo (0054); the discount is 0 below it. */
   discount_min_order?: number;
+  /** Snapshot of a tiered promo's tiers (0062); recompute picks the reached tier. */
+  discount_tiers?: PromoTier[] | null;
   pickup_address_id: string | null; notes: string | null;
   created_at: string; checked_in_at: string | null; ready_at: string | null;
   completed_at: string | null; closed_at: string | null;
