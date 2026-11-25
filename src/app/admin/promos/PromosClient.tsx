@@ -3,25 +3,22 @@
 import { useState, useTransition } from "react";
 import { createPromo, togglePromo, updatePromo, deletePromo } from "./actions";
 import { money, dateShort } from "@/lib/format";
+import { promoDiscountLabel } from "@/lib/promoForm";
+import { PromoDiscountFields } from "@/components/promo/PromoDiscountFields";
 import { QrCard } from "@/components/promo/QrCard";
 import type { PromoCode } from "@/lib/database.types";
 
-/** Shared promo field grid, prefilled for editing. */
+/** Shared promo field grid, prefilled for editing. Flat % / ₦, or tiers by order value. */
 function PromoFields({ p }: { p?: PromoCode }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-3">
       <div><label className="label">Code</label><input name="code" className="field uppercase" placeholder="WELCOME20" defaultValue={p?.code} /></div>
-      <div><label className="label">Type</label>
-        <select name="discount_type" className="field" defaultValue={p?.discount_type ?? "percent"}>
-          <option value="percent">Percent (%)</option><option value="fixed">Fixed (₦)</option>
-        </select>
+      <PromoDiscountFields p={p} showMinOrder />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div><label className="label">Usage limit (total)</label><input name="usage_limit" className="field" inputMode="numeric" placeholder="blank = unlimited" defaultValue={p?.usage_limit ?? ""} /></div>
+        <div><label className="label">Per customer</label><input name="per_customer_limit" className="field" inputMode="numeric" defaultValue={p?.per_customer_limit ?? 1} /></div>
+        <div><label className="label">Expires</label><input name="expires_at" type="date" className="field" defaultValue={p?.expires_at ? p.expires_at.slice(0, 10) : ""} /></div>
       </div>
-      <div><label className="label">Value</label><input name="value" className="field" inputMode="numeric" placeholder="20 or 1000" defaultValue={p?.value} /></div>
-      <div><label className="label">Max discount (₦, percent only)</label><input name="max_discount" className="field" inputMode="numeric" placeholder="optional" defaultValue={p?.max_discount ?? ""} /></div>
-      <div><label className="label">Usage limit (total)</label><input name="usage_limit" className="field" inputMode="numeric" placeholder="blank = unlimited" defaultValue={p?.usage_limit ?? ""} /></div>
-      <div><label className="label">Per customer</label><input name="per_customer_limit" className="field" inputMode="numeric" defaultValue={p?.per_customer_limit ?? 1} /></div>
-      <div><label className="label">Min order (₦)</label><input name="min_order" className="field" inputMode="numeric" defaultValue={p?.min_order ?? 0} /></div>
-      <div><label className="label">Expires</label><input name="expires_at" type="date" className="field" defaultValue={p?.expires_at ? p.expires_at.slice(0, 10) : ""} /></div>
     </div>
   );
 }
@@ -37,7 +34,7 @@ export function NewPromo() {
     <form className="card max-w-xl space-y-3 p-5" action={(fd) => start(async () => {
       setErr(null);
       const r = await createPromo(fd);
-      if (r?.error) setErr(r.error); else setOpen(false);
+      if (r && "error" in r && r.error) setErr(r.error); else setOpen(false);
     })}>
       <p className="font-medium text-ink">New promo code</p>
       <PromoFields />
@@ -55,16 +52,14 @@ export function PromoRow({ promo, fundedBy, qrUrl }: { promo: PromoCode; fundedB
   const [showQr, setShowQr] = useState(false);
   const [editing, setEditing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const discount = promo.discount_type === "percent"
-    ? `${promo.value}%${promo.max_discount ? ` (max ${money(promo.max_discount)})` : ""}`
-    : money(promo.value);
+  const discount = promoDiscountLabel(promo, money);
 
   function remove() {
     if (!window.confirm(`Delete promo code ${promo.code}? This can’t be undone.`)) return;
     setErr(null);
     start(async () => {
       const r = await deletePromo(promo.id);
-      if (r?.error) setErr(r.error);
+      if (r && "error" in r && r.error) setErr(r.error);
     });
   }
 
@@ -107,7 +102,7 @@ export function PromoRow({ promo, fundedBy, qrUrl }: { promo: PromoCode; fundedB
           <form className="space-y-3" action={(fd) => start(async () => {
             setErr(null);
             const r = await updatePromo(promo.id, fd);
-            if (r?.error) setErr(r.error); else setEditing(false);
+            if (r && "error" in r && r.error) setErr(r.error); else setEditing(false);
           })}>
             <p className="font-medium text-ink">Edit {promo.code}</p>
             <PromoFields p={promo} />
