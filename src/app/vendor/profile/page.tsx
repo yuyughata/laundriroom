@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { vendorProfileUrl } from "@/lib/vendorProfile";
 import { ShareKit } from "./ShareKit";
 import { WashDryToggle } from "./WashDryToggle";
+import { RenameBusiness } from "./RenameBusiness";
 import { money } from "@/lib/format";
 
 /**
@@ -45,6 +46,17 @@ export default async function VendorProfileLink() {
             <p className="mt-5 rounded-card bg-warn/10 px-4 py-3 text-sm text-warn">
               Your page is live, but customers can only place orders once laundriroom approves your laundry.
             </p>
+          )}
+
+          {ctx.isManager && (
+            <div className="card mt-6 p-5">
+              <p className="font-medium text-ink">Business name</p>
+              <p className="mt-1 text-sm text-slate">
+                This is the name customers see on your page, receipts and emails. Your page link
+                stays the same when you rename, so links and QR codes you&apos;ve shared keep working.
+              </p>
+              <RenameBusiness name={ctx.vendorName} />
+            </div>
           )}
 
           <div className="mt-6">
@@ -90,8 +102,9 @@ export default async function VendorProfileLink() {
               <li>Ask happy customers to rate their order in the app; ratings and reviews appear on your page.</li>
             </ul>
             <p className="mt-3 text-xs text-slate">
-              Your link name was created from your laundry&apos;s name and stays the same if you rename, so links
-              you&apos;ve shared keep working. To change it, contact laundriroom support.
+              Your link name (the web address of your page) was created from your laundry&apos;s name and stays the
+              same even when you rename your business, so links you&apos;ve shared keep working. To change the link
+              itself, contact laundriroom support.
             </p>
           </div>
         </>

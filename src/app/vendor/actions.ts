@@ -562,6 +562,27 @@ export async function setOffersWashDry(on: boolean) {
   return { ok: true };
 }
 
+/**
+ * Vendor → My page (manager only): rename the business. The public page link
+ * (`slug`) is created once from the original name and stays fixed — only a
+ * platform admin can change it — so links and QR codes you've already shared
+ * keep working after a rename. The new name flows everywhere the name is read
+ * live: the public page, receipts, emails and dashboards.
+ */
+export async function renameVendor(formData: FormData) {
+  const ctx = await getVendorContext();
+  if (!ctx.isManager) return { error: "Only a business-wide manager can change the business name." };
+  const name = String(formData.get("name") || "").trim();
+  if (!name) return { error: "Enter a business name." };
+  if (name.length > 80) return { error: "That name is too long (80 characters max)." };
+  const supabase = createClient();
+  const { error } = await supabase.from("vendors").update({ name } as never).eq("id", ctx.vendorId);
+  if (error) return { error: error.message };
+  revalidatePath("/vendor/profile");
+  revalidatePath("/vendor", "layout");
+  return { ok: true };
+}
+
 // ─── Items manager (edit/delete the vendor's price-list items) ───────────────
 // Prices and the catalogue are business-wide, so only a business-wide manager
 // may change them (RLS on price_list / item_types enforces this too).
