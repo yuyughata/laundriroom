@@ -140,7 +140,13 @@ promote an admin → deploy edge functions → wire Paystack).
   default plan; `schedule_payout_if_ready` always uses it, `0022`), express %
   and premium % (`platform_settings`) — plus delivery fee, penalty and
   referral reward. There are deliberately no per-vendor rates. Vendors can't
-  change their own status/plan/KYC flag (`guard_vendor_columns`).
+  change their own status/plan/KYC flag/slug/tag prefix (`guard_vendor_columns`),
+  but a business-wide manager **can rename the business** at Vendor → My page
+  (`renameVendor` → `vendors.name`; `RenameBusiness.tsx`). `name` isn't a
+  guarded column and the `vendors_manager_update` RLS policy allows it; the
+  `slug` (public `/v/<slug>` link) is generated once and stays fixed on rename,
+  so shared links/QRs keep working. The new name flows everywhere the name is
+  read live (public page, receipts, emails, dashboards).
 - Server Components fetch; interactive bits are small client components calling
   server actions in each area's `actions.ts`.
 - **Multi-branch vendors (`0033`):** a vendor is the business (name, KYC,
