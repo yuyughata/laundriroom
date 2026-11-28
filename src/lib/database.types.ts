@@ -95,6 +95,8 @@ export type PromoCode = {
   vendor_id: string | null;
   /** Tiered % by order value; null/empty = flat code (0062). */
   tiers?: PromoTier[] | null;
+  /** Lucky win: every Nth use of a tiered code gets the top tier regardless of order value (0065). Null = off. */
+  lucky_use?: number | null;
   active: boolean; starts_at: string | null; expires_at: string | null; created_at: string;
 };
 export type Referral = {
@@ -158,6 +160,8 @@ export type Order = {
   discount_min_order?: number;
   /** Snapshot of a tiered promo's tiers (0062); recompute picks the reached tier. */
   discount_tiers?: PromoTier[] | null;
+  /** This order won the promo's "lucky Nth use" (0065): gets the top tier regardless of value. */
+  lucky_win?: boolean;
   pickup_address_id: string | null; notes: string | null;
   created_at: string; checked_in_at: string | null; ready_at: string | null;
   completed_at: string | null; closed_at: string | null;

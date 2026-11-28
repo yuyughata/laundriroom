@@ -85,6 +85,11 @@ export default async function TrackOrder({
           Promo code {String(searchParams.promo_applied).slice(0, 40)} is applied — the discount shows once your items are priced.
         </div>
       )}
+      {o.lucky_win && (
+        <div className="mt-4 rounded-card border border-champagne/40 bg-champagne/10 p-4 text-sm text-ink">
+          🍀 <strong>Lucky win!</strong> You landed the lucky order on this code — you’ve got the top discount tier, no minimum spend needed.
+        </div>
+      )}
       {searchParams.promo_error && (
         <div className="mt-4 rounded-card border border-warn/30 bg-warn/10 p-4 text-sm text-warn">
           Your order is placed, but the promo code couldn&apos;t be used ({String(searchParams.promo_error).slice(0, 160)}). You can try another code below.
@@ -242,7 +247,7 @@ export default async function TrackOrder({
         {o.pickup_fee > 0 && <Row label="Pickup" value={money(o.pickup_fee)} />}
         <Row label="Delivery" value={o.delivery_fee > 0 ? money(o.delivery_fee) : "Free"} />
         {o.reschedule_penalty > 0 && <Row label="Re-delivery penalty" value={money(o.reschedule_penalty)} />}
-        {o.discount > 0 && <Row label={`Promo ${o.promo_code ?? ""}`} value={`−${money(o.discount)}`} />}
+        {o.discount > 0 && <Row label={`Promo ${o.promo_code ?? ""}${o.lucky_win ? " 🍀" : ""}`} value={`−${money(o.discount)}`} />}
         <div className="my-2 border-t border-ink/10" />
         <Row label="Total" value={money(o.total)} strong />
         <Row label="Payment" value={isPaid ? "Paid" : o.payment_timing === "on_delivery" ? "On delivery" : "Online"} />

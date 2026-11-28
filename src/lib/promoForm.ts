@@ -10,6 +10,7 @@ export type PromoFields = {
   max_discount: number | null;
   min_order: number;
   tiers: { min: number; pct: number }[] | null;
+  lucky_use: number | null;
 };
 
 export function parsePromoFields(formData: FormData): { error: string } | PromoFields {
@@ -17,6 +18,10 @@ export function parsePromoFields(formData: FormData): { error: string } | PromoF
   if (max_discount !== null && !(max_discount > 0)) return { error: "Max discount must be greater than 0 (or leave it blank)." };
 
   if (String(formData.get("mode") || "flat") === "tiered") {
+    const luckyRaw = formData.get("lucky_use");
+    const lucky_use = luckyRaw && String(luckyRaw).trim() !== "" ? Math.round(Number(luckyRaw)) : null;
+    if (lucky_use !== null && !(lucky_use > 0)) return { error: "Lucky win must be a whole number greater than 0 (or leave it blank)." };
+
     let raw: unknown;
     try { raw = JSON.parse(String(formData.get("tiers") || "[]")); } catch { return { error: "Couldn't read the tiers." }; }
     const tiers = (Array.isArray(raw) ? raw : [])
@@ -26,7 +31,7 @@ export function parsePromoFields(formData: FormData): { error: string } | PromoF
       .sort((a, b) => a.min - b.min);
     if (tiers.length === 0) return { error: "Add at least one tier (a minimum order and a %)." };
     for (let i = 1; i < tiers.length; i++) if (tiers[i].min === tiers[i - 1].min) return { error: "Each tier needs a different minimum order." };
-    return { discount_type: "percent", value: 0, max_discount, min_order: 0, tiers };
+    return { discount_type: "percent", value: 0, max_discount, min_order: 0, tiers, lucky_use };
   }
 
   const discount_type = String(formData.get("discount_type") || "percent") === "fixed" ? "fixed" : "percent";
@@ -34,16 +39,17 @@ export function parsePromoFields(formData: FormData): { error: string } | PromoF
   if (!(value > 0)) return { error: "Enter a discount value." };
   if (discount_type === "percent" && value > 100) return { error: "A percentage can't be more than 100." };
   const minRaw = Number(formData.get("min_order") || 0);
-  return { discount_type, value, max_discount, min_order: Number.isFinite(minRaw) && minRaw > 0 ? Math.round(minRaw) : 0, tiers: null };
+  return { discount_type, value, max_discount, min_order: Number.isFinite(minRaw) && minRaw > 0 ? Math.round(minRaw) : 0, tiers: null, lucky_use: null };
 }
 
 /** A readable summary of a code's discount for lists (flat or tiered). */
 export function promoDiscountLabel(
-  p: { discount_type: "percent" | "fixed"; value: number; max_discount: number | null; tiers?: { min: number; pct: number }[] | null },
+  p: { discount_type: "percent" | "fixed"; value: number; max_discount: number | null; tiers?: { min: number; pct: number }[] | null; lucky_use?: number | null },
   money: (n: number) => string,
 ): string {
   if (p.tiers?.length) {
-    return p.tiers.map((t) => `${t.pct}% ≥ ${money(t.min)}`).join(" · ") + (p.max_discount ? ` (max ${money(p.max_discount)})` : "");
+    const lucky = p.lucky_use && p.lucky_use > 0 ? ` · 🍀 every ${p.lucky_use}` : "";
+    return p.tiers.map((t) => `${t.pct}% ≥ ${money(t.min)}`).join(" · ") + (p.max_discount ? ` (max ${money(p.max_discount)})` : "") + lucky;
   }
   return p.discount_type === "percent"
     ? `${p.value}%${p.max_discount ? ` (max ${money(p.max_discount)})` : ""}`

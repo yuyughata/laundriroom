@@ -115,6 +115,17 @@ promote an admin → deploy edge functions → wire Paystack).
   `src/components/promo/PromoDiscountFields.tsx` (Flat/Tiered toggle + tier rows)
   and `src/lib/promoForm.ts` (`parsePromoFields`, `promoDiscountLabel`). Flat
   codes are unchanged (`discount_tiers` null).
+- **Lucky win on tiered promos (`0065`):** a tiered code can reward a lucky
+  order — the setter enters N (`promo_codes.lucky_use`) and **every Nth use**
+  (N, 2N, 3N…) gets the code's **top tier** regardless of order value, even
+  below the lowest tier minimum. `redeem_promo` counts under the `used_count`
+  row lock (so concurrent redemptions can't both be the Nth) and sets
+  `orders.lucky_win`; `recompute_order` then uses `max(pct)` of the tiers
+  instead of the subtotal-reached tier. Tiered codes only. Funding is unchanged
+  (`discount_vendor_funded` follows `vendor_id`), so a vendor-funded code's
+  lucky discount still comes out of the vendor payout, a platform code's
+  doesn't. Set in the shared `PromoDiscountFields` (tiered mode only); the
+  winning customer sees a "🍀 Lucky win!" banner on their order page.
 - **Who earns what (`0041`/`0042`):** `orders.commission_markup` is the rate
   added to item prices — the global commission on a normal order, 0 on an
   express order — set on insert by trigger and only changed by a turnaround
