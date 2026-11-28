@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { applyHomepageContent, HOMEPAGE_FIELDS } from "@/lib/homepageContent";
 import { renderHomepageSections, type HomeSectionRow } from "@/lib/homepageSections";
+import { MailingListForm } from "@/components/marketing/MailingListForm";
+import { WhatsAppFab } from "@/components/marketing/WhatsAppFab";
 
 /**
  * The homepage link preview (WhatsApp, etc.) tracks the editable hero so it
@@ -843,10 +845,22 @@ export default async function Landing() {
     /* DB unavailable — fall back to default copy */
   }
 
+  // Insert the mailing-list capture just above the footer; fall back to
+  // appending it if the footer marker isn't found.
+  const footerTag = "</main><footer>";
+  const cut = markup.indexOf(footerTag);
+  const body = cut === -1 ? markup : markup.slice(0, cut) + "</main>";
+  const footer = cut === -1 ? "" : "<footer>" + markup.slice(cut + footerTag.length);
+
+  const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "2348000000000";
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: landingStyles }} />
-      <div dangerouslySetInnerHTML={{ __html: markup }} />
+      <div dangerouslySetInnerHTML={{ __html: body }} />
+      <MailingListForm />
+      {footer && <div dangerouslySetInnerHTML={{ __html: footer }} />}
+      <WhatsAppFab phone={whatsapp} />
     </>
   );
 }

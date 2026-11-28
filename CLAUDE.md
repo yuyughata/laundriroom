@@ -149,6 +149,18 @@ promote an admin → deploy edge functions → wire Paystack).
   read live (public page, receipts, emails, dashboards).
 - Server Components fetch; interactive bits are small client components calling
   server actions in each area's `actions.ts`.
+- **Homepage marketing extras (`0063`):** the landing page (`src/app/page.tsx`,
+  a server-injected HTML string) renders two React pieces in its return: a
+  **mailing-list capture** (`components/marketing/MailingListForm.tsx` →
+  `subscribeMailingList` in `src/lib/subscribeActions.ts`, stored in
+  `mailing_list` — anon insert, admin-read RLS; email required, phone optional,
+  duplicate email is a no-op), inserted just above the footer; and a **WhatsApp
+  floating button** with a pulse-ring effect (`components/marketing/WhatsAppFab.tsx`,
+  pure anchor + CSS, raised above the existing `.floatcta` pill). The WhatsApp
+  number is `NEXT_PUBLIC_WHATSAPP_NUMBER` (digits only, intl format) with a
+  prefilled default message. Note: inline `<style>` in these components uses
+  `dangerouslySetInnerHTML` to avoid a server/client escaping hydration
+  mismatch.
 - **Multi-branch vendors (`0033`):** a vendor is the business (name, KYC,
   commission, one shared price list, one payout account, one `/v/<slug>`
   link); `branches` are its shop locations (address, hours, open switch). Every
