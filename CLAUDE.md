@@ -163,7 +163,14 @@ promote an admin → deploy edge functions → wire Paystack).
   mismatch. Admins see the captured contacts at **Admin → Mailing list**
   (`app/admin/mailing-list`, platform-admin only) — count, per-contact Email /
   WhatsApp reach-out, Copy-all-emails / Email-all-BCC / CSV export
-  (`MailingListTools.tsx`).
+  (`MailingListTools.tsx`). **Broadcast to them (`0064`):** "Mailing-list
+  subscribers" is an audience group in Admin → Emails — `newsletter_audience()`
+  unions the list in (de-duped by email; an account wins, an opted-out account
+  is never mailed even if listed), `mailing_list` got its own
+  `unsubscribe_token`/`unsubscribed_at` so each gets a working one-click
+  unsubscribe, and `unsubscribe_newsletter()` handles both. The group is
+  independent of the account-only "everyone"; the send-newsletter edge function
+  needed no change (it already tolerates a null `profile_id`).
 - **Multi-branch vendors (`0033`):** a vendor is the business (name, KYC,
   commission, one shared price list, one payout account, one `/v/<slug>`
   link); `branches` are its shop locations (address, hours, open switch). Every

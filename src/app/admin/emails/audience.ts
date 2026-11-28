@@ -2,6 +2,7 @@ import type { Newsletter } from "@/lib/database.types";
 
 const GROUP_LABEL: Record<string, string> = {
   customers: "Customers", vendor_managers: "Laundry managers", vendor_staff: "Laundry staff", team: "laundriroom team", everyone: "Everyone",
+  mailing_list: "Mailing-list subscribers",
 };
 /** "Customers + 3 people" */
 export function audienceSummary(n: Pick<Newsletter, "audience">) {
