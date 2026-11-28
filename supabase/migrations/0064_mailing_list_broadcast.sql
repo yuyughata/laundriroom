@@ -32,8 +32,8 @@ begin
   with picks as (
     -- Account recipients (active, has email, not opted out), from the chosen
     -- groups plus any chosen people. pref 0 so an account wins de-dup.
-    select p.id as profile_id, p.email::text as email, p.full_name, p.unsubscribe_token,
-           0 as pref, p.created_at
+    select p.id as pid, p.email::text as em, p.full_name as fn, p.unsubscribe_token as tok,
+           0 as pref, p.created_at as cat
       from profiles p
      where p.status = 'active'
        and p.email is not null and btrim(p.email::text) <> ''
@@ -60,9 +60,9 @@ begin
               where lower(pp.email) = lower(m.email) and pp.newsletter_opt_out
            )
   )
-  select distinct on (lower(email)) profile_id, email, full_name, unsubscribe_token
+  select distinct on (lower(picks.em)) picks.pid, picks.em, picks.fn, picks.tok
     from picks
-   order by lower(email), pref, created_at;
+   order by lower(picks.em), picks.pref, picks.cat;
 end;
 $$;
 revoke execute on function newsletter_audience(jsonb) from public, anon;
