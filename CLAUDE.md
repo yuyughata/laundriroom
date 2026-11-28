@@ -160,7 +160,10 @@ promote an admin → deploy edge functions → wire Paystack).
   number is `NEXT_PUBLIC_WHATSAPP_NUMBER` (digits only, intl format) with a
   prefilled default message. Note: inline `<style>` in these components uses
   `dangerouslySetInnerHTML` to avoid a server/client escaping hydration
-  mismatch.
+  mismatch. Admins see the captured contacts at **Admin → Mailing list**
+  (`app/admin/mailing-list`, platform-admin only) — count, per-contact Email /
+  WhatsApp reach-out, Copy-all-emails / Email-all-BCC / CSV export
+  (`MailingListTools.tsx`).
 - **Multi-branch vendors (`0033`):** a vendor is the business (name, KYC,
   commission, one shared price list, one payout account, one `/v/<slug>`
   link); `branches` are its shop locations (address, hours, open switch). Every
