@@ -88,9 +88,20 @@ export function NewsletterEditor({ start, people: startPeople }: { start: Editor
 
   function toggleGroup(g: NewsletterGroup) {
     setDirty(true);
-    setGroups((cur) => g === "everyone"
-      ? (cur.includes("everyone") ? [] : ["everyone"])
-      : cur.includes(g) ? cur.filter((x) => x !== g) : [...cur.filter((x) => x !== "everyone"), g]);
+    // Mailing-list subscribers are non-account contacts, independent of the
+    // account groups (and of "everyone"): toggle them on their own.
+    if (g === "mailing_list") {
+      setGroups((cur) => cur.includes("mailing_list") ? cur.filter((x) => x !== "mailing_list") : [...cur, "mailing_list"]);
+      return;
+    }
+    setGroups((cur) => {
+      const ml = cur.includes("mailing_list") ? (["mailing_list"] as NewsletterGroup[]) : [];
+      const base = cur.filter((x) => x !== "mailing_list");
+      const next: NewsletterGroup[] = g === "everyone"
+        ? (base.includes("everyone") ? [] : ["everyone"])
+        : base.includes(g) ? base.filter((x) => x !== g) : [...base.filter((x) => x !== "everyone"), g];
+      return [...next, ...ml];
+    });
   }
 
   const everyone = groups.includes("everyone");
@@ -166,6 +177,12 @@ export function NewsletterEditor({ start, people: startPeople }: { start: Editor
               );
             })}
           </div>
+          <label className={`mt-2 flex cursor-pointer items-start gap-2 rounded-lg border p-3 ${groups.includes("mailing_list") ? "border-ink bg-ink/5" : "border-ink/15"}`}>
+            <input type="checkbox" className="mt-1" checked={groups.includes("mailing_list")}
+              onChange={() => toggleGroup("mailing_list")} />
+            <span><span className="block text-sm font-medium text-ink">Mailing-list subscribers</span>
+              <span className="block text-xs text-slate">Homepage promo sign-ups (not app accounts). Each gets its own unsubscribe link.</span></span>
+          </label>
           <PeoplePicker people={people} onChange={(p) => { setPeople(p); setDirty(true); }} />
           <p className="mt-3 text-sm text-ink">
             {count == null ? "Counting…" : <><span className="font-semibold">{count}</span> {count === 1 ? "person" : "people"} will get it</>}

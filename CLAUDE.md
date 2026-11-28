@@ -140,9 +140,37 @@ promote an admin → deploy edge functions → wire Paystack).
   default plan; `schedule_payout_if_ready` always uses it, `0022`), express %
   and premium % (`platform_settings`) — plus delivery fee, penalty and
   referral reward. There are deliberately no per-vendor rates. Vendors can't
-  change their own status/plan/KYC flag (`guard_vendor_columns`).
+  change their own status/plan/KYC flag/slug/tag prefix (`guard_vendor_columns`),
+  but a business-wide manager **can rename the business** at Vendor → My page
+  (`renameVendor` → `vendors.name`; `RenameBusiness.tsx`). `name` isn't a
+  guarded column and the `vendors_manager_update` RLS policy allows it; the
+  `slug` (public `/v/<slug>` link) is generated once and stays fixed on rename,
+  so shared links/QRs keep working. The new name flows everywhere the name is
+  read live (public page, receipts, emails, dashboards).
 - Server Components fetch; interactive bits are small client components calling
   server actions in each area's `actions.ts`.
+- **Homepage marketing extras (`0063`):** the landing page (`src/app/page.tsx`,
+  a server-injected HTML string) renders two React pieces in its return: a
+  **mailing-list capture** (`components/marketing/MailingListForm.tsx` →
+  `subscribeMailingList` in `src/lib/subscribeActions.ts`, stored in
+  `mailing_list` — anon insert, admin-read RLS; email required, phone optional,
+  duplicate email is a no-op), inserted just above the footer; and a **WhatsApp
+  floating button** with a pulse-ring effect (`components/marketing/WhatsAppFab.tsx`,
+  pure anchor + CSS, raised above the existing `.floatcta` pill). The WhatsApp
+  number is `NEXT_PUBLIC_WHATSAPP_NUMBER` (digits only, intl format) with a
+  prefilled default message. Note: inline `<style>` in these components uses
+  `dangerouslySetInnerHTML` to avoid a server/client escaping hydration
+  mismatch. Admins see the captured contacts at **Admin → Mailing list**
+  (`app/admin/mailing-list`, platform-admin only) — count, per-contact Email /
+  WhatsApp reach-out, Copy-all-emails / Email-all-BCC / CSV export
+  (`MailingListTools.tsx`). **Broadcast to them (`0064`):** "Mailing-list
+  subscribers" is an audience group in Admin → Emails — `newsletter_audience()`
+  unions the list in (de-duped by email; an account wins, an opted-out account
+  is never mailed even if listed), `mailing_list` got its own
+  `unsubscribe_token`/`unsubscribed_at` so each gets a working one-click
+  unsubscribe, and `unsubscribe_newsletter()` handles both. The group is
+  independent of the account-only "everyone"; the send-newsletter edge function
+  needed no change (it already tolerates a null `profile_id`).
 - **Multi-branch vendors (`0033`):** a vendor is the business (name, KYC,
   commission, one shared price list, one payout account, one `/v/<slug>`
   link); `branches` are its shop locations (address, hours, open switch). Every

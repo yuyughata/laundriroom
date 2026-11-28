@@ -60,7 +60,7 @@ export type RiderContact = {
   active: boolean; created_by: string | null; created_at: string; updated_at: string; last_used_at: string | null;
 }
 
-export type NewsletterGroup = "customers" | "vendor_managers" | "vendor_staff" | "team" | "everyone";
+export type NewsletterGroup = "customers" | "vendor_managers" | "vendor_staff" | "team" | "everyone" | "mailing_list";
 export type NewsletterAudience = { groups: NewsletterGroup[]; user_ids: string[] };
 export type Newsletter = {
   id: string; subject: string; preheader: string | null;

@@ -7,7 +7,7 @@ import { cleanNewsletterHtml, cleanUrl } from "@/lib/newsletterHtml";
 import type { NewsletterAudience, NewsletterGroup } from "@/lib/database.types";
 import { isEmailKind, type EmailKind } from "@/lib/emailKinds";
 
-const GROUPS: NewsletterGroup[] = ["customers", "vendor_managers", "vendor_staff", "team", "everyone"];
+const GROUPS: NewsletterGroup[] = ["customers", "vendor_managers", "vendor_staff", "team", "everyone", "mailing_list"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Email broadcasts (newsletters, promotions, announcements, updates) are for platform admins (also enforced by RLS). */
