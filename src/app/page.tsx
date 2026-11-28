@@ -852,7 +852,9 @@ export default async function Landing() {
   const body = cut === -1 ? markup : markup.slice(0, cut) + "</main>";
   const footer = cut === -1 ? "" : "<footer>" + markup.slice(cut + footerTag.length);
 
-  const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "2348000000000";
+  // laundriroom contact line (09021059882 → 234 902 105 9882). Override per
+  // environment with NEXT_PUBLIC_WHATSAPP_NUMBER (digits only, intl format).
+  const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "2349021059882";
 
   return (
     <>
