@@ -74,6 +74,17 @@ export function PromoDiscountFields({ p, showMinOrder = false }: { p?: PromoCode
           </div>
           <button type="button" className="btn-ghost mt-2 text-xs" onClick={addTier}>+ Add tier</button>
           <p className="mt-1 text-xs text-slate">The order gets the highest tier it reaches. Below the lowest minimum, the code gives no discount.</p>
+
+          <div className="mt-3 rounded-card border border-ink/15 bg-ivory/40 p-3">
+            <label className="label" htmlFor="lucky_use">🍀 Lucky win (optional)</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate">Every</span>
+              <input id="lucky_use" name="lucky_use" className="field w-24" inputMode="numeric" placeholder="e.g. 10"
+                defaultValue={p?.lucky_use ?? ""} />
+              <span className="text-xs text-slate">use of the code wins the <strong className="text-ink">top tier</strong> — even if the order is below the minimum.</span>
+            </div>
+            <p className="mt-1 text-xs text-slate">Leave blank to turn it off. Recurs: the 10th, 20th, 30th… order each win.</p>
+          </div>
         </div>
       )}
 
